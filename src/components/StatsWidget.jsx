@@ -14,7 +14,7 @@ function relativeTime(dateStr) {
 
 function StatCell({ icon: Icon, value, line1, line2, className = "" }) {
   return (
-    <div className={`bg-card p-5 flex items-center gap-4 ${className}`}>
+    <div className={`bg-secondary p-5 flex items-center gap-4 ${className}`}>
       <Icon className="w-5 h-5 text-muted-foreground shrink-0" strokeWidth={1.5} />
       <div className="min-w-0">
         <div className="text-2xl sm:text-3xl font-display font-light leading-none truncate">{value}</div>
