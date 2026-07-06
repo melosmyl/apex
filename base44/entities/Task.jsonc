@@ -39,6 +39,14 @@
     "delegated_back": {
       "type": "boolean",
       "default": false
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date"
     }
   },
   "required": [

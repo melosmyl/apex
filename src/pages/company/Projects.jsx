@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { FolderKanban, Plus } from "lucide-react";
+import { FolderKanban, Plus, LayoutGrid, GanttChart } from "lucide-react";
+import GanttTimeline from "@/components/projects/GanttTimeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,11 +18,14 @@ export default function Projects() {
   const { companyId } = useParams();
   const [items, setItems] = useState(null);
   const [advisors, setAdvisors] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [view, setView] = useState("board");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", timeline: "", executive_owner: "", status: "planning" });
 
   const load = () => base44.entities.Project.filter({ company_id: companyId }, "-created_date", 100).then(setItems);
-  useEffect(() => { load(); base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then(setAdvisors); }, [companyId]);
+  const loadTasks = () => base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200).then(setTasks);
+  useEffect(() => { load(); loadTasks(); base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then(setAdvisors); }, [companyId]);
 
   const create = async () => {
     if (!form.name.trim()) return;
@@ -38,20 +42,30 @@ export default function Projects() {
       {items === null ? <div className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />
         : items.length === 0 ? <EmptyState icon={FolderKanban} title="No projects yet" description="Create a project to organise objectives, owners and timelines." action={<Button onClick={() => setOpen(true)} className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> New project</Button>} />
         : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {items.map((p) => (
-            <div key={p.id} className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h3 className="font-display text-lg">{p.name}</h3>
-                <Badge variant="secondary" className={`capitalize shrink-0 ${STATUS[p.status]}`}>{p.status.replace("_", " ")}</Badge>
-              </div>
-              {p.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{p.description}</p>}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{p.executive_owner || "Unassigned"}</span><span>{p.timeline}</span>
-              </div>
+        <>
+          <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-full w-fit mb-6">
+            <button onClick={() => setView("board")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm transition-colors ${view === "board" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><LayoutGrid className="w-4 h-4" /> Board</button>
+            <button onClick={() => setView("timeline")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm transition-colors ${view === "timeline" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><GanttChart className="w-4 h-4" /> Timeline</button>
+          </div>
+          {view === "board" ? (
+            <div className="grid sm:grid-cols-2 gap-4">
+              {items.map((p) => (
+                <div key={p.id} className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h3 className="font-display text-lg">{p.name}</h3>
+                    <Badge variant="secondary" className={`capitalize shrink-0 ${STATUS[p.status]}`}>{p.status.replace("_", " ")}</Badge>
+                  </div>
+                  {p.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{p.description}</p>}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{p.executive_owner || "Unassigned"}</span><span>{p.timeline}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          ) : (
+            <GanttTimeline projects={items} tasks={tasks} onTasksChange={loadTasks} />
+          )}
+        </>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
