@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Geist:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -30,10 +30,10 @@
     --chart-4: 40 45% 60%;
     --chart-5: 10 40% 55%;
     --radius: 0.75rem;
-    --font-heading: "Fraunces", ui-serif, Georgia, serif;
-    --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Fraunces", ui-serif, Georgia, serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --font-heading: "Cormorant Garamond", ui-serif, Georgia, serif;
+    --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
+    --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -98,8 +98,6 @@
 }
 
 @layer utilities {
-  .font-acne { font-family: "Archivo", ui-sans-serif, system-ui, sans-serif; }
-  .font-acne h1, .font-acne h2, .font-acne h3, .font-acne h4 { font-family: "Archivo", ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.02em; }
   .fade-in { animation: fadeIn 0.6s ease both; }
   .rise-in { animation: riseIn 0.6s cubic-bezier(0.22,1,0.36,1) both; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
