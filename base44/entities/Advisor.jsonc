@@ -49,6 +49,17 @@
     },
     "accent": {
       "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "ai",
+        "human"
+      ],
+      "default": "ai"
+    },
+    "email": {
+      "type": "string"
     }
   },
   "required": [

@@ -3,11 +3,12 @@ import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Users, Trash2, Loader2 } from "lucide-react";
+import { UserPlus, Users, Trash2, Loader2, Mail } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import AddAdvisorDialog from "@/components/team/AddAdvisorDialog";
+import InvitePersonDialog from "@/components/team/InvitePersonDialog";
 import AdvisorProfileDialog from "@/components/team/AdvisorProfileDialog";
 
 export default function ExecutiveTeam() {
@@ -15,6 +16,7 @@ export default function ExecutiveTeam() {
   const [advisors, setAdvisors] = useState(null);
   const [subscriptions, setSubscriptions] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
   const load = async () => {
@@ -51,6 +53,12 @@ export default function ExecutiveTeam() {
     }
   };
 
+  const invitePerson = async ({ name, role, email }) => {
+    await base44.users.inviteUser(email, "user");
+    await base44.entities.Advisor.create({ company_id: companyId, type: "human", name, role, email, biography: "Invited team member." });
+    await load();
+  };
+
   const remove = async (advisor) => {
     const sub = subFor(advisor.id);
     if (sub && sub.status === "active" && sub.subscription_id) {
@@ -66,16 +74,19 @@ export default function ExecutiveTeam() {
   return (
     <div>
       <PageHeader eyebrow="The heart of the platform" title="Executive Team"
-        description="Assemble a team of specialist AI advisors. Your first two are free — each additional advisor is £9/month.">
-        <Button onClick={() => setAddOpen(true)} className="rounded-full px-5"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
+        description="Assemble your executive team — add specialist AI advisors or invite real collaborators. Your first two AI advisors are free, then £9/month each.">
+        <div className="flex gap-2">
+          <Button onClick={() => setAddOpen(true)} className="rounded-full px-5"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
+          <Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
+        </div>
       </PageHeader>
 
       {advisors === null ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{[0,1,2].map(i => <div key={i} className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />)}</div>
       ) : advisors.length === 0 ? (
         <EmptyState icon={Users} title="Your boardroom is empty"
-          description="Invite advisors from the library to build your executive team. Your first two are free."
-          action={<Button onClick={() => setAddOpen(true)} className="rounded-full px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite your first advisor</Button>} />
+          description="Invite AI advisors from the library or bring in real collaborators to build your executive team."
+          action={<div className="flex gap-2 justify-center"><Button onClick={() => setAddOpen(true)} className="rounded-full px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button><Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-6"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button></div>} />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {advisors.map((a) => {
@@ -92,6 +103,7 @@ export default function ExecutiveTeam() {
                   <h3 className="font-display text-lg">{a.name}</h3>
                   {isPending && <Badge variant="outline" className="text-[10px] font-normal bg-amber-50 text-amber-700 border-amber-200"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Activating</Badge>}
                   {isActive && <Badge variant="outline" className="text-[10px] font-normal">£9/mo</Badge>}
+                  {a.type === "human" && <Badge variant="secondary" className="text-[10px] font-normal">Member</Badge>}
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">{a.role}</p>
                 <p className="text-xs text-muted-foreground line-clamp-2">{a.biography}</p>
@@ -102,6 +114,7 @@ export default function ExecutiveTeam() {
       )}
 
       <AddAdvisorDialog open={addOpen} onOpenChange={setAddOpen} existingKeys={existingKeys} onAdd={addAdvisor} requiresPayment={requiresPayment} />
+      <InvitePersonDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={invitePerson} />
       <AdvisorProfileDialog advisor={selected} open={!!selected} onOpenChange={(o) => !o && setSelected(null)}
         onAction={remove} actionLabel="Remove from team" actionVariant="destructive" />
     </div>
