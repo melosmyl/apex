@@ -14,7 +14,7 @@ function relativeTime(dateStr) {
 
 function StatCell({ icon: Icon, value, line1, line2, className = "" }) {
   return (
-    <div className={`bg-secondary p-5 flex items-center gap-4 ${className}`}>
+    <div className={`bg-card p-5 flex items-center gap-4 ${className}`}>
       <Icon className="w-5 h-5 text-muted-foreground shrink-0" strokeWidth={1.5} />
       <div className="min-w-0">
         <div className="text-2xl sm:text-3xl font-display font-light leading-none truncate">{value}</div>
@@ -56,7 +56,7 @@ export default function StatsWidget({ decisions = [], meetings = [], tasks = [] 
   return (
     <div className="mb-8 rise-in">
       <div className="rounded-2xl border border-border overflow-hidden">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px bg-border">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px bg-muted-foreground/30">
           <StatCell icon={Scale} value={decisionsWaiting} line1="Decisions" line2="Waiting" />
           <StatCell icon={CheckCircle2} value={tasksCompletedOvernight} line1="Tasks Completed" line2="Overnight" />
           <StatCell icon={Calendar} value={meetingValue} line1="Last Board Meeting" line2={relativeTime(lastMeeting?.created_date)} />
