@@ -5,7 +5,7 @@ import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Check } from "lucide-react";
 
-export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = [], onAdd }) {
+export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = [], onAdd, requiresPayment = false }) {
   const [adding, setAdding] = useState(null);
 
   const add = async (lib) => {
@@ -19,7 +19,12 @@ export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = []
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl font-light">Invite an advisor</DialogTitle>
-          <p className="text-sm text-muted-foreground">Choose a specialist to join your executive team.</p>
+          <p className="text-sm text-muted-foreground">
+            Choose a specialist to join your executive team.
+            {requiresPayment
+              ? " You've used your two free advisors — additional advisors are £9/month each."
+              : " Your first two advisors are included free."}
+          </p>
         </DialogHeader>
         <div className="grid sm:grid-cols-2 gap-3 pt-2">
           {ADVISOR_LIBRARY.map((a) => {
@@ -34,7 +39,9 @@ export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = []
                 {on ? (
                   <span className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Added</span>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={() => add(a)} disabled={adding === a.key}>{adding === a.key ? "…" : "Invite"}</Button>
+                  <Button size="sm" variant="outline" onClick={() => add(a)} disabled={adding === a.key}>
+                    {adding === a.key ? "…" : requiresPayment ? "Add · £9/mo" : "Invite"}
+                  </Button>
                 )}
               </div>
             );

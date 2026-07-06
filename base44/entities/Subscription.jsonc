@@ -1,0 +1,38 @@
+{
+  "name": "Subscription",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "advisor_id": {
+      "type": "string"
+    },
+    "advisor_name": {
+      "type": "string"
+    },
+    "checkout_id": {
+      "type": "string"
+    },
+    "subscription_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "active",
+        "canceled"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "company_id",
+    "advisor_id",
+    "checkout_id"
+  ]
+}
