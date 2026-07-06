@@ -39,7 +39,6 @@ export default function Companies() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
-        <HealthWidget />
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10 fade-in">
           <div>
             <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-3">
@@ -55,6 +54,8 @@ export default function Companies() {
             }
           </div>
         </div>
+
+        <HealthWidget />
 
         {companies === null ?
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
