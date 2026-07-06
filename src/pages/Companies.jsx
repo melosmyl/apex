@@ -60,7 +60,7 @@ export default function Companies() {
           <div className="flex gap-2 items-center">
             <Link to="/pricing"><Button variant="ghost" className="rounded-full">Pricing</Button></Link>
             {companies?.length > 0 &&
-            <Button onClick={() => setDialog(true)} className="px-5 rounded-full"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
+            <Button onClick={() => setDialog(true)} className="px-5 rounded-full bg-[#187221]"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
             }
           </div>
         </div>
