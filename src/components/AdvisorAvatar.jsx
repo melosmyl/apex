@@ -7,7 +7,7 @@ const SIZES = { sm: "w-9 h-9 text-xs", md: "w-12 h-12 text-sm", lg: "w-16 h-16 t
 export default function AdvisorAvatar({ name, accent = "#7a5c3e", photo_url, size = "md", className = "" }) {
   const libraryAdvisor = ADVISOR_LIBRARY.find((a) => a.name === name);
   const ringShadow = libraryAdvisor
-    ? `0 0 0 2px ${accent}, 0 1px 3px rgba(0,0,0,0.08)`
+    ? `0 0 0 2px #4a90d9, 0 1px 3px rgba(0,0,0,0.08)`
     : photo_url
       ? `0 0 0 1px rgba(0,0,0,0.06)`
       : `0 1px 2px rgba(0,0,0,0.08)`;
