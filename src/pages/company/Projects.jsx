@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { FolderKanban, Plus, LayoutGrid, GanttChart } from "lucide-react";
+import { FolderKanban, Plus, LayoutGrid, GanttChart, KanbanSquare } from "lucide-react";
 import GanttTimeline from "@/components/projects/GanttTimeline";
+import ProjectKanban from "@/components/projects/ProjectKanban";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +47,7 @@ export default function Projects() {
           <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-full w-fit mb-6">
             <button onClick={() => setView("board")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm transition-colors ${view === "board" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><LayoutGrid className="w-4 h-4" /> Board</button>
             <button onClick={() => setView("timeline")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm transition-colors ${view === "timeline" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><GanttChart className="w-4 h-4" /> Timeline</button>
+            <button onClick={() => setView("kanban")} className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm transition-colors ${view === "kanban" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><KanbanSquare className="w-4 h-4" /> Kanban</button>
           </div>
           {view === "board" ? (
             <div className="grid sm:grid-cols-2 gap-4">
@@ -62,8 +64,10 @@ export default function Projects() {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : view === "timeline" ? (
             <GanttTimeline projects={items} tasks={tasks} onTasksChange={loadTasks} />
+          ) : (
+            <ProjectKanban projects={items} tasks={tasks} onTasksChange={loadTasks} />
           )}
         </>
       )}
