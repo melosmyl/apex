@@ -3,7 +3,7 @@ import DocumentLibrary from "@/components/documents/DocumentLibrary";
 
 export default function Documents() {
   return (
-    <DocumentLibrary kind="document"
+    <DocumentLibrary kind="document" allowFiles
       eyebrow="Built-in document management"
       title="Documents"
       description="Business plans, decks, strategies and contracts — kept in one elegant place."
