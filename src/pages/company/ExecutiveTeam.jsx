@@ -83,7 +83,7 @@ export default function ExecutiveTeam() {
       <PageHeader eyebrow="The heart of the platform" title="Executive Team"
       description="Assemble your executive team — add specialist AI advisors or invite real collaborators. Your first two AI advisors are free, then £9/month each.">
         <div className="flex gap-2">
-          <Button onClick={() => setAddOpen(true)} className="rounded-full px-5 bg-[#417a24]"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
+          <Button onClick={() => setAddOpen(true)} className="rounded-full px-5 bg-[#3b6e21]"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
           <Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
         </div>
       </PageHeader>
