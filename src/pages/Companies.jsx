@@ -41,7 +41,7 @@ export default function Companies() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10 fade-in">
           <div>
             <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-3">
-              {user ? `Welcome, ${user.full_name?.split(" ")[0] || "Founder"}` : "\u00A0"}
+              {user ? `${(() => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; })()}, ${user.full_name?.split(" ")[0] || "Founder"}` : "\u00A0"}
             </div>
             <h1 className="text-4xl sm:text-5xl font-light">My Companies</h1>
             <p className="text-muted-foreground mt-3 font-display italic text-lg">Never build alone.</p>
