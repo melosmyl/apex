@@ -26,6 +26,16 @@
         "done"
       ],
       "default": "todo"
+    },
+    "deliverable": {
+      "type": "string"
+    },
+    "blocker": {
+      "type": "string"
+    },
+    "delegated_back": {
+      "type": "boolean",
+      "default": false
     }
   },
   "required": [

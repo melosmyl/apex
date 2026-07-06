@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { CheckSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
-import AdvisorAvatar from "@/components/AdvisorAvatar";
+import TaskCard from "@/components/tasks/TaskCard";
+import { executeTask } from "@/lib/taskExecution";
 
 const COLUMNS = [
   { key: "todo", label: "To Do" },
@@ -19,9 +20,11 @@ const COLUMNS = [
 
 export default function Tasks() {
   const { companyId } = useParams();
+  const { company } = useOutletContext();
   const [items, setItems] = useState(null);
   const [advisors, setAdvisors] = useState([]);
   const [open, setOpen] = useState(false);
+  const [executingId, setExecutingId] = useState(null);
   const [form, setForm] = useState({ title: "", assigned_to: "" });
 
   const load = () => base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200).then(setItems);
@@ -33,8 +36,33 @@ export default function Tasks() {
     setForm({ title: "", assigned_to: "" }); setOpen(false); load();
   };
 
-  const move = async (task, status) => { await base44.entities.Task.update(task.id, { status }); load(); };
-  const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
+  const move = async (task, dir) => {
+    const idx = COLUMNS.findIndex((c) => c.key === task.status);
+    const next = dir === "forward" ? COLUMNS[idx + 1]?.key : COLUMNS[idx - 1]?.key;
+    if (!next) return;
+    await base44.entities.Task.update(task.id, { status: next }); load();
+  };
+
+  const execute = async (task) => {
+    const advisor = advisors.find((a) => a.name === task.assigned_to);
+    if (!advisor) return;
+    setExecutingId(task.id);
+    try {
+      const res = await executeTask({ advisor, task, company });
+      if (res.outcome === "completed") {
+        await base44.entities.Task.update(task.id, { status: "done", deliverable: res.deliverable, delegated_back: false });
+      } else {
+        await base44.entities.Task.update(task.id, { delegated_back: true, blocker: res.blocker, assigned_to: "Founder", status: "todo" });
+      }
+      load();
+    } finally {
+      setExecutingId(null);
+    }
+  };
+
+  const completeForFounder = async (task) => {
+    await base44.entities.Task.update(task.id, { status: "done" }); load();
+  };
 
   return (
     <div>
@@ -54,21 +82,19 @@ export default function Tasks() {
                   <span className="text-xs text-muted-foreground">{colItems.length}</span>
                 </div>
                 <div className="space-y-2 min-h-[40px]">
-                  {colItems.map((t) => {
-                    const idx = COLUMNS.findIndex((c) => c.key === col.key);
-                    return (
-                      <div key={t.id} className="bg-card border border-border/70 rounded-xl p-3 rise-in">
-                        <p className="text-sm leading-snug mb-2">{t.title}</p>
-                        <div className="flex items-center justify-between">
-                          {t.assigned_to ? <div className="flex items-center gap-1.5"><AdvisorAvatar name={t.assigned_to} accent={accentOf(t.assigned_to)} size="sm" /><span className="text-[11px] text-muted-foreground truncate max-w-[70px]">{t.assigned_to.split(" ")[0]}</span></div> : <span className="text-[11px] text-muted-foreground">Unassigned</span>}
-                          <div className="flex gap-1">
-                            {idx > 0 && <button onClick={() => move(t, COLUMNS[idx-1].key)} className="text-xs text-muted-foreground hover:text-foreground px-1">‹</button>}
-                            {idx < COLUMNS.length-1 && <button onClick={() => move(t, COLUMNS[idx+1].key)} className="text-xs text-muted-foreground hover:text-foreground px-1">›</button>}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {colItems.map((t) => (
+                    <TaskCard
+                      key={t.id}
+                      task={t}
+                      advisors={advisors}
+                      executing={executingId === t.id}
+                      onExecute={execute}
+                      onCompleteFounder={completeForFounder}
+                      onMove={move}
+                      canBack={COLUMNS.findIndex((c) => c.key === col.key) > 0}
+                      canForward={COLUMNS.findIndex((c) => c.key === col.key) < COLUMNS.length - 1}
+                    />
+                  ))}
                 </div>
               </div>
             );
