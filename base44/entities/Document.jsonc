@@ -1,0 +1,43 @@
+{
+  "name": "Document",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Business Plan",
+        "Pitch Deck",
+        "Financials",
+        "Brand Guidelines",
+        "Customer Personas",
+        "Competitor Research",
+        "Marketing",
+        "Contract",
+        "Other"
+      ],
+      "default": "Other"
+    },
+    "content": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "knowledge",
+        "document",
+        "research"
+      ],
+      "default": "document"
+    }
+  },
+  "required": [
+    "company_id",
+    "title"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "name": "Advisor",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "library_key": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "biography": {
+      "type": "string"
+    },
+    "decision_style": {
+      "type": "string"
+    },
+    "communication_style": {
+      "type": "string"
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "weaknesses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expertise": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "personality_traits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "accent": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "name",
+    "role"
+  ]
+}

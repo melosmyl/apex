@@ -1,0 +1,58 @@
+{
+  "name": "Decision",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "meeting_id": {
+      "type": "string"
+    },
+    "question": {
+      "type": "string"
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "type": "string"
+    },
+    "final_recommendation": {
+      "type": "string"
+    },
+    "decision_taken": {
+      "type": "string"
+    },
+    "reasoning": {
+      "type": "string"
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence_level": {
+      "type": "number"
+    },
+    "outcome_review": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "decided",
+        "reviewed"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "company_id",
+    "question"
+  ]
+}

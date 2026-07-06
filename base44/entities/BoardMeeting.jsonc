@@ -1,0 +1,86 @@
+{
+  "name": "BoardMeeting",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "question": {
+      "type": "string"
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "discussion": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "advisor": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "stance": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "executive_summary": {
+      "type": "string"
+    },
+    "recommendation": {
+      "type": "string"
+    },
+    "confidence_score": {
+      "type": "number"
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "minority_opinion": {
+      "type": "string"
+    },
+    "alternative_strategies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assigned_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "assigned_to": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "company_id",
+    "question"
+  ]
+}

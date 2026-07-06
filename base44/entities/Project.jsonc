@@ -1,0 +1,41 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "objectives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "timeline": {
+      "type": "string"
+    },
+    "executive_owner": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "planning",
+        "active",
+        "on_hold",
+        "completed"
+      ],
+      "default": "planning"
+    }
+  },
+  "required": [
+    "company_id",
+    "name"
+  ]
+}
