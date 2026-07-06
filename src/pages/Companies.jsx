@@ -41,10 +41,10 @@ export default function Companies() {
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10 fade-in">
           <div>
-            <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-3">
+            <div className="text-4xl sm:text-5xl font-light font-display mb-3">
               {user ? `${(() => {const h = new Date().getHours();return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";})()}, ${user.full_name?.split(" ")[0] || "there"}` : "\u00A0"}
             </div>
-            <h1 className="text-4xl sm:text-5xl font-light">Executive Briefing</h1>
+            <h1 className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-body">Executive Briefing</h1>
             <p className="text-muted-foreground mt-3 font-display italic text-lg">Never build alone.</p>
           </div>
           <div className="flex gap-2 items-center">
