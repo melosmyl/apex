@@ -43,7 +43,7 @@ export default function Companies() {
             <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-3">
               {user ? `${(() => {const h = new Date().getHours();return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";})()}, ${user.full_name?.split(" ")[0] || "there"}` : "\u00A0"}
             </div>
-            <h1 className="text-4xl sm:text-5xl font-light">Create our next venture</h1>
+            <h1 className="text-4xl sm:text-5xl font-light">Create Your </h1>
             <p className="text-muted-foreground mt-3 font-display italic text-lg">Never build alone.</p>
           </div>
           <div className="flex gap-2 items-center">
