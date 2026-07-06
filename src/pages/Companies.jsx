@@ -6,6 +6,7 @@ import { Plus, Building2 } from "lucide-react";
 import CompanyCard from "@/components/companies/CompanyCard";
 import CreateCompanyDialog from "@/components/companies/CreateCompanyDialog";
 import EmptyState from "@/components/EmptyState";
+import HealthWidget from "@/components/HealthWidget";
 
 export default function Companies() {
   const [companies, setCompanies] = useState(null);
@@ -53,6 +54,8 @@ export default function Companies() {
             }
           </div>
         </div>
+
+        <HealthWidget />
 
         {companies === null ?
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
