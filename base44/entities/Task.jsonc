@@ -5,6 +5,9 @@
     "company_id": {
       "type": "string"
     },
+    "project_id": {
+      "type": "string"
+    },
     "title": {
       "type": "string"
     },

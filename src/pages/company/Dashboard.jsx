@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useOutletContext, useNavigate, useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Scale, Target, CheckSquare, FileText, Landmark, TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react";
+import ProjectProgress from "@/components/dashboard/ProjectProgress";
 
 function Card({ title, icon: Icon, children, onView }) {
   return (
@@ -65,6 +66,8 @@ export default function Dashboard() {
           })}
         </div>
       )}
+
+      <ProjectProgress companyId={companyId} onNavigate={() => go("projects")} />
 
       <div className="grid lg:grid-cols-2 gap-5">
         <Card title="Recent Board Decisions" icon={Scale} onView={() => go("decisions")}>

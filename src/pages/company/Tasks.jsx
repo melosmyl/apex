@@ -23,17 +23,18 @@ export default function Tasks() {
   const { company } = useOutletContext();
   const [items, setItems] = useState(null);
   const [advisors, setAdvisors] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [open, setOpen] = useState(false);
   const [executingId, setExecutingId] = useState(null);
-  const [form, setForm] = useState({ title: "", assigned_to: "" });
+  const [form, setForm] = useState({ title: "", assigned_to: "", project_id: "" });
 
   const load = () => base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200).then(setItems);
-  useEffect(() => { load(); base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then(setAdvisors); }, [companyId]);
+  useEffect(() => { load(); base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then(setAdvisors); base44.entities.Project.filter({ company_id: companyId }, "-created_date", 100).then(setProjects); }, [companyId]);
 
   const create = async () => {
     if (!form.title.trim()) return;
-    await base44.entities.Task.create({ company_id: companyId, title: form.title, assigned_to: form.assigned_to, created_by: "Founder", status: "todo" });
-    setForm({ title: "", assigned_to: "" }); setOpen(false); load();
+    await base44.entities.Task.create({ company_id: companyId, title: form.title, assigned_to: form.assigned_to, project_id: form.project_id || undefined, created_by: "Founder", status: "todo" });
+    setForm({ title: "", assigned_to: "", project_id: "" }); setOpen(false); load();
   };
 
   const move = async (task, dir) => {
@@ -110,6 +111,11 @@ export default function Tasks() {
             <div><Label className="mb-1.5 block">Assign to</Label>
               <select value={form.assigned_to} onChange={(e)=>setForm(f=>({...f,assigned_to:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">Unassigned</option>{advisors.map(a=><option key={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            <div><Label className="mb-1.5 block">Project</Label>
+              <select value={form.project_id} onChange={(e)=>setForm(f=>({...f,project_id:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="">None</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="flex justify-end gap-2"><Button variant="ghost" onClick={()=>setOpen(false)}>Cancel</Button><Button onClick={create} disabled={!form.title.trim()}>Create</Button></div>
