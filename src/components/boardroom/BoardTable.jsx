@@ -8,7 +8,15 @@ export default function BoardTable({ advisors, activeName, selectedIds = [], onT
   const isSelected = (a) => selectedIds.includes(a.id);
   return (
     <div className="relative w-full max-w-2xl mx-auto aspect-[4/3]">
-      <div className="absolute inset-[16%] rounded-[45%] bg-gradient-to-b from-[#6b5540] to-[#4a3a2c] shadow-inner border-4 border-[#5c4a38]" />
+      <div className="absolute inset-[16%] rounded-[45%] shadow-inner border-4 border-[#5c4a38]"
+        style={{
+          backgroundColor: "#6b4e2e",
+          backgroundImage: [
+            "repeating-linear-gradient(90deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0.04) 4px, rgba(0,0,0,0) 7px)",
+            "repeating-linear-gradient(93deg, rgba(255,220,180,0.07) 0px, transparent 9px, rgba(80,50,20,0.10) 18px, transparent 27px)",
+            "linear-gradient(112deg, #7a5a34 0%, #5c4225 40%, #6e4f2c 72%, #4f371d 100%)",
+          ],
+        }} />
       <div className="absolute inset-[19%] rounded-[45%] border border-white/10" />
 
       {/* Founder at head */}
