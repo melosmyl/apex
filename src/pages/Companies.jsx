@@ -64,7 +64,7 @@ export default function Companies() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {companies.map((c) => (
-              <div key={c.id} className="rise-in"><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} /></div>
+              <div key={c.id} className="rise-in h-full"><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} /></div>
             ))}
           </div>
         )}
