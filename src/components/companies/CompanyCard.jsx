@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
+import { getAdvisorByKey } from "@/lib/advisorLibrary";
 
 const STATUS_TIERS = [
   { min: 80, label: "EXCELLENT", color: "#1B4332" },
@@ -80,9 +81,10 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
       <div className="mb-5">
         <div className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">Executive Team</div>
         <div className="flex items-center gap-1.5">
-          {team.length > 0 ? team.map((a) => (
-            <AdvisorAvatar key={a.id} name={a.name} accent={a.accent || "#7a5c3e"} size="sm" />
-          )) : <span className="text-sm text-muted-foreground italic">No advisors yet</span>}
+          {team.length > 0 ? team.map((a) => {
+            const lib = a.library_key ? getAdvisorByKey(a.library_key) : null;
+            return <AdvisorAvatar key={a.id} name={a.name} accent={a.accent || lib?.accent || "#7a5c3e"} photo_url={a.photo_url || lib?.photo_url} size="sm" />;
+          }) : <span className="text-sm text-muted-foreground italic">No advisors yet</span>}
           {extra > 0 && (
             <div className="w-9 h-9 rounded-full bg-secondary text-muted-foreground flex items-center justify-center text-xs font-medium border border-border">+{extra}</div>
           )}
