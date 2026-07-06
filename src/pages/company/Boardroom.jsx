@@ -21,6 +21,8 @@ export default function Boardroom() {
   const { company } = useOutletContext();
   const navigate = useNavigate();
   const [advisors, setAdvisors] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(null);
+  const [hasInteracted, setHasInteracted] = useState(false);
   const [question, setQuestion] = useState("");
   const [phase, setPhase] = useState("idle"); // idle | thinking | result
   const [activeName, setActiveName] = useState(null);
@@ -28,25 +30,38 @@ export default function Boardroom() {
   const [savedMeeting, setSavedMeeting] = useState(null);
   const [recording, setRecording] = useState(false);
 
-  useEffect(() => { base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then(setAdvisors); }, [companyId]);
+  useEffect(() => { base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then((advs) => { setAdvisors(advs); setSelectedIds(advs.map((a) => a.id)); }); }, [companyId]);
 
   useEffect(() => {
     if (phase !== "thinking" || !advisors?.length) return;
+    const participants = advisors.filter((a) => selectedIds?.includes(a.id));
+    if (!participants.length) return;
     let i = 0;
-    const t = setInterval(() => { setActiveName(advisors[i % advisors.length].name); i++; }, 900);
+    const t = setInterval(() => { setActiveName(participants[i % participants.length].name); i++; }, 900);
     return () => clearInterval(t);
-  }, [phase, advisors]);
+  }, [phase, advisors, selectedIds]);
+
+  const toggleAdvisor = (a) => {
+    if (!hasInteracted) {
+      setSelectedIds([a.id]);
+      setHasInteracted(true);
+    } else {
+      setSelectedIds((prev) => prev.includes(a.id) ? prev.filter((id) => id !== a.id) : [...prev, a.id]);
+    }
+  };
 
   const start = async () => {
     if (!question.trim()) return;
+    const participants = advisors.filter((a) => selectedIds?.includes(a.id));
+    if (!participants.length) return;
     setPhase("thinking");
     setResult(null); setSavedMeeting(null);
     try {
       const knowledge = await base44.entities.Document.filter({ company_id: companyId, kind: "knowledge" }, "-created_date", 20);
-      const res = await convene({ company, advisors, question, knowledge });
+      const res = await convene({ company, advisors: participants, question, knowledge });
       const meeting = await base44.entities.BoardMeeting.create({
         company_id: companyId, question,
-        participants: advisors.map((a) => a.name),
+        participants: participants.map((a) => a.name),
         discussion: res.discussion || [],
         executive_summary: res.executive_summary, recommendation: res.recommendation,
         confidence_score: res.confidence_score, risks: res.risks || [],
@@ -66,9 +81,10 @@ export default function Boardroom() {
 
   const recordDecision = async () => {
     setRecording(true);
+    const participants = advisors.filter((a) => selectedIds?.includes(a.id));
     const d = await base44.entities.Decision.create({
       company_id: companyId, meeting_id: savedMeeting?.id, question,
-      participants: advisors.map((a) => a.name), summary: result.executive_summary,
+      participants: participants.map((a) => a.name), summary: result.executive_summary,
       final_recommendation: result.recommendation, risks: result.risks || [],
       confidence_level: result.confidence_score, status: "pending",
     });
@@ -95,7 +111,10 @@ export default function Boardroom() {
 
       {phase !== "result" && (
         <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
-          <BoardTable advisors={advisors} activeName={activeName} />
+          <BoardTable advisors={advisors} activeName={activeName} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            {selectedIds?.length || 0} attending · Click a member to choose who joins — the whole board is present by default.
+          </p>
           <div className="max-w-xl mx-auto mt-8">
             {phase === "thinking" ? (
               <div className="text-center py-4">
@@ -114,7 +133,7 @@ export default function Boardroom() {
                     <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
                   ))}
                 </div>
-                <Button onClick={start} disabled={!question.trim()} className="w-full mt-4 rounded-full h-11">
+                <Button onClick={start} disabled={!question.trim() || !selectedIds?.length} className="w-full mt-4 rounded-full h-11">
                   <Landmark className="w-4 h-4 mr-2" /> Convene the board
                 </Button>
               </>
@@ -129,7 +148,7 @@ export default function Boardroom() {
             <p className="font-display text-xl max-w-2xl">"{question}"</p>
             <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); }}>New question</Button>
           </div>
-          <MeetingResult result={result} advisors={advisors} onRecordDecision={recordDecision} recording={recording} />
+          <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id))} onRecordDecision={recordDecision} recording={recording} />
         </div>
       )}
     </div>
