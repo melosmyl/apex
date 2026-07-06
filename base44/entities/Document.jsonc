@@ -34,6 +34,12 @@
         "research"
       ],
       "default": "document"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "file_name": {
+      "type": "string"
     }
   },
   "required": [
