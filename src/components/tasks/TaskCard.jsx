@@ -9,8 +9,8 @@ export default function TaskCard({ task, advisors, executing, onExecute, onCompl
   const isDelegated = task.delegated_back;
   const isDone = task.status === "done";
   const isFounderTask = task.assigned_to === "Founder";
-  const canExecute = advisor && !isDone && !isDelegated && !executing;
-  const canComplete = !isDone && (isDelegated || isFounderTask);
+  const canExecute = advisor && !isDone && !isDelegated && !executing && task.status !== "review";
+  const canComplete = !isDone && (isDelegated || isFounderTask || task.status === "review");
 
   return (
     <div className={`bg-card border rounded-xl p-3 rise-in ${isDelegated ? "border-amber-300 bg-amber-50/40" : "border-border/70"}`}>

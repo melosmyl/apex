@@ -48,10 +48,12 @@ export default function Tasks() {
     const advisor = advisors.find((a) => a.name === task.assigned_to);
     if (!advisor) return;
     setExecutingId(task.id);
+    await base44.entities.Task.update(task.id, { status: "in_progress", delegated_back: false });
+    load();
     try {
       const res = await executeTask({ advisor, task, company });
       if (res.outcome === "completed") {
-        await base44.entities.Task.update(task.id, { status: "done", deliverable: res.deliverable, delegated_back: false });
+        await base44.entities.Task.update(task.id, { status: "review", deliverable: res.deliverable, delegated_back: false });
       } else {
         await base44.entities.Task.update(task.id, { delegated_back: true, blocker: res.blocker, assigned_to: "Founder", status: "todo" });
       }
