@@ -10,7 +10,7 @@ export default function CompanyCard({ company, stats }) {
       className="group text-left bg-card border border-border/70 rounded-2xl p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full min-h-[20rem]">
       
       <div className="flex items-start justify-between mb-5">
-        <div className="w-14 h-14 rounded-2xl text-primary-foreground flex items-center justify-center font-display text-2xl overflow-hidden bg-[#d08d11]">
+        <div className="w-14 h-14 rounded-2xl text-primary-foreground flex items-center justify-center font-display text-2xl overflow-hidden bg-[#e9a62b]">
           {company.logo_url ? <img src={company.logo_url} alt="" className="w-full h-full object-cover" /> : company.name?.[0]}
         </div>
         <ArrowUpRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 -translate-x-1 transition-all" />
