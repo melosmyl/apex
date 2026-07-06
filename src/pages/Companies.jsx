@@ -35,7 +35,7 @@ export default function Companies() {
   useEffect(() => { load(); }, []);
 
   return (
-    <div className="min-h-screen bg-background font-acne">
+    <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10 fade-in">
           <div>
