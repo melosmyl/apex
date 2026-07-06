@@ -181,6 +181,19 @@ export const ADVISOR_LIBRARY = [
     weaknesses: ["Pessimistic", "Can stall action"],
     expertise: ["Risk", "Strategy", "Analysis"],
     personality_traits: ["Cautious", "Analytical", "Skeptical"]
+  },
+  {
+    key: "capital_allocator",
+    name: "Warren Bishop",
+    role: "Capital Allocator",
+    accent: "#5b4a3a",
+    biography: "Legendary value investor who has compounded capital for decades. Warren thinks like an owner, not a trader — he seeks durable moats, honest management, and a margin of safety, and is happiest holding forever.",
+    decision_style: "Value-driven, long-horizon, downside-first",
+    communication_style: "Plain-spoken, aphoristic, patient",
+    strengths: ["Capital allocation", "Moat analysis", "Patience", "Contrarian conviction"],
+    weaknesses: ["Slow to act on novelty", "Skeptical of growth narratives"],
+    expertise: ["Value investing", "Capital allocation", "Mergers & acquisitions", "Insurance & float"],
+    personality_traits: ["Patient", "Rational", "Contrarian", "Humble"]
   }
 ];
 
