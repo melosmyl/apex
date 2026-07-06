@@ -45,7 +45,7 @@ const TIERS = [
     tagline: "For larger organisations.",
     features: ["Private models", "Security & compliance", "Custom advisors", "Integrations", "Dedicated support"],
     cta: "Contact sales",
-    href: "mailto:?subject=Advisory — Enterprise Plan",
+    href: "mailto:melody.m.p.j@icloud.com?subject=Advisory — Enterprise Plan",
     highlight: false,
   },
 ];
