@@ -7,22 +7,30 @@ import CompanyCard from "@/components/companies/CompanyCard";
 import CreateCompanyDialog from "@/components/companies/CreateCompanyDialog";
 import EmptyState from "@/components/EmptyState";
 import HealthWidget from "@/components/HealthWidget";
+import StatsWidget from "@/components/StatsWidget";
 
 export default function Companies() {
   const [companies, setCompanies] = useState(null);
   const [stats, setStats] = useState({});
   const [user, setUser] = useState(null);
   const [dialog, setDialog] = useState(false);
+  const [meetings, setMeetings] = useState([]);
+  const [decisions, setDecisions] = useState([]);
+  const [tasks, setTasks] = useState([]);
 
   const load = async () => {
     const [me, list] = await Promise.all([base44.auth.me(), base44.entities.Company.list("-created_date")]);
     setUser(me);
     setCompanies(list);
-    const [advisors, meetings, decisions] = await Promise.all([
+    const [advisors, meetings, decisions, tasksList] = await Promise.all([
     base44.entities.Advisor.list("-created_date", 500),
     base44.entities.BoardMeeting.list("-created_date", 500),
-    base44.entities.Decision.list("-created_date", 500)]
+    base44.entities.Decision.list("-created_date", 500),
+    base44.entities.Task.list("-updated_date", 500)]
     );
+    setMeetings(meetings);
+    setDecisions(decisions);
+    setTasks(tasksList);
     const s = {};
     list.forEach((c) => {
       s[c.id] = {
@@ -55,6 +63,7 @@ export default function Companies() {
           </div>
         </div>
 
+        <StatsWidget decisions={decisions} meetings={meetings} tasks={tasks} />
         <HealthWidget />
 
         {companies === null ?
