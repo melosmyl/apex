@@ -33,8 +33,10 @@ export default function Companies() {
     setTasks(tasksList);
     const s = {};
     list.forEach((c) => {
+      const companyAdvisors = advisors.filter((a) => a.company_id === c.id);
       s[c.id] = {
-        advisors: advisors.filter((a) => a.company_id === c.id).length,
+        advisors: companyAdvisors.length,
+        advisorList: companyAdvisors,
         meetings: meetings.filter((m) => m.company_id === c.id).length,
         decisions: decisions.filter((d) => d.company_id === c.id).length
       };
@@ -78,9 +80,9 @@ export default function Companies() {
           action={<Button onClick={() => setDialog(true)} className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :
 
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-5">
             {companies.map((c) =>
-          <div key={c.id} className="rise-in h-full"><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} /></div>
+          <div key={c.id} className="rise-in h-full"><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} advisors={stats[c.id]?.advisorList || []} /></div>
           )}
           </div>
         }
