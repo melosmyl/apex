@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Plus, Building2 } from "lucide-react";
@@ -45,9 +46,12 @@ export default function Companies() {
             <h1 className="text-4xl sm:text-5xl font-light">My Companies</h1>
             <p className="text-muted-foreground mt-3 font-display italic text-lg">Never build alone.</p>
           </div>
-          {companies?.length > 0 &&
-          <Button onClick={() => setDialog(true)} className="px-5 rounded-full"><Plus className="w-4 h-4 mr-1.5" /> New company</Button>
-          }
+          <div className="flex gap-2 items-center">
+            <Link to="/pricing"><Button variant="ghost" className="rounded-full">Pricing</Button></Link>
+            {companies?.length > 0 &&
+            <Button onClick={() => setDialog(true)} className="px-5 rounded-full"><Plus className="w-4 h-4 mr-1.5" /> New company</Button>
+            }
+          </div>
         </div>
 
         {companies === null ?

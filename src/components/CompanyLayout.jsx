@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Outlet, useParams, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useParams, NavLink, useNavigate, useLocation, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import {
   LayoutDashboard, Users, Landmark, FolderKanban, CheckSquare, BookOpen,
@@ -65,8 +65,9 @@ export default function CompanyLayout() {
           </NavLink>
         ))}
       </nav>
-      <div className="px-6 py-4 border-t border-border/60 text-xs text-muted-foreground font-display italic">
-        Never build alone.
+      <div className="px-6 py-4 border-t border-border/60 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground font-display italic">Never build alone.</span>
+        <Link to="/pricing" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
       </div>
     </div>
   );
