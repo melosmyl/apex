@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Users, Trash2, Loader2, Mail } from "lucide-react";
+import { UserPlus, Users, Trash2, Loader2, Mail, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
@@ -15,17 +15,24 @@ export default function ExecutiveTeam() {
   const { companyId } = useParams();
   const [advisors, setAdvisors] = useState(null);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
   const load = async () => {
-    const [advs, subs] = await Promise.all([
-      base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100),
-      base44.entities.Subscription.filter({ company_id: companyId }, "-created_date", 100),
-    ]);
-    setAdvisors(advs);
-    setSubscriptions(subs);
+    setLoadError(null);
+    try {
+      const [advs, subs] = await Promise.all([
+        base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100),
+        base44.entities.Subscription.filter({ company_id: companyId }, "-created_date", 100),
+      ]);
+      setAdvisors(advs);
+      setSubscriptions(subs);
+    } catch (e) {
+      console.error("ExecutiveTeam load failed", e);
+      setLoadError(e?.message || "Network Error");
+    }
   };
   useEffect(() => { load(); }, [companyId]);
 
@@ -81,7 +88,11 @@ export default function ExecutiveTeam() {
         </div>
       </PageHeader>
 
-      {advisors === null ? (
+      {loadError ? (
+        <EmptyState icon={RefreshCw} title="Couldn't load your team"
+          description={`A network error occurred${loadError ? `: ${loadError}` : ""}. Please check your connection and try again.`}
+          action={<Button onClick={load} className="rounded-full px-6"><RefreshCw className="w-4 h-4 mr-1.5" /> Retry</Button>} />
+      ) : advisors === null ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{[0,1,2].map(i => <div key={i} className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />)}</div>
       ) : advisors.length === 0 ? (
         <EmptyState icon={Users} title="Your boardroom is empty"
