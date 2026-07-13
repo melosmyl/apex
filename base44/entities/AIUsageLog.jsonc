@@ -1,0 +1,57 @@
+{
+  "name": "AIUsageLog",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "meeting_id": {
+      "type": "string"
+    },
+    "advisor_id": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "request_type": {
+      "type": "string"
+    },
+    "input_size": {
+      "type": "number"
+    },
+    "output_size": {
+      "type": "number"
+    },
+    "estimated_cost": {
+      "type": "number"
+    },
+    "latency_ms": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "error",
+        "fallback_used"
+      ],
+      "default": "success"
+    },
+    "error_code": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "model",
+    "request_type",
+    "status"
+  ]
+}

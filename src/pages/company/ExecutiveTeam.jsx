@@ -8,6 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import AddAdvisorDialog from "@/components/team/AddAdvisorDialog";
+import { ADVISOR_PROVIDER_CONFIG } from "@/lib/advisorLibrary";
 import InvitePersonDialog from "@/components/team/InvitePersonDialog";
 import AdvisorProfileDialog from "@/components/team/AdvisorProfileDialog";
 
@@ -44,11 +45,17 @@ export default function ExecutiveTeam() {
   const requiresPayment = freeAdvisors.length >= 2;
 
   const addAdvisor = async (lib) => {
+    const config = ADVISOR_PROVIDER_CONFIG[lib.key] || {};
     const created = await base44.entities.Advisor.create({
       company_id: companyId, library_key: lib.key, name: lib.name, role: lib.role,
-      biography: lib.biography, decision_style: lib.decision_style, communication_style: lib.communication_style,
-      strengths: lib.strengths, weaknesses: lib.weaknesses, expertise: lib.expertise,
-      personality_traits: lib.personality_traits, accent: lib.accent
+      biography: lib.biography, short_bio: lib.biography, decision_style: lib.decision_style, communication_style: lib.communication_style,
+      strengths: lib.strengths, weaknesses: lib.weaknesses, blind_spots: lib.weaknesses, expertise: lib.expertise,
+      personality_traits: lib.personality_traits, accent: lib.accent,
+      system_instructions: config.system_instructions,
+      default_provider: config.default_provider || "openai", default_model: config.default_model || "gpt-4o",
+      fallback_provider: config.fallback_provider, fallback_model: config.fallback_model,
+      temperature: config.temperature ?? 0.7, maximum_output_length: config.maximum_output_length ?? 2000,
+      is_premium: config.is_premium || false, is_active: true, version: 1,
     });
     if (requiresPayment) {
       const res = await base44.functions.invoke("create-checkout", {

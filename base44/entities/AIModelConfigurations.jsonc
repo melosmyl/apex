@@ -1,0 +1,75 @@
+{
+  "name": "AIModelConfigurations",
+  "type": "object",
+  "properties": {
+    "provider": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic",
+        "mistral",
+        "google"
+      ]
+    },
+    "model_name": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "supports_structured_output": {
+      "type": "boolean",
+      "default": true
+    },
+    "supports_long_context": {
+      "type": "boolean",
+      "default": false
+    },
+    "relative_cost_level": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium"
+    },
+    "speed_level": {
+      "type": "string",
+      "enum": [
+        "slow",
+        "medium",
+        "fast"
+      ],
+      "default": "medium"
+    },
+    "quality_level": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "high",
+        "premium"
+      ],
+      "default": "high"
+    },
+    "last_tested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "model_name",
+    "display_name"
+  ]
+}

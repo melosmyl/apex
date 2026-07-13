@@ -14,6 +14,196 @@
         "type": "string"
       }
     },
+    "status": {
+      "type": "string",
+      "enum": [
+        "preparing",
+        "independent_complete",
+        "challenge_complete",
+        "complete",
+        "failed"
+      ],
+      "default": "preparing"
+    },
+    "independent_responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "advisor_id": {
+            "type": "string"
+          },
+          "advisor_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "provider_used": {
+            "type": "string"
+          },
+          "model_used": {
+            "type": "string"
+          },
+          "used_fallback": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "string"
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "key_arguments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missing_information": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggested_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidence_score": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "challenge_responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "advisor_id": {
+            "type": "string"
+          },
+          "advisor_name": {
+            "type": "string"
+          },
+          "challenged_advisor": {
+            "type": "string"
+          },
+          "point_challenged": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revised_position": {
+            "type": "string"
+          },
+          "confidence_score": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "board_resolution": {
+      "type": "object",
+      "properties": {
+        "executive_summary": {
+          "type": "string"
+        },
+        "decision_question": {
+          "type": "string"
+        },
+        "recommended_direction": {
+          "type": "string"
+        },
+        "reasoning": {
+          "type": "string"
+        },
+        "areas_of_agreement": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "areas_of_disagreement": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "main_risks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "minority_opinion": {
+          "type": "string"
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_information": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recommended_experiment": {
+          "type": "string"
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "assigned_to": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "overall_confidence_score": {
+          "type": "number"
+        }
+      }
+    },
+    "founder_decision": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accept",
+        "reject",
+        "modify",
+        "undecided",
+        "custom"
+      ],
+      "default": "pending"
+    },
+    "founder_decision_notes": {
+      "type": "string"
+    },
     "discussion": {
       "type": "array",
       "items": {

@@ -1,0 +1,37 @@
+{
+  "name": "SystemLimits",
+  "type": "object",
+  "properties": {
+    "max_meetings_per_month": {
+      "type": "number",
+      "default": 10
+    },
+    "max_advisors_per_meeting": {
+      "type": "number",
+      "default": 5
+    },
+    "min_advisors_per_meeting": {
+      "type": "number",
+      "default": 3
+    },
+    "max_context_size": {
+      "type": "number",
+      "default": 8000
+    },
+    "max_output_length": {
+      "type": "number",
+      "default": 2000
+    },
+    "request_timeout_ms": {
+      "type": "number",
+      "default": 60000
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 1
+    }
+  },
+  "required": [
+    "max_advisors_per_meeting"
+  ]
+}

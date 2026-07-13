@@ -14,6 +14,7 @@ import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import SubscriptionConfirmed from '@/pages/SubscriptionConfirmed';
 import Pricing from '@/pages/Pricing';
+import Admin from '@/pages/Admin';
 
 import Companies from '@/pages/Companies';
 import CompanyLayout from '@/components/CompanyLayout';
@@ -59,6 +60,7 @@ const AuthenticatedApp = () => {
       <Route path="/pricing" element={<Pricing />} />
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/" element={<Companies />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="/company/:companyId" element={<CompanyLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />

@@ -14,16 +14,31 @@
     "role": {
       "type": "string"
     },
+    "short_bio": {
+      "type": "string"
+    },
     "biography": {
+      "type": "string"
+    },
+    "expertise": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "communication_style": {
       "type": "string"
     },
     "decision_style": {
       "type": "string"
     },
-    "communication_style": {
-      "type": "string"
-    },
     "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blind_spots": {
       "type": "array",
       "items": {
         "type": "string"
@@ -35,20 +50,63 @@
         "type": "string"
       }
     },
-    "expertise": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
     "personality_traits": {
       "type": "array",
       "items": {
         "type": "string"
       }
     },
+    "system_instructions": {
+      "type": "string"
+    },
+    "avatar": {
+      "type": "string"
+    },
     "accent": {
       "type": "string"
+    },
+    "is_premium": {
+      "type": "boolean",
+      "default": false
+    },
+    "default_provider": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic",
+        "mistral"
+      ],
+      "default": "openai"
+    },
+    "default_model": {
+      "type": "string"
+    },
+    "fallback_provider": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic",
+        "mistral"
+      ]
+    },
+    "fallback_model": {
+      "type": "string"
+    },
+    "temperature": {
+      "type": "number",
+      "default": 0.7
+    },
+    "maximum_output_length": {
+      "type": "number",
+      "default": 2000
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "version": {
+      "type": "number",
+      "default": 1
     },
     "type": {
       "type": "string",

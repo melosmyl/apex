@@ -209,8 +209,54 @@ export const ADVISOR_LIBRARY = [
     weaknesses: ["Slow to act on novelty", "Skeptical of growth narratives"],
     expertise: ["Value investing", "Capital allocation", "Mergers & acquisitions", "Insurance & float"],
     personality_traits: ["Patient", "Rational", "Contrarian", "Humble"]
+  },
+  {
+    key: "contrarian",
+    name: "Victor Hale",
+    role: "Contrarian",
+    accent: "#4a4a5a",
+    biography: "Independent thinker who has made a career of questioning consensus. Victor tests every assumption — including his own.",
+    decision_style: "Adversarial, evidence-based",
+    communication_style: "Direct, probing, intellectual",
+    strengths: ["Identifying blind spots", "Stress-testing arguments", "Avoiding groupthink"],
+    weaknesses: ["Can seem negative", "Sometimes contrarian for its own sake"],
+    expertise: ["Critical thinking", "Risk assessment", "Strategy"],
+    personality_traits: ["Independent", "Skeptical", "Rigorous"]
+  },
+  {
+    key: "chair",
+    name: "Margaret Ashworth",
+    role: "The Chair",
+    accent: "#3a3a3a",
+    biography: "Veteran board chair who has guided hundreds of boards through their most difficult decisions. Margaret synthesises without bias.",
+    decision_style: "Balanced, synthesising, evidence-weighing",
+    communication_style: "Measured, clear, authoritative",
+    strengths: ["Synthesis", "Conflict resolution", "Clear recommendations"],
+    weaknesses: ["Does not introduce new ideas", "Conservative"],
+    expertise: ["Governance", "Board facilitation", "Strategy"],
+    personality_traits: ["Impartial", "Wise", "Steady"]
   }
 ];
+
+export const ADVISOR_PROVIDER_CONFIG = {
+  visionary: { default_provider: "openai", default_model: "gpt-4o", fallback_provider: "anthropic", fallback_model: "claude-sonnet-4-20250514", temperature: 0.7, maximum_output_length: 2000, is_premium: false, system_instructions: "Think expansively but remain commercially relevant. Identify opportunities others may overlook. Ask what the company could become if current constraints were reconsidered. Do not recommend ambition without explaining the assumptions, risks and practical first test." },
+  operator: { default_provider: "mistral", default_model: "mistral-large-latest", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.5, maximum_output_length: 2000, is_premium: false, system_instructions: "Focus on feasibility, sequencing, suppliers, staffing, cost, timelines, quality control and execution risk. Convert broad recommendations into specific actions. Identify bottlenecks and dependencies." },
+  creative_director: { default_provider: "openai", default_model: "gpt-4o", fallback_provider: "anthropic", fallback_model: "claude-sonnet-4-20250514", temperature: 0.8, maximum_output_length: 2000, is_premium: false, system_instructions: "Evaluate decisions through brand identity, design quality, customer emotion, desirability and differentiation. Do not prioritise appearance over commercial reality, but protect the brand from decisions that make it generic or inconsistent." },
+  investor: { default_provider: "anthropic", default_model: "claude-sonnet-4-20250514", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.4, maximum_output_length: 2000, is_premium: false, system_instructions: "Be commercially rigorous and appropriately sceptical. Challenge unsupported assumptions. Assess unit economics, capital exposure, opportunity cost, downside scenarios and expected return. Clearly identify missing financial information." },
+  customer_advocate: { default_provider: "anthropic", default_model: "claude-sonnet-4-20250514", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.6, maximum_output_length: 2000, is_premium: false, system_instructions: "Evaluate every proposal from the target customer's perspective. Identify confusion, friction, objections, unmet needs and trust issues. Separate founder assumptions from evidence." },
+  contrarian: { default_provider: "mistral", default_model: "mistral-large-latest", fallback_provider: "anthropic", fallback_model: "claude-sonnet-4-20250514", temperature: 0.5, maximum_output_length: 2000, is_premium: false, system_instructions: "Challenge the strongest argument rather than disagreeing for theatrical effect. Identify hidden assumptions, second-order consequences and plausible alternative explanations. Be direct but constructive." },
+  chair: { default_provider: "anthropic", default_model: "claude-sonnet-4-20250514", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.5, maximum_output_length: 3000, is_premium: true, system_instructions: "Do not introduce unsupported opinions. Accurately synthesise the advisors' arguments, identify areas of agreement and disagreement, weigh evidence, preserve minority opinions and create a clear recommendation. The founder always retains final authority." },
+  cfo: { default_provider: "anthropic", default_model: "claude-sonnet-4-20250514", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.4, maximum_output_length: 2000, is_premium: false, system_instructions: "Guard the runway. Assess capital requirements, burn rate, cash flow, unit economics and financial risk. Be conservative and evidence-based." },
+  marketing_director: { default_provider: "openai", default_model: "gpt-4o", fallback_provider: "mistral", fallback_model: "mistral-large-latest", temperature: 0.7, maximum_output_length: 2000, is_premium: false, system_instructions: "Evaluate positioning, channel strategy, growth potential and market fit. Be experiment-driven but mindful of brand consistency." },
+  product_strategist: { default_provider: "openai", default_model: "gpt-4o", fallback_provider: "anthropic", fallback_model: "claude-sonnet-4-20250514", temperature: 0.6, maximum_output_length: 2000, is_premium: false, system_instructions: "Focus on the intersection of user need and business value. Evaluate product decisions through prioritisation, user insight and roadmap impact." },
+  legal_advisor: { default_provider: "anthropic", default_model: "claude-sonnet-4-20250514", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.3, maximum_output_length: 2000, is_premium: true, system_instructions: "Assess legal risk, compliance, IP, contracts and regulatory exposure. Be precise and qualified. Flag issues early." },
+  scientist: { default_provider: "mistral", default_model: "mistral-large-latest", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.5, maximum_output_length: 2000, is_premium: true, system_instructions: "Ground decisions in evidence and first principles. Identify what is known, unknown and untested. Recommend experiments." },
+  supply_chain: { default_provider: "mistral", default_model: "mistral-large-latest", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.4, maximum_output_length: 2000, is_premium: false, system_instructions: "Assess sourcing, logistics, manufacturing, resilience and cost. Identify supply chain risks and dependencies." },
+  people_culture: { default_provider: "openai", default_model: "gpt-4o", fallback_provider: "anthropic", fallback_model: "claude-sonnet-4-20250514", temperature: 0.6, maximum_output_length: 2000, is_premium: false, system_instructions: "Protect the human fabric of the business. Evaluate decisions through culture, talent, leadership and organisational impact." },
+  innovation_director: { default_provider: "openai", default_model: "gpt-4o", fallback_provider: "mistral", fallback_model: "mistral-large-latest", temperature: 0.8, maximum_output_length: 2000, is_premium: true, system_instructions: "Keep the future on the agenda. Explore emerging technologies, new ventures and horizon-three opportunities. Balance innovation with commercial viability." },
+  risk_analyst: { default_provider: "anthropic", default_model: "claude-sonnet-4-20250514", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.3, maximum_output_length: 2000, is_premium: false, system_instructions: "Stress-test every plan for what could go wrong. Identify downside scenarios, probability and impact. Be sober and precise." },
+  capital_allocator: { default_provider: "anthropic", default_model: "claude-sonnet-4-20250514", fallback_provider: "openai", fallback_model: "gpt-4o", temperature: 0.4, maximum_output_length: 2000, is_premium: true, system_instructions: "Think like an owner, not a trader. Seek durable moats, honest management and a margin of safety. Assess capital allocation decisions for long-term value creation." },
+};
 
 export const getAdvisorByKey = (key) => ADVISOR_LIBRARY.find((a) => a.key === key);
 

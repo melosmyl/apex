@@ -1,15 +1,8 @@
 import React from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import AdvisorAvatar from "@/components/AdvisorAvatar";
-import { AlertTriangle, Lightbulb, ListChecks, MessageSquareQuote, Sparkles, ArrowRight } from "lucide-react";
-
-const STANCE = {
-  supports: "text-emerald-800 bg-emerald-50 border-emerald-200",
-  challenges: "text-rose-800 bg-rose-50 border-rose-200",
-  questions: "text-amber-800 bg-amber-50 border-amber-200",
-  neutral: "text-stone-700 bg-stone-50 border-stone-200",
-};
+import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical } from "lucide-react";
+import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
+import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 
 function List({ icon: Icon, title, items }) {
   if (!items?.length) return null;
@@ -23,77 +16,70 @@ function List({ icon: Icon, title, items }) {
   );
 }
 
-export default function MeetingResult({ result, advisors, onRecordDecision, recording }) {
+export default function MeetingResult({ result, advisors, companyId, onRecordDecision }) {
   const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
-  const conf = Math.round(result.confidence_score || 0);
+  const resolution = result.board_resolution || {};
+  const independent = result.independent_responses || [];
+  const challenges = result.challenge_responses || [];
+  const conf = Math.round(resolution.overall_confidence_score || 0);
 
   return (
     <div className="space-y-8">
       <div className="bg-card border border-border/70 rounded-2xl p-6 sm:p-8 rise-in">
         <div className="flex items-start justify-between gap-4 mb-5">
-          <div className="flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /><h3 className="font-display text-2xl">Executive Summary</h3></div>
+          <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-primary" /><h3 className="font-display text-2xl">Board Resolution</h3></div>
           <div className="text-center shrink-0">
             <div className="font-display text-3xl">{conf}<span className="text-lg text-muted-foreground">%</span></div>
             <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Confidence</div>
           </div>
         </div>
-        <p className="text-[15px] leading-relaxed mb-6">{result.executive_summary}</p>
-        <div className="bg-accent/50 rounded-xl p-5">
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommendation</div>
-          <p className="font-display text-lg leading-snug">{result.recommendation}</p>
+        <p className="text-[15px] leading-relaxed mb-6">{resolution.executive_summary}</p>
+        <div className="bg-accent/50 rounded-xl p-5 mb-6">
+          <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Direction</div>
+          <p className="font-display text-lg leading-snug">{resolution.recommended_direction}</p>
         </div>
+        {resolution.reasoning && (
+          <div className="mb-4"><div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Reasoning</div><p className="text-sm leading-relaxed">{resolution.reasoning}</p></div>
+        )}
+        <div className="grid sm:grid-cols-2 gap-4 mb-4">
+          <List icon={Lightbulb} title="Areas of Agreement" items={resolution.areas_of_agreement} />
+          <List icon={AlertTriangle} title="Areas of Disagreement" items={resolution.areas_of_disagreement} />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4 mb-4">
+          <List icon={AlertTriangle} title="Main Risks" items={resolution.main_risks} />
+          <List icon={Lightbulb} title="Assumptions" items={resolution.assumptions} />
+        </div>
+        {resolution.minority_opinion && (
+          <div className="bg-card border border-border/70 rounded-2xl p-5 mb-4">
+            <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Minority Opinion</div>
+            <p className="text-sm leading-relaxed italic text-muted-foreground">{resolution.minority_opinion}</p>
+          </div>
+        )}
+        {resolution.missing_information?.length > 0 && (
+          <List icon={AlertTriangle} title="Missing Information" items={resolution.missing_information} />
+        )}
+        {resolution.recommended_experiment && (
+          <div className="bg-secondary/40 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-2 mb-1"><FlaskConical className="w-4 h-4 text-muted-foreground" /><span className="text-[11px] uppercase tracking-widest text-muted-foreground">Recommended Experiment</span></div>
+            <p className="text-sm">{resolution.recommended_experiment}</p>
+          </div>
+        )}
         {onRecordDecision && (
-          <div className="flex justify-end mt-6">
-            <Button onClick={onRecordDecision} disabled={recording} className="rounded-full px-5">
-              {recording ? "Recording…" : <>Record in Decision Centre <ArrowRight className="w-4 h-4 ml-1.5" /></>}
-            </Button>
+          <div className="flex justify-end mt-4">
+            <Button onClick={onRecordDecision} variant="outline" className="rounded-full px-5">Record in Decision Centre <ArrowRight className="w-4 h-4 ml-1.5" /></Button>
           </div>
         )}
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <List icon={AlertTriangle} title="Risks" items={result.risks} />
-        <List icon={Lightbulb} title="Alternative Strategies" items={result.alternative_strategies} />
-        <List icon={ListChecks} title="Next Steps" items={result.next_steps} />
-        {result.minority_opinion && (
-          <div className="bg-card border border-border/70 rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-3"><MessageSquareQuote className="w-4 h-4 text-muted-foreground" /><h4 className="font-display text-base">Minority Opinion</h4></div>
-            <p className="text-sm leading-relaxed italic text-muted-foreground">{result.minority_opinion}</p>
-          </div>
-        )}
-      </div>
-
-      {result.assigned_tasks?.length > 0 && (
-        <div>
-          <h4 className="font-display text-lg mb-3">Assigned Tasks</h4>
-          <div className="space-y-2">
-            {result.assigned_tasks.map((t, i) => (
-              <div key={i} className="flex items-center gap-3 bg-card border border-border/70 rounded-xl p-3">
-                <AdvisorAvatar name={t.assigned_to} accent={accentOf(t.assigned_to)} size="sm" />
-                <span className="text-sm flex-1">{t.title}</span>
-                <span className="text-xs text-muted-foreground">{t.assigned_to}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <FounderDecisionControls meetingId={result.meeting_id} nextActions={resolution.next_actions} companyId={companyId} />
 
       <div>
-        <h4 className="font-display text-lg mb-3">The Discussion</h4>
-        <div className="space-y-4">
-          {result.discussion?.map((turn, i) => (
-            <div key={i} className="flex gap-3 rise-in">
-              <AdvisorAvatar name={turn.advisor} accent={accentOf(turn.advisor)} size="md" />
-              <div className="flex-1 bg-card border border-border/70 rounded-2xl rounded-tl-sm p-4">
-                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <span className="font-medium text-sm">{turn.advisor}</span>
-                  <span className="text-xs text-muted-foreground">{turn.role}</span>
-                  {turn.stance && <Badge variant="outline" className={`text-[10px] font-normal capitalize ${STANCE[turn.stance] || STANCE.neutral}`}>{turn.stance}</Badge>}
-                </div>
-                <p className="text-sm leading-relaxed">{turn.message}</p>
-              </div>
-            </div>
-          ))}
+        <h4 className="font-display text-lg mb-3">Advisor Perspectives</h4>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {independent.map((resp, i) => {
+            const challenge = challenges.find(c => c.advisor_id === resp.advisor_id);
+            return <AdvisorResponseCard key={i} independent={resp} challenge={challenge} accent={accentOf(resp.advisor_name)} />;
+          })}
         </div>
       </div>
     </div>
