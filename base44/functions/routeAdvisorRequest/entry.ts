@@ -48,29 +48,7 @@ async function callAnthropic(model, systemPrompt, userPrompt, temperature, maxTo
   } finally { clearTimeout(timeout); }
 }
 
-async function callMistral(model, systemPrompt, userPrompt, temperature, maxTokens, timeoutMs) {
-  const apiKey = Deno.env.get('MISTRAL_API_KEY');
-  if (!apiKey) throw new Error('MISTRAL_API_KEY not configured');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model, temperature, max_tokens: maxTokens,
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-        response_format: { type: 'json_object' },
-      }),
-      signal: controller.signal,
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(`Mistral error: ${data.error?.message || res.status}`);
-    return { content: data.choices[0].message.content, inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0 };
-  } finally { clearTimeout(timeout); }
-}
-
-const PROVIDERS = { openai: callOpenAI, anthropic: callAnthropic, mistral: callMistral };
+const PROVIDERS = { openai: callOpenAI, anthropic: callAnthropic };
 
 // ─── Response Validation & Repair ───────────────────────────────
 

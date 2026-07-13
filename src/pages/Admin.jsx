@@ -13,7 +13,6 @@ import { Shield, Save, Activity, Settings, FlaskConical, Loader2, AlertCircle } 
 const PROVIDERS = [
   { value: "openai", label: "OpenAI" },
   { value: "anthropic", label: "Anthropic" },
-  { value: "mistral", label: "Mistral" },
 ];
 
 export default function Admin() {

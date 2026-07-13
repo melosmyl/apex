@@ -73,8 +73,7 @@
       "type": "string",
       "enum": [
         "openai",
-        "anthropic",
-        "mistral"
+        "anthropic"
       ],
       "default": "openai"
     },
@@ -85,8 +84,7 @@
       "type": "string",
       "enum": [
         "openai",
-        "anthropic",
-        "mistral"
+        "anthropic"
       ]
     },
     "fallback_model": {
