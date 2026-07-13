@@ -8,7 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 
@@ -76,12 +75,14 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
           <div className="space-y-4 pt-2">
             <div><Label className="mb-1.5 block">Title</Label><Input value={form.title} onChange={(e)=>setForm(f=>({...f,title:e.target.value}))} autoFocus /></div>
             <div><Label className="mb-1.5 block">Category</Label>
-              <Select value={form.category} onValueChange={(val) => setForm(f => ({ ...f, category: val }))}>
-                <SelectTrigger className="w-full h-10 rounded-md"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-1.5">
+                {CATEGORIES.map(c => (
+                  <button key={c} type="button" onClick={() => setForm(f => ({ ...f, category: c }))}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${form.category === c ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
             </div>
             <div><Label className="mb-1.5 block">Content</Label><Textarea value={form.content} onChange={(e)=>setForm(f=>({...f,content:e.target.value}))} rows={6} placeholder="Paste or write the content your advisors should know." /></div>
             {allowFiles && (
