@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Plus, X, Trash2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import MetricsEditor from "@/components/company/MetricsEditor";
 
 export default function CompanySettings() {
   const { company, setCompany } = useOutletContext();
@@ -14,7 +15,7 @@ export default function CompanySettings() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     name: company.name || "", industry: company.industry || "", tagline: company.tagline || "",
-    description: company.description || "", priorities: company.priorities || [],
+    description: company.description || "", priorities: company.priorities || [], metrics: company.metrics || [],
   });
   const [newPriority, setNewPriority] = useState("");
   const [saved, setSaved] = useState(false);
@@ -59,6 +60,8 @@ export default function CompanySettings() {
             <Button variant="outline" onClick={()=>{if(newPriority.trim()){set("priorities",[...form.priorities,newPriority.trim()]);setNewPriority("");}}}><Plus className="w-4 h-4" /></Button>
           </div>
         </div>
+
+        <MetricsEditor metrics={form.metrics} onChange={(m) => set("metrics", m)} />
 
         <div className="flex items-center justify-between pt-2">
           <Button onClick={save}>{saved ? "Saved" : "Save changes"}</Button>
