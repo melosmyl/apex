@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Plus, Building2, RefreshCw } from "lucide-react";
+import { Plus, Building2, RefreshCw, Shield } from "lucide-react";
 import CompanyCard from "@/components/companies/CompanyCard";
 import CreateCompanyDialog from "@/components/companies/CreateCompanyDialog";
 import EmptyState from "@/components/EmptyState";
@@ -82,6 +82,7 @@ export default function Companies() {
             <p className="text-muted-foreground mt-3 font-display italic text-lg">Never build alone.</p>
           </div>
           <div className="flex gap-2 items-center">
+            {user?.role === "admin" && <Link to="/admin"><Button variant="ghost" className="rounded-full"><Shield className="w-4 h-4 mr-1.5" /> Admin</Button></Link>}
             <Link to="/pricing"><Button variant="ghost" className="rounded-full">Pricing</Button></Link>
             {companies?.length > 0 &&
             <Button onClick={() => setDialog(true)} className="px-5 rounded-full bg-[#187221] text-gray-50"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
