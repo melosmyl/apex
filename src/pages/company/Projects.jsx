@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { FolderKanban, Plus, LayoutGrid, GanttChart, KanbanSquare } from "lucide-react";
+import { FolderKanban, Plus, LayoutGrid, GanttChart, KanbanSquare, Sparkles } from "lucide-react";
 import GanttTimeline from "@/components/projects/GanttTimeline";
 import ProjectKanban from "@/components/projects/ProjectKanban";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
+import ProjectPlannerDialog from "@/components/projects/ProjectPlannerDialog";
 
 const STATUS = { planning: "bg-stone-100 text-stone-700", active: "bg-emerald-50 text-emerald-800", on_hold: "bg-amber-50 text-amber-800", completed: "bg-blue-50 text-blue-800" };
 
@@ -23,6 +24,8 @@ export default function Projects() {
   const [view, setView] = useState("board");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", timeline: "", executive_owner: "", status: "planning" });
+  const [plannerProject, setPlannerProject] = useState(null);
+  const [plannerOpen, setPlannerOpen] = useState(false);
 
   const load = () => base44.entities.Project.filter({ company_id: companyId }, "-created_date", 100).then(setItems);
   const loadTasks = () => base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200).then(setTasks);
@@ -61,6 +64,9 @@ export default function Projects() {
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{p.executive_owner || "Unassigned"}</span><span>{p.timeline}</span>
                   </div>
+                  <button onClick={() => { setPlannerProject(p); setPlannerOpen(true); }} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-3 pt-3 border-t border-border/50 w-full">
+                    <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} /> Plan with AI
+                  </button>
                 </div>
               ))}
             </div>
@@ -95,6 +101,7 @@ export default function Projects() {
           </div>
         </DialogContent>
       </Dialog>
+      <ProjectPlannerDialog project={plannerProject} companyId={companyId} open={plannerOpen} onOpenChange={(v) => { setPlannerOpen(v); if (!v) { loadTasks(); setPlannerProject(null); } }} />
     </div>
   );
 }
