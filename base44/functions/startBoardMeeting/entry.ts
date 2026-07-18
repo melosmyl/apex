@@ -1,13 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 
-const CHAIR_OPENING_INSTRUCTIONS = `You are The Chair opening a board meeting.
-
-Introduce the founder's question, set the objective for this meeting, and provide relevant company context.
-Address the advisors by name and invite each to share their initial position.
-Keep your opening concise (80-150 words). Do NOT give your own opinion — you are the facilitator.`;
-
-const ADVISOR_INITIAL_INSTRUCTIONS_SUFFIX = `\n\nGive your concise initial position (80-150 words). State your overall view and preliminary recommendation. Do not repeat what others have said — add your unique perspective.`;
-
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -27,7 +19,7 @@ Deno.serve(async (req) => {
     if (advisor_ids.length < minAdv || advisor_ids.length > maxAdv)
       return Response.json({ error: `Select between ${minAdv} and ${maxAdv} advisors` }, { status: 400 });
 
-    // Load company + context
+    // Load company + context (all user-scoped)
     const company = await base44.entities.Company.get(company_id);
     const [documents, decisions, meetings, projects, advisors] = await Promise.all([
       base44.entities.Document.filter({ company_id }, '-created_date', 20),
@@ -41,110 +33,69 @@ Deno.serve(async (req) => {
     if (selectedAdvisors.length < minAdv)
       return Response.json({ error: 'Not enough AI advisors selected' }, { status: 400 });
 
-    // Build context
+    // Build context package
     const contextPackage = buildContext(company, documents, decisions, meetings, projects, limits.max_context_size || 8000);
 
-    // Find chair advisor (from full advisor list, not just selected)
-    let chairAdvisor = advisors.find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
-    if (!chairAdvisor) chairAdvisor = selectedAdvisors[0];
-
-    // Create meeting with empty transcript
+    // Save meeting with status "preparing"
     const meeting = await base44.entities.BoardMeeting.create({
       company_id, question, participants: selectedAdvisors.map(a => a.name),
-      status: 'preparing', meeting_phase: 'opening', transcript: [],
-      context_snapshot: contextPackage,
-      independent_responses: [], challenge_responses: [],
+      status: 'preparing', independent_responses: [], challenge_responses: [],
     });
 
-    const transcript = [];
-    let seq = 1;
+    // Phase 1: Independent responses (parallel)
+    const independentSchema = {
+      type: 'object',
+      properties: {
+        position: { type: 'string', description: 'Your overall position on the question' },
+        recommendation: { type: 'string', description: 'Your specific recommendation' },
+        key_arguments: { type: 'array', items: { type: 'string' } },
+        assumptions: { type: 'array', items: { type: 'string' } },
+        risks: { type: 'array', items: { type: 'string' } },
+        missing_information: { type: 'array', items: { type: 'string' } },
+        suggested_actions: { type: 'array', items: { type: 'string' } },
+        confidence_score: { type: 'number', description: '0-100' },
+      },
+      required: ['position', 'recommendation', 'key_arguments', 'confidence_score'],
+    };
 
-    // ─── Phase 1: Chair Opening ───────────────────────────────
-    try {
-      const openingResult = await base44.functions.invoke('routeAdvisorRequest', {
-        advisor_id: chairAdvisor.id, company_id, meeting_id: meeting.id,
-        system_instructions: CHAIR_OPENING_INSTRUCTIONS,
-        company_context: contextPackage,
-        user_question: question,
-        output_schema: {
-          type: 'object',
-          properties: { message: { type: 'string', description: 'Your opening remarks (80-150 words)' } },
-          required: ['message'],
-        },
-        temperature: 0.5, max_output_length: 500,
-        request_type: 'chair_opening',
-      });
+    const independentResults = await Promise.all(selectedAdvisors.map(advisor =>
+      base44.functions.invoke('routeAdvisorRequest', {
+        advisor_id: advisor.id, company_id, meeting_id: meeting.id,
+        system_instructions: advisor.system_instructions, company_context: contextPackage,
+        user_question: question, previous_responses: [], output_schema: independentSchema,
+        temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,
+        request_type: 'independent',
+      }).then(res => ({ advisor, data: res.data })).catch(err => ({ advisor, error: err.message }))
+    ));
 
-      transcript.push({
-        sequence: seq++, phase: 'opening',
-        speaker_name: 'The Chair', advisor_role: 'Chair', speaker_type: 'chair',
-        message: openingResult.data?.response?.message || `The Chair opens the meeting. The question before the board is: "${question}". Each advisor is invited to share their initial position.`,
-        responds_to: null, stance: null, advisor_id: chairAdvisor.id,
-      });
-    } catch (e) {
-      console.error('Chair opening failed:', e.message);
-      transcript.push({
-        sequence: seq++, phase: 'opening',
-        speaker_name: 'The Chair', advisor_role: 'Chair', speaker_type: 'chair',
-        message: `The Chair opens the meeting. The question before the board is: "${question}". I invite each advisor to share their initial position.`,
-        responds_to: null, stance: null, advisor_id: chairAdvisor.id,
-      });
-    }
-
-    await base44.entities.BoardMeeting.update(meeting.id, { transcript, meeting_phase: 'opening' });
-
-    // ─── Phase 2: Initial Positions (sequential) ──────────────
-    const positionAdvisors = selectedAdvisors.filter(a => a.id !== chairAdvisor.id);
-    for (const advisor of positionAdvisors) {
-      const transcriptStr = formatTranscript(transcript);
-      try {
-        const result = await base44.functions.invoke('routeAdvisorRequest', {
-          advisor_id: advisor.id, company_id, meeting_id: meeting.id,
-          system_instructions: (advisor.system_instructions || '') + ADVISOR_INITIAL_INSTRUCTIONS_SUFFIX,
-          company_context: contextPackage,
-          meeting_context: transcriptStr,
-          user_question: question,
-          output_schema: {
-            type: 'object',
-            properties: {
-              message: { type: 'string', description: 'Your initial position (80-150 words)' },
-              responds_to: { type: 'string', description: 'Who you are responding to (usually "The Chair")' },
-            },
-            required: ['message'],
-          },
-          temperature: advisor.temperature, max_output_length: 600,
-          request_type: 'initial_position',
-        });
-
-        transcript.push({
-          sequence: seq++, phase: 'initial_positions',
-          speaker_name: advisor.name, advisor_role: advisor.role, speaker_type: 'advisor',
-          message: result.data?.response?.message || `${advisor.name} was temporarily unavailable.`,
-          responds_to: result.data?.response?.responds_to || 'The Chair',
-          stance: 'initial', advisor_id: advisor.id,
-        });
-      } catch (e) {
-        console.error(`Advisor ${advisor.name} initial position failed:`, e.message);
-        transcript.push({
-          sequence: seq++, phase: 'initial_positions',
-          speaker_name: advisor.name, advisor_role: advisor.role, speaker_type: 'advisor',
-          message: `${advisor.name} was temporarily unavailable for an opening position.`,
-          responds_to: 'The Chair', stance: 'initial', advisor_id: advisor.id,
-        });
+    const independentResponses = independentResults.map(r => {
+      const d = r.data;
+      if (r.error || !d?.response) {
+        return {
+          advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
+          provider_used: d?.provider_used || null, model_used: d?.model_used || null, used_fallback: d?.used_fallback || false,
+          position: 'This advisor was temporarily unavailable.', recommendation: 'No recommendation available.',
+          key_arguments: [], assumptions: [], risks: [], missing_information: [], suggested_actions: [], confidence_score: 0,
+        };
       }
+      const resp = d.response;
+      return {
+        advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
+        provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
+        position: resp.position || '', recommendation: resp.recommendation || '',
+        key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
+        risks: resp.risks || [], missing_information: resp.missing_information || [],
+        suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
+      };
+    });
 
-      // Save after each turn
-      await base44.entities.BoardMeeting.update(meeting.id, { transcript, meeting_phase: 'initial_positions' });
-    }
-
-    // Transition to discussion phase
     await base44.entities.BoardMeeting.update(meeting.id, {
-      status: 'discussing', meeting_phase: 'discussion', transcript,
+      status: 'independent_complete', independent_responses: independentResponses,
     });
 
     return Response.json({
-      meeting_id: meeting.id, status: 'discussing',
-      transcript, meeting_phase: 'discussion',
+      meeting_id: meeting.id, status: 'independent_complete',
+      independent_responses: independentResponses,
       advisor_names: selectedAdvisors.map(a => a.name),
     });
   } catch (error) {
@@ -152,16 +103,6 @@ Deno.serve(async (req) => {
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
-
-function formatTranscript(transcript) {
-  return transcript.map(t => {
-    const speaker = t.speaker_type === 'chair' ? 'The Chair' :
-                    t.speaker_type === 'founder' ? `Founder (${t.speaker_name})` :
-                    `${t.speaker_name} (${t.advisor_role})`;
-    const response = t.responds_to ? ` [responding to ${t.responds_to}]` : '';
-    return `[${t.phase}] ${speaker}${response}: ${t.message}`;
-  }).join('\n\n');
-}
 
 function buildContext(company, documents, decisions, meetings, projects, maxSize) {
   let ctx = `Company: ${company.name || 'N/A'}\nIndustry: ${company.industry || 'N/A'}\n`;

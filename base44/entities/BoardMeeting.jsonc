@@ -20,67 +20,10 @@
         "preparing",
         "independent_complete",
         "challenge_complete",
-        "discussing",
-        "ready_for_resolution",
         "complete",
         "failed"
       ],
       "default": "preparing"
-    },
-    "meeting_phase": {
-      "type": "string",
-      "enum": [
-        "opening",
-        "initial_positions",
-        "discussion",
-        "challenge",
-        "rebuttal",
-        "resolution"
-      ],
-      "default": "opening"
-    },
-    "transcript": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "sequence": {
-            "type": "number"
-          },
-          "phase": {
-            "type": "string"
-          },
-          "speaker_name": {
-            "type": "string"
-          },
-          "advisor_role": {
-            "type": "string"
-          },
-          "speaker_type": {
-            "type": "string",
-            "enum": [
-              "chair",
-              "advisor",
-              "founder"
-            ]
-          },
-          "message": {
-            "type": "string"
-          },
-          "responds_to": {
-            "type": "string"
-          },
-          "stance": {
-            "type": "string"
-          },
-          "advisor_id": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "context_snapshot": {
-      "type": "string"
     },
     "independent_responses": {
       "type": "array",

@@ -12,17 +12,13 @@ export async function startMeeting({ companyId, question, advisorIds }) {
   }
 }
 
-export async function runDiscussionTurn(meetingId, userMessage, addressedTo) {
+export async function runChallenge(meetingId) {
   try {
-    const res = await base44.functions.invoke("runChallengeRound", {
-      meeting_id: meetingId,
-      user_message: userMessage || null,
-      addressed_to: addressedTo || null,
-    });
+    const res = await base44.functions.invoke("runChallengeRound", { meeting_id: meetingId });
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(e.response?.data?.error || e.message || "Discussion turn failed.");
+    throw new Error(e.response?.data?.error || e.message || "Challenge round failed.");
   }
 }
 
@@ -35,6 +31,3 @@ export async function runResolution(meetingId) {
     throw new Error(e.response?.data?.error || e.message || "Resolution failed.");
   }
 }
-
-// Backward-compatible alias
-export const runChallenge = runDiscussionTurn;
