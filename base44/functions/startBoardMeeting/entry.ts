@@ -14,10 +14,9 @@ Deno.serve(async (req) => {
     const limitsList = await base44.asServiceRole.entities.SystemLimits.list('-created_date', 1);
     const limits = limitsList[0] || { max_advisors_per_meeting: 5, min_advisors_per_meeting: 3, max_context_size: 8000 };
     const minAdv = limits.min_advisors_per_meeting || 3;
-    const maxAdv = limits.max_advisors_per_meeting || 5;
 
-    if (advisor_ids.length < minAdv || advisor_ids.length > maxAdv)
-      return Response.json({ error: `Select between ${minAdv} and ${maxAdv} advisors` }, { status: 400 });
+    if (advisor_ids.length < minAdv)
+      return Response.json({ error: `Select at least ${minAdv} advisors` }, { status: 400 });
 
     // Load company + context (all user-scoped)
     const company = await base44.entities.Company.get(company_id);

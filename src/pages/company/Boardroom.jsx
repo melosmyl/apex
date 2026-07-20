@@ -59,7 +59,7 @@ export default function Boardroom() {
   const start = async () => {
     if (!question.trim()) return;
     const selected = advisors.filter(a => selectedIds?.includes(a.id) && a.type !== "human");
-    if (selected.length < 3 || selected.length > 5) { setError("Select between 3 and 5 advisors."); return; }
+    if (selected.length < 3) { setError("Select at least 3 advisors."); return; }
     setPhase("preparing"); setError(null); setResult(null);
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selected.map(a => a.id) });
@@ -114,7 +114,7 @@ export default function Boardroom() {
         <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
           <BoardTable advisors={advisors} activeName={activeName} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
           <p className="text-center text-xs text-muted-foreground mt-4">
-            {selectedCount} attending{selectedCount < 3 && " · At least 3 required"}{selectedCount > 5 && " · Maximum 5"}
+            {selectedCount} attending{selectedCount < 3 && " · At least 3 required"}
           </p>
           {error && <p className="text-center text-sm text-destructive mt-2">{error}</p>}
           <div className="max-w-xl mx-auto mt-8">
@@ -128,7 +128,7 @@ export default function Boardroom() {
                     <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
                   ))}
                 </div>
-                <Button onClick={start} disabled={!question.trim() || selectedCount < 3 || selectedCount > 5} className="w-full mt-4 rounded-full h-11">
+                <Button onClick={start} disabled={!question.trim() || selectedCount < 3} className="w-full mt-4 rounded-full h-11">
                   <Landmark className="w-4 h-4 mr-2" /> Start Board Meeting
                 </Button>
               </>
