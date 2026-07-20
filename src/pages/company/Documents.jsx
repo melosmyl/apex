@@ -1,12 +1,13 @@
 import React from "react";
-import DocumentLibrary from "@/components/documents/DocumentLibrary";
+import DocumentManager from "@/components/documents/DocumentManager";
 
 export default function Documents() {
   return (
-    <DocumentLibrary kind="document" allowFiles
+    <DocumentManager
       eyebrow="Built-in document management"
       title="Documents"
-      description="Business plans, decks, strategies and contracts — kept in one elegant place."
-      emptyText="Create your first document to keep your company's working papers together." />
+      description="Every deliverable your advisors produce — filed, versioned and ready for review."
+      emptyText="Documents created by your advisors will appear here automatically. You can also add your own."
+    />
   );
 }

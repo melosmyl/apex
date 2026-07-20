@@ -5,8 +5,176 @@
     "company_id": {
       "type": "string"
     },
+    "project_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "meeting_id": {
+      "type": "string"
+    },
+    "decision_id": {
+      "type": "string"
+    },
+    "created_by_advisor_id": {
+      "type": "string"
+    },
+    "created_by_user_id": {
+      "type": "string"
+    },
     "title": {
       "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "Report",
+        "Research Paper",
+        "Strategy",
+        "Business Plan",
+        "Pitch Deck",
+        "Presentation",
+        "Spreadsheet",
+        "Financial Model",
+        "Budget",
+        "Forecast",
+        "Competitor Analysis",
+        "Market Research",
+        "Marketing Plan",
+        "Campaign Plan",
+        "Brand Brief",
+        "Creative Brief",
+        "Product Specification",
+        "Project Plan",
+        "Timeline",
+        "Meeting Summary",
+        "Board Resolution",
+        "Decision Memo",
+        "Proposal",
+        "Email Draft",
+        "Letter",
+        "Contract Draft",
+        "Policy",
+        "Checklist",
+        "Template",
+        "Supplier Comparison",
+        "Customer Persona",
+        "Launch Plan",
+        "Risk Assessment",
+        "Other"
+      ],
+      "default": "Other"
+    },
+    "document_category": {
+      "type": "string"
+    },
+    "folder_path": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "in_progress",
+        "ready_for_review",
+        "revision_requested",
+        "approved",
+        "superseded",
+        "archived"
+      ],
+      "default": "draft"
+    },
+    "content_format": {
+      "type": "string",
+      "enum": [
+        "Rich text",
+        "Structured document",
+        "Spreadsheet",
+        "Presentation",
+        "PDF",
+        "DOCX",
+        "XLSX",
+        "PPTX",
+        "CSV",
+        "Markdown",
+        "Plain text"
+      ],
+      "default": "Rich text"
+    },
+    "content": {
+      "type": "string"
+    },
+    "structured_content": {
+      "type": "object"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "file_name": {
+      "type": "string"
+    },
+    "preview_url": {
+      "type": "string"
+    },
+    "source_references": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "version_number": {
+      "type": "number",
+      "default": 1
+    },
+    "parent_document_id": {
+      "type": "string"
+    },
+    "is_latest_version": {
+      "type": "boolean",
+      "default": true
+    },
+    "approval_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "revision_requested",
+        "rejected"
+      ],
+      "default": "pending"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "approved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_opened_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revision_notes": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "knowledge",
+        "document",
+        "research"
+      ],
+      "default": "document"
     },
     "category": {
       "type": "string",
@@ -22,24 +190,6 @@
         "Other"
       ],
       "default": "Other"
-    },
-    "content": {
-      "type": "string"
-    },
-    "kind": {
-      "type": "string",
-      "enum": [
-        "knowledge",
-        "document",
-        "research"
-      ],
-      "default": "document"
-    },
-    "file_url": {
-      "type": "string"
-    },
-    "file_name": {
-      "type": "string"
     }
   },
   "required": [

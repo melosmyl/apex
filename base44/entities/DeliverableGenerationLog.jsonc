@@ -1,0 +1,63 @@
+{
+  "name": "DeliverableGenerationLog",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "advisor_id": {
+      "type": "string"
+    },
+    "document_id": {
+      "type": "string"
+    },
+    "document_type": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "input_size": {
+      "type": "number"
+    },
+    "output_size": {
+      "type": "number"
+    },
+    "estimated_cost": {
+      "type": "number"
+    },
+    "generation_time": {
+      "type": "number"
+    },
+    "export_format": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "error"
+      ],
+      "default": "success"
+    },
+    "error_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "document_type",
+    "provider",
+    "model",
+    "status"
+  ]
+}

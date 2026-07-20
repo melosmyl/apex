@@ -33,6 +33,9 @@
     "deliverable": {
       "type": "string"
     },
+    "document_id": {
+      "type": "string"
+    },
     "blocker": {
       "type": "string"
     },
