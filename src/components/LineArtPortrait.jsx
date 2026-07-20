@@ -125,7 +125,12 @@ const PORTRAITS = {
   people_culture: () => (<><AfroHair /><Shoulders /><Neck /><Head /><EyesClosed /><Nose /><Smile /></>),
   innovation_director: () => (<><Shoulders /><Neck /><Head /><Ears /><MessyHair /><EyesOpen /><Nose /><Smile /></>),
   risk_analyst: () => (<><BobHair /><Shoulders /><Neck /><Head /><EyesClosed /><Glasses /><Nose /><Neutral /></>),
-  capital_allocator: () => (<><Shoulders /><Neck /><Head /><Ears /><Brows /><EyesOpen /><Glasses /><Nose /><Neutral /></>)
+  capital_allocator: () => (<><Shoulders /><Neck /><Head /><Ears /><Brows /><EyesOpen /><Glasses /><Nose /><Neutral /></>),
+  ai_expert: () => (<><Shoulders /><Neck /><Head /><Ears /><ShortHair /><Brows /><EyesOpen /><Glasses /><Nose /><Neutral /></>),
+  elon_musk: () => (<><Shoulders /><Neck /><Head /><Ears /><ShortHair /><Brows /><EyesOpen /><Nose /><Smile /></>),
+  warren_buffett: () => (<><Shoulders /><Neck /><Head /><Ears /><SidePartHair /><Brows /><EyesOpen /><Glasses /><Nose /><Smile /></>),
+  jeff_bezos: () => (<><Shoulders /><Neck /><Head /><Ears /><Brows /><EyesOpen /><Nose /><Neutral /></>),
+  rick_rubin: () => (<><LongHairBack /><Shoulders /><Neck /><Head /><LongHairFront /><Beard /><EyesClosed /><Nose /><Neutral /></>)
 };
 
 export default function LineArtPortrait({ variant }) {
