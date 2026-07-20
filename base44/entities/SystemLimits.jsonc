@@ -29,6 +29,10 @@
     "retry_count": {
       "type": "number",
       "default": 1
+    },
+    "max_discussion_rounds": {
+      "type": "number",
+      "default": 3
     }
   },
   "required": [

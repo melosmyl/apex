@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical } from "lucide-react";
 import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
+import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
 
 function List({ icon: Icon, title, items }) {
   if (!items?.length) return null;
@@ -70,6 +71,8 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
           </div>
         )}
       </div>
+
+      <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} />
 
       <FounderDecisionControls meetingId={result.meeting_id} nextActions={resolution.next_actions} companyId={companyId} />
 

@@ -19,6 +19,7 @@
       "enum": [
         "preparing",
         "independent_complete",
+        "discussion_complete",
         "challenge_complete",
         "complete",
         "failed"
@@ -119,6 +120,59 @@
         }
       }
     },
+    "discussion_transcript": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "round": {
+            "type": "number"
+          },
+          "advisor_id": {
+            "type": "string"
+          },
+          "advisor_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "message_type": {
+            "type": "string"
+          },
+          "reply_to_advisor": {
+            "type": "string"
+          },
+          "changed_opinion": {
+            "type": "boolean"
+          },
+          "new_position": {
+            "type": "string"
+          },
+          "new_risks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidence_score": {
+            "type": "number"
+          },
+          "provider_used": {
+            "type": "string"
+          },
+          "model_used": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "discussion_rounds_completed": {
+      "type": "number"
+    },
     "board_resolution": {
       "type": "object",
       "properties": {
@@ -186,6 +240,47 @@
         },
         "overall_confidence_score": {
           "type": "number"
+        },
+        "discussion_evaluation": {
+          "type": "object",
+          "properties": {
+            "strongest_arguments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "disproven_arguments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "uncertain_assumptions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "most_persuasive_advisor": {
+              "type": "string"
+            },
+            "consensus_assessment": {
+              "type": "string"
+            },
+            "opinions_changed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "missing_evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },

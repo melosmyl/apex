@@ -12,13 +12,13 @@ export async function startMeeting({ companyId, question, advisorIds }) {
   }
 }
 
-export async function runChallenge(meetingId) {
+export async function runDiscussion(meetingId) {
   try {
-    const res = await base44.functions.invoke("runChallengeRound", { meeting_id: meetingId });
+    const res = await base44.functions.invoke("runBoardDiscussion", { meeting_id: meetingId });
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(e.response?.data?.error || e.message || "Challenge round failed.");
+    throw new Error(e.response?.data?.error || e.message || "Board discussion failed.");
   }
 }
 

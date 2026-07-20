@@ -2,7 +2,45 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.38';
 
 const CHAIR_INSTRUCTIONS = `You are The Chair — the board meeting facilitator and synthesiser.
 
+You are evaluating a multi-round executive board discussion. Before producing the Board Resolution, you must carefully evaluate the entire discussion:
+
+1. Which arguments were strongest and why
+2. Which arguments were disproven or weakened during the discussion
+3. Which assumptions remain uncertain
+4. Which advisor contributed the most persuasive reasoning
+5. Whether genuine consensus exists or a minority opinion should be preserved
+6. What evidence was missing that would have strengthened the discussion
+
+Only after evaluating the discussion should you create the final recommendation.
+Do not simply average opinions. Weigh the quality of arguments. Give more weight to arguments that survived scrutiny and less to those that were successfully challenged.
+
 Do not introduce unsupported opinions. Accurately synthesise the advisors' arguments, identify areas of agreement and disagreement, weigh evidence, preserve minority opinions and create a clear recommendation. The founder always retains final authority.`;
+
+function formatTranscriptForChair(transcript) {
+  const byRound = {};
+  transcript.forEach(msg => {
+    if (!byRound[msg.round]) byRound[msg.round] = [];
+    byRound[msg.round].push(msg);
+  });
+
+  let text = '';
+  for (const round of Object.keys(byRound).sort((a, b) => Number(a) - Number(b))) {
+    const roundNum = Number(round);
+    const msgs = byRound[round];
+    text += `--- Round ${roundNum}${roundNum === 1 ? ' (Independent Positions)' : ' (Discussion)'} ---\n`;
+    msgs.forEach(msg => {
+      text += `${msg.advisor_name} (${msg.role})`;
+      if (msg.reply_to_advisor) text += ` -> responding to ${msg.reply_to_advisor}`;
+      if (msg.changed_opinion) text += ` [OPINION CHANGED]`;
+      text += `: ${msg.message}\n`;
+      if (msg.changed_opinion && msg.new_position) text += `  -> New position: ${msg.new_position}\n`;
+      if (msg.new_risks?.length) text += `  -> New risks: ${msg.new_risks.join('; ')}\n`;
+      text += `  [Confidence: ${msg.confidence_score}%]\n`;
+    });
+    text += '\n';
+  }
+  return text;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -18,6 +56,7 @@ Deno.serve(async (req) => {
 
     const independentResponses = meeting.independent_responses || [];
     const challengeResponses = meeting.challenge_responses || [];
+    const discussionTranscript = meeting.discussion_transcript || [];
 
     const advisors = await base44.entities.Advisor.filter({ company_id: meeting.company_id }, '-created_date', 100);
     let chairAdvisor = advisors.find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
@@ -40,26 +79,43 @@ Deno.serve(async (req) => {
         recommended_experiment: { type: 'string' },
         next_actions: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, assigned_to: { type: 'string' } } } },
         overall_confidence_score: { type: 'number' },
+        discussion_evaluation: {
+          type: 'object',
+          properties: {
+            strongest_arguments: { type: 'array', items: { type: 'string' } },
+            disproven_arguments: { type: 'array', items: { type: 'string' } },
+            uncertain_assumptions: { type: 'array', items: { type: 'string' } },
+            most_persuasive_advisor: { type: 'string' },
+            consensus_assessment: { type: 'string' },
+            opinions_changed: { type: 'array', items: { type: 'string' } },
+            missing_evidence: { type: 'array', items: { type: 'string' } },
+          },
+        },
       },
       required: ['executive_summary', 'recommended_direction', 'reasoning', 'overall_confidence_score'],
     };
 
-    const allResponses = [
-      ...independentResponses.map(r => ({ advisor: r.advisor_name, position: r.position, recommendation: r.recommendation })),
-      ...challengeResponses.map(r => ({ advisor: r.advisor_name, revised_position: r.revised_position })),
-    ];
-
-    const meetingContext = `Independent advisor responses:\n${independentResponses.map(r =>
-      `- ${r.advisor_name} (${r.role}): Position: ${r.position}. Recommendation: ${r.recommendation}. Key arguments: ${(r.key_arguments || []).join('; ')}. Risks: ${(r.risks || []).join('; ')}. Confidence: ${r.confidence_score}%`
-    ).join('\n\n')}\n\nChallenge round:\n${challengeResponses.map(r =>
-      `- ${r.advisor_name} challenged ${r.challenged_advisor}: ${r.point_challenged}. Reason: ${r.reason}. Revised position: ${r.revised_position}. Confidence: ${r.confidence_score}%`
-    ).join('\n')}`;
+    let meetingContext;
+    if (discussionTranscript.length > 0) {
+      meetingContext = `=== FULL BOARD DISCUSSION TRANSCRIPT ===\nQuestion: ${meeting.question}\n\n${formatTranscriptForChair(discussionTranscript)}`;
+    } else {
+      // Fallback for older meetings without a discussion transcript
+      const allResponses = [
+        ...independentResponses.map(r => ({ advisor: r.advisor_name, position: r.position, recommendation: r.recommendation })),
+        ...challengeResponses.map(r => ({ advisor: r.advisor_name, revised_position: r.revised_position })),
+      ];
+      meetingContext = `Independent advisor responses:\n${independentResponses.map(r =>
+        `- ${r.advisor_name} (${r.role}): Position: ${r.position}. Recommendation: ${r.recommendation}. Key arguments: ${(r.key_arguments || []).join('; ')}. Risks: ${(r.risks || []).join('; ')}. Confidence: ${r.confidence_score}%`
+      ).join('\n\n')}\n\nChallenge round:\n${challengeResponses.map(r =>
+        `- ${r.advisor_name} challenged ${r.challenged_advisor}: ${r.point_challenged}. Reason: ${r.reason}. Revised position: ${r.revised_position}. Confidence: ${r.confidence_score}%`
+      ).join('\n')}`;
+    }
 
     const chairResult = await base44.functions.invoke('routeAdvisorRequest', {
       advisor_id: chairAdvisor.id, company_id: meeting.company_id, meeting_id: meeting.id,
       system_instructions: CHAIR_INSTRUCTIONS, company_context: null, meeting_context: meetingContext,
-      user_question: meeting.question, previous_responses: allResponses,
-      output_schema: resolutionSchema, temperature: 0.5, max_output_length: 3000,
+      user_question: meeting.question, previous_responses: [],
+      output_schema: resolutionSchema, temperature: 0.5, max_output_length: 4000,
       request_type: 'chair_synthesis',
     });
 
@@ -71,6 +127,13 @@ Deno.serve(async (req) => {
 
     const nextActions = resolution.next_actions || [];
 
+    const discussionField = discussionTranscript.length > 0
+      ? discussionTranscript.map(m => ({ advisor: m.advisor_name, role: m.role, message: m.message, stance: m.message_type }))
+      : [
+          ...independentResponses.map(r => ({ advisor: r.advisor_name, role: r.role, message: `${r.position} ${r.recommendation}`, stance: 'supports' })),
+          ...challengeResponses.map(r => ({ advisor: r.advisor_name, role: 'Challenge', message: r.revised_position, stance: 'challenges' })),
+        ];
+
     const updated = await base44.entities.BoardMeeting.update(meeting.id, {
       status: 'complete', board_resolution: resolution,
       executive_summary: resolution.executive_summary,
@@ -80,15 +143,13 @@ Deno.serve(async (req) => {
       minority_opinion: resolution.minority_opinion || '',
       next_steps: nextActions.map(a => a.title),
       assigned_tasks: nextActions,
-      discussion: [
-        ...independentResponses.map(r => ({ advisor: r.advisor_name, role: r.role, message: `${r.position} ${r.recommendation}`, stance: 'supports' })),
-        ...challengeResponses.map(r => ({ advisor: r.advisor_name, role: 'Challenge', message: r.revised_position, stance: 'challenges' })),
-      ],
+      discussion: discussionField,
     });
 
     return Response.json({
       meeting_id: meeting.id, status: 'complete',
       independent_responses: independentResponses, challenge_responses: challengeResponses,
+      discussion_transcript: discussionTranscript,
       board_resolution: resolution, meeting: updated,
     });
   } catch (error) {

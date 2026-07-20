@@ -8,7 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import BoardTable from "@/components/boardroom/BoardTable";
 import MeetingResult from "@/components/boardroom/MeetingResult";
-import { startMeeting, runChallenge, runResolution } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution } from "@/lib/boardroom";
 
 const PROMPTS = [
   "Should we manufacture our products in Portugal or Vietnam?",
@@ -18,7 +18,7 @@ const PROMPTS = [
 
 const PHASE_MESSAGES = {
   preparing: "Reviewing company context",
-  challenge: "The board is challenging assumptions",
+  discussion: "The board is in executive discussion",
   resolution: "The Chair is preparing the resolution",
 };
 
@@ -63,8 +63,8 @@ export default function Boardroom() {
     setPhase("preparing"); setError(null); setResult(null);
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selected.map(a => a.id) });
-      setPhase("challenge");
-      await runChallenge(phase1.meeting_id);
+      setPhase("discussion");
+      await runDiscussion(phase1.meeting_id);
       setPhase("resolution");
       const final = await runResolution(phase1.meeting_id);
       setResult(final);
