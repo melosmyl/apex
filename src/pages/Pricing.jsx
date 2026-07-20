@@ -10,7 +10,7 @@ const TIERS = [
     price: "£0",
     period: "forever",
     tagline: "Perfect for falling in love with the product.",
-    features: ["1 company", "2 executive advisors", "10 board meetings per month", "Decision history", "Basic company memory"],
+    features: ["1 company", "6 executive advisors", "10 board meetings per month", "Decision history", "Basic company memory"],
     cta: "Get started",
     href: "/register",
     highlight: false,

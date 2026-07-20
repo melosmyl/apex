@@ -42,7 +42,7 @@ export default function ExecutiveTeam() {
     const s = subFor(a.id);
     return !s || s.status === "canceled";
   });
-  const requiresPayment = freeAdvisors.length >= 2;
+  const requiresPayment = freeAdvisors.length >= 6;
 
   const addAdvisor = async (lib) => {
     const config = ADVISOR_PROVIDER_CONFIG[lib.key] || {};
@@ -88,7 +88,7 @@ export default function ExecutiveTeam() {
   return (
     <div>
       <PageHeader eyebrow="The heart of the platform" title="Executive Team"
-      description="Assemble your executive team — add specialist AI advisors or invite real collaborators. Your first two AI advisors are free, then £9/month each.">
+      description="Assemble your executive team — add specialist AI advisors or invite real collaborators. Your first six AI advisors are free, then £9/month each.">
         <div className="flex gap-2">
           <Button onClick={() => setAddOpen(true)} className="rounded-full px-5 bg-[#3b6e21]"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
           <Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
