@@ -54,11 +54,49 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
   const extra = Math.max(0, advisors.length - 4);
   const initials = company.name?.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "•";
 
-  return null;
+  return (
+    <button
+      onClick={() => navigate(`/company/${company.id}`)}
+      className="w-full text-left bg-card border border-border/70 rounded-2xl p-5 sm:p-6 hover:border-border hover:shadow-sm transition-all group rise-in"
+    >
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+            <span className="font-display text-sm font-medium text-muted-foreground">{initials}</span>
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-display text-xl leading-tight truncate">{company.name}</h3>
+            {company.industry && <p className="text-xs text-muted-foreground mt-0.5">{company.industry}</p>}
+          </div>
+        </div>
+        <ArrowUpRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      </div>
 
+      {company.tagline && <p className="text-sm text-muted-foreground mb-5 line-clamp-2">{company.tagline}</p>}
 
+      <div className="flex items-end justify-between gap-4 mb-5">
+        <div className="flex gap-6">
+          <Stat value={stats.advisors || 0} label="Advisors" />
+          <Stat value={stats.meetings || 0} label="Meetings" />
+          <Stat value={stats.decisions || 0} label="Decisions" />
+        </div>
+        <HealthRing score={score} />
+      </div>
 
-
+      {team.length > 0 && (
+        <div className="flex items-center gap-2 pt-4 border-t border-border/50">
+          <div className="flex -space-x-2">
+            {team.map((a, i) => (
+              <div key={a.id || i} className="ring-2 ring-card rounded-full">
+                <AdvisorAvatar name={a.name} accent={a.accent} size="sm" />
+              </div>
+            ))}
+          </div>
+          {extra > 0 && <span className="text-xs text-muted-foreground ml-1">+{extra} more</span>}
+        </div>
+      )}
+    </button>
+  );
 
 
 
