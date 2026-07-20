@@ -31,3 +31,16 @@ export async function runResolution(meetingId) {
     throw new Error(e.response?.data?.error || e.message || "Resolution failed.");
   }
 }
+
+export async function runFounderFollowup(meetingId, founderMessage) {
+  try {
+    const res = await base44.functions.invoke("runFounderFollowup", {
+      meeting_id: meetingId,
+      founder_message: founderMessage,
+    });
+    if (res.data?.error) throw new Error(res.data.error);
+    return res.data;
+  } catch (e) {
+    throw new Error(e.response?.data?.error || e.message || "Follow-up failed.");
+  }
+}

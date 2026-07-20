@@ -8,7 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import BoardTable from "@/components/boardroom/BoardTable";
 import MeetingResult from "@/components/boardroom/MeetingResult";
-import { startMeeting, runDiscussion, runResolution } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution, runFounderFollowup } from "@/lib/boardroom";
 
 const PROMPTS = [
   "Should we manufacture our products in Portugal or Vietnam?",
@@ -89,6 +89,12 @@ export default function Boardroom() {
     navigate(`/company/${companyId}/decisions?id=${d.id}`);
   };
 
+  const handleFollowup = async (message) => {
+    if (!result?.meeting_id) return;
+    const res = await runFounderFollowup(result.meeting_id, message);
+    setResult(prev => ({ ...prev, discussion_transcript: res.discussion_transcript }));
+  };
+
   if (advisors === null) return <div className="h-64 rounded-2xl bg-secondary/60 animate-pulse" />;
 
   const aiAdvisors = advisors.filter(a => a.type !== "human");
@@ -154,7 +160,7 @@ export default function Boardroom() {
             <p className="font-display text-xl max-w-2xl">"{question}"</p>
             <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); }}>New question</Button>
           </div>
-          <MeetingResult result={result} advisors={advisors.filter(a => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={recordDecision} />
+          <MeetingResult result={result} advisors={advisors.filter(a => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={recordDecision} onFollowup={handleFollowup} />
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
+import FounderReplyBox from "@/components/boardroom/FounderReplyBox";
 import { ChevronDown, ChevronUp, MessageSquare, CornerDownRight, RefreshCw, AlertTriangle } from "lucide-react";
 
 const MESSAGE_TYPE_META = {
@@ -13,6 +14,7 @@ const MESSAGE_TYPE_META = {
   risk_identified: { label: "Risk", className: "bg-destructive/10 text-destructive" },
   opinion_changed: { label: "Changed", className: "bg-primary text-primary-foreground" },
   final_statement: { label: "Final", className: "bg-secondary text-muted-foreground" },
+  founder_message: { label: "Founder", className: "bg-primary text-primary-foreground" },
 };
 
 function FilterPill({ active, onClick, children }) {
@@ -29,6 +31,25 @@ function FilterPill({ active, onClick, children }) {
 }
 
 function DiscussionMessage({ msg, accent }) {
+  if (msg.message_type === 'founder_message') {
+    return (
+      <div className="flex gap-3 group">
+        <div className="shrink-0 pt-0.5">
+          <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-medium font-display">You</div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="font-display text-sm font-medium">You</span>
+            <span className="text-xs text-muted-foreground">Founder</span>
+            <span className="inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Founder Reply</span>
+          </div>
+          <div className="bg-primary/5 rounded-xl p-3 border border-primary/10">
+            <p className="text-sm leading-relaxed text-foreground/90">{msg.message}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const typeMeta = MESSAGE_TYPE_META[msg.message_type] || MESSAGE_TYPE_META.initial;
 
   return (
@@ -126,12 +147,16 @@ function DiscussionEvaluation({ evaluation }) {
   );
 }
 
-export default function ExecutiveDiscussion({ transcript = [], evaluation, advisors = [] }) {
+export default function ExecutiveDiscussion({ transcript = [], evaluation, advisors = [], onFollowup }) {
   const [expanded, setExpanded] = useState(false);
   const [filterAdvisor, setFilterAdvisor] = useState("all");
   const [filterType, setFilterType] = useState("all");
 
   const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
+
+  useEffect(() => {
+    if (transcript.some(m => m.message_type === 'founder_message')) setExpanded(true);
+  }, [transcript]);
 
   const rounds = useMemo(
     () => [...new Set(transcript.map((m) => m.round))].sort((a, b) => a - b),
@@ -211,7 +236,7 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
                 <div key={round}>
                   <div className="flex items-center gap-3 my-4">
                     <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                      {round === 1 ? "Round 1 — Independent Positions" : `Round ${round} — Discussion`}
+                      {round === 1 ? "Round 1 — Independent Positions" : roundMessages.some(m => m.message_type === 'founder_message') ? `Round ${round} — Founder Follow-up` : `Round ${round} — Discussion`}
                     </div>
                     <div className="flex-1 h-px bg-border/50" />
                   </div>
@@ -224,6 +249,7 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
               );
             })}
           </div>
+          {onFollowup && <FounderReplyBox onSubmit={onFollowup} />}
         </div>
       )}
     </div>

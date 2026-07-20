@@ -17,7 +17,7 @@ function List({ icon: Icon, title, items }) {
   );
 }
 
-export default function MeetingResult({ result, advisors, companyId, onRecordDecision }) {
+export default function MeetingResult({ result, advisors, companyId, onRecordDecision, onFollowup }) {
   const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
   const resolution = result.board_resolution || {};
   const independent = result.independent_responses || [];
@@ -72,7 +72,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         )}
       </div>
 
-      <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} />
+      <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} />
 
       <FounderDecisionControls meetingId={result.meeting_id} nextActions={resolution.next_actions} companyId={companyId} />
 
