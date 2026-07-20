@@ -27,19 +27,31 @@ async function callOpenAI(model, systemPrompt, userPrompt, temperature, maxToken
   } finally { clearTimeout(timeout); }
 }
 
+// Claude 4.6+ generation models (dateless IDs) deprecated the `temperature` parameter.
+// They use adaptive thinking instead. Send temperature only for older models.
+const ANTHROPIC_NO_TEMP_MODELS = new Set([
+  'claude-sonnet-5', 'claude-sonnet-4-6',
+  'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6',
+  'claude-fable-5', 'claude-mythos-5',
+]);
+
 async function callAnthropic(model, systemPrompt, userPrompt, temperature, maxTokens, timeoutMs) {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const body = {
+      model, system: systemPrompt, max_tokens: maxTokens,
+      messages: [{ role: 'user', content: userPrompt }],
+    };
+    if (!ANTHROPIC_NO_TEMP_MODELS.has(model)) {
+      body.temperature = temperature;
+    }
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model, system: systemPrompt, temperature, max_tokens: maxTokens,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     const data = await res.json();
