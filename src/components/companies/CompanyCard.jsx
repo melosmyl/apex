@@ -54,47 +54,47 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
   const extra = Math.max(0, advisors.length - 4);
   const initials = company.name?.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "•";
 
-  return (
-    <button
-      onClick={() => navigate(`/company/${company.id}/dashboard`)}
-      className="group text-left bg-card border border-border/70 rounded-2xl p-5 sm:p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex flex-col h-full hidden">
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="w-14 h-14 rounded-xl border border-border flex items-center justify-center font-display text-lg text-foreground bg-secondary/50 shrink-0 overflow-hidden">
-            {company.logo_url ? <img src={company.logo_url} alt="" className="w-full h-full object-cover" /> : initials}
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-xl font-display truncate">{company.name}</h3>
-            <p className="text-sm text-muted-foreground truncate">{company.industry || company.tagline || "—"}</p>
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: tier.color }} />
-              <span className="text-[10px] uppercase tracking-[0.15em] font-medium" style={{ color: tier.color }}>{tier.label}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <HealthRing score={score} />
-          <ArrowUpRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-      </div>
+  return null;
 
-      <div className="mb-5">
-        <div className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">Executive Team</div>
-        <div className="flex items-center gap-1.5">
-          {team.length > 0 ? team.map((a) => {
-            const lib = a.library_key ? getAdvisorByKey(a.library_key) : null;
-            return <AdvisorAvatar key={a.id} name={a.name} accent={a.accent || lib?.accent || "#7a5c3e"} photo_url={a.photo_url || lib?.photo_url} size="sm" />;
-          }) : <span className="text-sm text-muted-foreground italic">No advisors yet</span>}
-          {extra > 0 &&
-          <div className="w-9 h-9 rounded-full bg-secondary text-muted-foreground flex items-center justify-center text-xs font-medium border border-border">+{extra}</div>
-          }
-        </div>
-      </div>
 
-      <div className="grid grid-cols-3 gap-3 pt-4 border-t border-border/60 mt-auto">
-        <Stat value={stats.advisors || 0} label="Advisors" />
-        <Stat value={stats.meetings || 0} label="Meetings" />
-        <Stat value={stats.decisions || 0} label="Decisions" />
-      </div>
-    </button>);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
