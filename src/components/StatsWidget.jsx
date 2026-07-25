@@ -14,11 +14,11 @@ function relativeTime(dateStr) {
 
 function StatCell({ icon: Icon, value, line1, line2, className = "" }) {
   return (
-    <div className={`bg-card p-5 flex items-center gap-4 ${className}`}>
-      <Icon className="w-5 h-5 text-muted-foreground shrink-0" strokeWidth={1.5} />
+    <div className={`bg-card p-6 flex items-center gap-4 ${className}`}>
+      <Icon className="w-[18px] h-[18px] text-muted-foreground shrink-0" strokeWidth={1.5} />
       <div className="min-w-0">
-        <div className="text-2xl sm:text-3xl font-display font-light leading-none truncate">{value}</div>
-        <div className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-2 leading-tight">
+        <div className="text-2xl sm:text-3xl font-display font-normal leading-none truncate">{value}</div>
+        <div className="text-[10px] uppercase tracking-editorial text-muted-foreground mt-2 leading-tight font-medium">
           <div>{line1}</div>
           <div>{line2}</div>
         </div>
@@ -54,9 +54,9 @@ export default function StatsWidget({ decisions = [], meetings = [], tasks = [] 
   const productivity = tasks.length ? `${Math.round((doneTasks / tasks.length) * 100)}%` : "—";
 
   return (
-    <div className="mb-8 rise-in">
-      <div className="rounded-2xl border border-border overflow-hidden">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px bg-muted-foreground/60">
+    <div className="mb-10 rise-in">
+      <div className="rounded-[var(--radius)] border border-border/50 overflow-hidden shadow-card">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px bg-border/40">
           <StatCell icon={Scale} value={decisionsWaiting} line1="Decisions" line2="Waiting" />
           <StatCell icon={CheckCircle2} value={tasksCompletedOvernight} line1="Tasks Completed" line2="Overnight" />
           <StatCell icon={Calendar} value={meetingValue} line1="Last Board Meeting" line2={relativeTime(lastMeeting?.created_date)} />

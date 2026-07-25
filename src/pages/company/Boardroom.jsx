@@ -129,37 +129,37 @@ export default function Boardroom() {
         description="Pose a strategic question. Your advisors will debate it — and reach a recommendation." />
 
       {phase !== "result" && (
-        <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
+        <div className="bg-card border border-border/50 rounded-[var(--radius)] p-8 sm:p-12 mb-8 shadow-card rise-in">
           <BoardTable advisors={advisors} activeName={activeName} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
-          <p className="text-center text-xs text-muted-foreground mt-4">
+          <p className="text-center text-xs text-muted-foreground mt-5 tracking-wide">
             {selectedCount} attending{selectedCount < 3 && " · At least 3 required"}
           </p>
           {error && <p className="text-center text-sm text-destructive mt-2">{error}</p>}
-          <div className="max-w-xl mx-auto mt-8">
+          <div className="max-w-xl mx-auto mt-10">
             {phase === "idle" ? (
               <>
                 <Textarea value={question} onChange={e => setQuestion(e.target.value)} rows={3}
                   placeholder="Ask your board a strategic question…"
-                  className="text-base resize-none bg-background rounded-2xl" />
-                <div className="flex flex-wrap gap-2 mt-3">
+                  className="text-base resize-none bg-background/50 rounded-xl leading-relaxed" />
+                <div className="flex flex-wrap gap-2 mt-4">
                   {PROMPTS.map(p => (
-                    <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
+                    <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary/60 hover:bg-accent/60 rounded-full px-3.5 py-1.5 transition-all duration-300">{p}</button>
                   ))}
                 </div>
-                <Button onClick={start} disabled={!question.trim() || selectedCount < 3} className="w-full mt-4 rounded-full h-11">
-                  <Landmark className="w-4 h-4 mr-2" /> Start Board Meeting
+                <Button onClick={start} disabled={!question.trim() || selectedCount < 3} className="w-full mt-6 h-12 text-base">
+                  <Landmark className="w-4 h-4 mr-2" strokeWidth={1.5} /> Start Board Meeting
                 </Button>
               </>
             ) : (
-              <div className="text-center py-8">
+              <div className="text-center py-12">
                 <div className="inline-flex items-center gap-2 text-muted-foreground">
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  <span className="font-display text-lg">{PHASE_MESSAGES[phase]}</span>
+                  <Sparkles className="w-4 h-4 animate-pulse" strokeWidth={1.5} />
+                  <span className="font-display text-xl font-normal">{PHASE_MESSAGES[phase]}</span>
                 </div>
                 {phase === "preparing" && activeName && (
-                  <p className="text-sm text-muted-foreground mt-2">{activeName} is evaluating…</p>
+                  <p className="text-sm text-muted-foreground mt-3">{activeName} is evaluating…</p>
                 )}
-                <p className="font-display text-base mt-4 max-w-md mx-auto text-muted-foreground italic">"{question}"</p>
+                <p className="font-display text-lg mt-6 max-w-md mx-auto text-muted-foreground italic">"{question}"</p>
               </div>
             )}
           </div>
@@ -168,9 +168,9 @@ export default function Boardroom() {
 
       {phase === "result" && result && (
         <div>
-          <div className="flex items-center justify-between mb-6">
-            <p className="font-display text-xl max-w-2xl">"{question}"</p>
-            <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); }}>New question</Button>
+          <div className="flex items-center justify-between mb-10">
+            <p className="font-display text-xl sm:text-2xl max-w-2xl font-normal leading-snug">"{question}"</p>
+            <Button variant="outline" className="shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); }}>New question</Button>
           </div>
           <MeetingResult result={result} advisors={advisors.filter(a => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={recordDecision} onFollowup={handleFollowup} />
         </div>

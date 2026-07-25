@@ -68,24 +68,24 @@ export default function HealthWidget() {
     <div className="mb-8 rise-in">
       {error && <p className="text-sm text-destructive mb-2">{error}</p>}
       {device ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-card border border-border/70 rounded-2xl p-4">
-          <div className="flex items-center gap-2.5 pr-4 border-r border-border/60">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-card border border-border/50 rounded-[var(--radius)] p-5 shadow-soft">
+          <div className="flex items-center gap-2.5 pr-4 border-r border-border/50">
             <Heart
-              className="w-6 h-6 text-rose-500"
+              className="w-5 h-5 text-destructive"
               style={heartRate ? { animation: `heartbeat ${Math.max(0.4, 60 / heartRate)}s ease-in-out infinite` } : undefined}
               fill="currentColor"
             />
             <div>
-              <div className="text-2xl font-display font-light leading-none">{heartRate ?? "—"}</div>
-              <div className="text-[11px] text-muted-foreground uppercase tracking-wider">BPM</div>
+              <div className="text-2xl font-display font-normal leading-none">{heartRate ?? "—"}</div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-editorial font-medium">BPM</div>
             </div>
           </div>
-          <div className="flex items-center gap-2 pr-4 border-r border-border/60">
+          <div className="flex items-center gap-2 pr-4 border-r border-border/50">
             <Bluetooth className="w-4 h-4 text-muted-foreground" />
             <span className="text-sm">{deviceName}</span>
           </div>
           {battery !== null && (
-            <div className="flex items-center gap-2 pr-4 border-r border-border/60">
+            <div className="flex items-center gap-2 pr-4 border-r border-border/50">
               <BatteryMedium className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm">{battery}%</span>
             </div>

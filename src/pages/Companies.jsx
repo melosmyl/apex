@@ -56,14 +56,14 @@ export default function Companies() {
   if (error) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
-          <div className="flex flex-col items-center justify-center text-center py-20 rise-in">
-            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-5">
-              <RefreshCw className="w-7 h-7 text-muted-foreground" strokeWidth={1.5} />
+        <div className="max-w-5xl mx-auto px-6 sm:px-10 py-14 lg:py-20">
+          <div className="flex flex-col items-center justify-center text-center py-24 rise-in">
+            <div className="w-16 h-16 rounded-2xl bg-secondary/70 flex items-center justify-center mb-6">
+              <RefreshCw className="w-6 h-6 text-muted-foreground" strokeWidth={1.25} />
             </div>
-            <h3 className="text-xl font-display mb-2">Connection interrupted</h3>
-            <p className="text-muted-foreground max-w-sm mb-6">We couldn't reach the server. Please check your connection and try again.</p>
-            <Button onClick={load} className="rounded-full px-6"><RefreshCw className="w-4 h-4 mr-1.5" /> Retry</Button>
+            <h3 className="text-2xl font-display font-light mb-2">Connection interrupted</h3>
+            <p className="text-muted-foreground max-w-sm mb-8 leading-relaxed">We couldn't reach the server. Please check your connection and try again.</p>
+            <Button onClick={load} className="px-6"><RefreshCw className="w-4 h-4 mr-1.5" /> Retry</Button>
           </div>
         </div>
       </div>
@@ -72,20 +72,20 @@ export default function Companies() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10 fade-in">
+      <div className="max-w-5xl mx-auto px-6 sm:px-10 py-14 lg:py-20">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-12 fade-in">
           <div>
-            <div className="text-4xl sm:text-5xl font-light font-display mb-3">
+            <div className="text-4xl sm:text-5xl font-light font-display mb-3 leading-tight">
               {user ? `${(() => {const h = new Date().getHours();return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";})()}, ${user.full_name?.split(" ")[0] || "there"}` : "\u00A0"}
             </div>
-            <h1 className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-body">Here's your Executive Briefing.</h1>
-            <p className="text-muted-foreground mt-3 font-display italic text-lg">Never build alone.</p>
+            <h1 className="text-[11px] uppercase tracking-editorial text-muted-foreground font-body font-medium">Here's your Executive Briefing.</h1>
+            <p className="text-muted-foreground mt-4 font-display italic text-lg">Never build alone.</p>
           </div>
           <div className="flex gap-2 items-center">
             {user?.role === "admin" && <Link to="/admin"><Button variant="ghost" className="rounded-full"><Shield className="w-4 h-4 mr-1.5" /> Admin</Button></Link>}
             <Link to="/pricing"><Button variant="ghost" className="rounded-full">Pricing</Button></Link>
             {companies?.length > 0 &&
-            <Button onClick={() => setDialog(true)} className="px-5 rounded-full bg-[#187221] text-gray-50"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
+            <Button onClick={() => setDialog(true)} className="px-6"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
             }
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function Companies() {
 
         {companies === null ?
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[0, 1, 2].map((i) => <div key={i} className="h-56 rounded-2xl bg-secondary/60 animate-pulse" />)}
+            {[0, 1, 2].map((i) => <div key={i} className="h-56 rounded-[var(--radius)] bg-secondary/40 animate-pulse" />)}
           </div> :
         companies.length === 0 ?
         <EmptyState
@@ -105,7 +105,7 @@ export default function Companies() {
           action={<Button onClick={() => setDialog(true)} className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :
 
 
-        <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-6">
             {companies.map((c) =>
           <div key={c.id} className="rise-in h-full"><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} advisors={stats[c.id]?.advisorList || []} /></div>
           )}

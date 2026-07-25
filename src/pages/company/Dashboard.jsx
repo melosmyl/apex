@@ -6,13 +6,13 @@ import ProjectProgress from "@/components/dashboard/ProjectProgress";
 
 function Card({ title, icon: Icon, children, onView }) {
   return (
-    <div className="bg-card border border-border/70 rounded-2xl p-6 rise-in">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-card border border-border/50 rounded-[var(--radius)] p-7 shadow-card rise-in">
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2.5">
-          <Icon className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.75} />
-          <h3 className="font-display text-lg">{title}</h3>
+          <Icon className="w-[17px] h-[17px] text-muted-foreground" strokeWidth={1.5} />
+          <h3 className="font-display text-lg font-normal">{title}</h3>
         </div>
-        {onView && <button onClick={onView} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></button>}
+        {onView && <button onClick={onView} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">View all <ArrowRight className="w-3 h-3" /></button>}
       </div>
       {children}
     </div>
@@ -44,10 +44,10 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="mb-10 rise-in">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Company Dashboard</div>
-        <h1 className="text-3xl sm:text-4xl font-light">{company.name}</h1>
-        {company.tagline && <p className="text-muted-foreground mt-2 max-w-2xl">{company.tagline}</p>}
+      <div className="mb-12 rise-in">
+        <div className="text-[11px] uppercase tracking-editorial text-muted-foreground mb-3 font-medium">Executive Briefing</div>
+        <h1 className="text-3xl sm:text-4xl font-display font-light leading-tight">{company.name}</h1>
+        {company.tagline && <p className="text-muted-foreground mt-3 max-w-2xl leading-relaxed">{company.tagline}</p>}
       </div>
 
       {company.metrics?.length > 0 && (
@@ -55,11 +55,11 @@ export default function Dashboard() {
           {company.metrics.map((m, i) => {
             const T = m.trend === "up" ? TrendingUp : m.trend === "down" ? TrendingDown : Minus;
             return (
-              <div key={i} className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{m.label}</div>
+              <div key={i} className="bg-card border border-border/50 rounded-[var(--radius)] p-5 shadow-card rise-in">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">{m.label}</div>
                 <div className="flex items-end justify-between">
-                  <div className="font-display text-2xl">{m.value}</div>
-                  <T className={`w-4 h-4 ${m.trend === "up" ? "text-emerald-700" : m.trend === "down" ? "text-destructive" : "text-muted-foreground"}`} />
+                  <div className="font-display text-2xl font-normal">{m.value}</div>
+                  <T className={`w-4 h-4 ${m.trend === "up" ? "text-chart-2" : m.trend === "down" ? "text-destructive" : "text-muted-foreground"}`} strokeWidth={1.5} />
                 </div>
               </div>
             );
@@ -69,7 +69,7 @@ export default function Dashboard() {
 
       <ProjectProgress companyId={companyId} onNavigate={() => go("projects")} />
 
-      <div className="grid lg:grid-cols-2 gap-5">
+      <div className="grid lg:grid-cols-2 gap-6">
         <Card title="Recent Board Decisions" icon={Scale} onView={() => go("decisions")}>
           {!data ? <Empty text="Loading…" /> : data.decisions.length === 0 ? <Empty text="No decisions recorded yet." /> : (
             <ul className="space-y-3">
