@@ -73,19 +73,18 @@ export default function Companies() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10 fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-12 fade-in">
           <div>
-            <div className="text-4xl sm:text-5xl font-light font-display mb-3">
+            <div className="text-[2.5rem] sm:text-[3.25rem] sm:leading-[1.08] font-normal font-display mb-3 text-balance">
               {user ? `${(() => {const h = new Date().getHours();return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";})()}, ${user.full_name?.split(" ")[0] || "there"}` : "\u00A0"}
             </div>
-            <h1 className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-body">Here's your Executive Briefing.</h1>
-            <p className="text-muted-foreground mt-3 font-display italic text-lg">Never build alone.</p>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-md leading-relaxed">Here's your executive briefing. <span className="font-display italic text-foreground/80">Never build alone.</span></p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center">
             {user?.role === "admin" && <Link to="/admin"><Button variant="ghost" className="rounded-full"><Shield className="w-4 h-4 mr-1.5" /> Admin</Button></Link>}
             <Link to="/pricing"><Button variant="ghost" className="rounded-full">Pricing</Button></Link>
             {companies?.length > 0 &&
-            <Button onClick={() => setDialog(true)} className="px-5 rounded-full bg-[#187221] text-gray-50"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
+            <Button onClick={() => setDialog(true)} variant="brand" className="px-6 rounded-full text-[0.95rem]"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
             }
           </div>
         </div>
@@ -94,20 +93,20 @@ export default function Companies() {
         <HealthWidget />
 
         {companies === null ?
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[0, 1, 2].map((i) => <div key={i} className="h-56 rounded-2xl bg-secondary/60 animate-pulse" />)}
+        <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-6">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="h-72 rounded-3xl bg-secondary/50 animate-pulse" />)}
           </div> :
         companies.length === 0 ?
         <EmptyState
           icon={Building2}
           title="Establish your first company"
           description="Create a workspace, assemble your AI executive team, and start making better decisions together."
-          action={<Button onClick={() => setDialog(true)} className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :
+          action={<Button onClick={() => setDialog(true)} variant="brand" className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :
 
 
-        <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-5">
-            {companies.map((c) =>
-          <div key={c.id} className="rise-in h-full"><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} advisors={stats[c.id]?.advisorList || []} /></div>
+        <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-6">
+            {companies.map((c, i) =>
+          <div key={c.id} className="rise-in h-full" style={{ animationDelay: `${i * 60}ms` }}><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} advisors={stats[c.id]?.advisorList || []} /></div>
           )}
           </div>
         }
