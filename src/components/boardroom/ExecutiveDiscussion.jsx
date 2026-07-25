@@ -23,8 +23,8 @@ function FilterPill({ active, onClick, children }) {
   return (
     <button
       onClick={onClick}
-      className={`text-xs rounded-full px-3.5 py-1.5 transition-all duration-300 whitespace-nowrap ${
-        active ? "bg-primary text-primary-foreground" : "bg-secondary/60 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+      className={`text-xs rounded-full px-3 py-1 transition-colors whitespace-nowrap ${
+        active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:bg-accent"
       }`}
     >
       {children}
@@ -77,7 +77,7 @@ function DiscussionMessage({ msg, accent }) {
             </span>
           )}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90 mb-1">{msg.message}</p>
+        <p className="text-sm leading-relaxed text-foreground/90">{msg.message}</p>
         {msg.new_position && (
           <p className="text-sm italic text-muted-foreground mt-1.5 pl-3 border-l-2 border-primary/30">
             New position: {msg.new_position}
@@ -102,8 +102,8 @@ function DiscussionMessage({ msg, accent }) {
 
 function DiscussionEvaluation({ evaluation }) {
   return (
-    <div className="bg-secondary/20 p-6 border-b border-border/50">
-      <div className="text-[11px] uppercase tracking-editorial text-muted-foreground mb-4 font-medium">Chair's Evaluation of the Discussion</div>
+    <div className="bg-secondary/30 p-5 border-b border-border/50">
+      <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-3">Chair's Evaluation of the Discussion</div>
       <div className="grid sm:grid-cols-2 gap-4">
         {evaluation.strongest_arguments?.length > 0 && (
           <div>
@@ -194,15 +194,15 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
   if (!transcript.length) return null;
 
   return (
-    <div className="bg-card border border-border/50 rounded-[var(--radius)] overflow-hidden shadow-card rise-in">
+    <div className="bg-card border border-border/70 rounded-2xl overflow-hidden rise-in">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-6 hover:bg-accent/30 transition-all duration-300"
+        className="w-full flex items-center justify-between p-5 hover:bg-accent/30 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <MessageSquare className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.5} />
+          <MessageSquare className="w-5 h-5 text-muted-foreground" />
           <div className="text-left">
-            <h3 className="font-display text-lg font-normal">Executive Discussion</h3>
+            <h3 className="font-display text-lg">Executive Discussion</h3>
             <p className="text-xs text-muted-foreground">
               {stats.rounds} rounds · {stats.messages} messages
               {stats.challenges > 0 && ` · ${stats.challenges} challenges`}
@@ -217,7 +217,7 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
         <div className="border-t border-border/50">
           {evaluation && <DiscussionEvaluation evaluation={evaluation} />}
 
-          <div className="flex flex-wrap items-center gap-2 p-5 border-b border-border/50">
+          <div className="flex flex-wrap items-center gap-2 p-4 border-b border-border/50">
             <FilterPill active={filterAdvisor === "all"} onClick={() => setFilterAdvisor("all")}>All advisors</FilterPill>
             {advisorNames.map((name) => (
               <FilterPill key={name} active={filterAdvisor === name} onClick={() => setFilterAdvisor(name)}>{name}</FilterPill>
@@ -231,19 +231,19 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
             <FilterPill active={filterType === "risks"} onClick={() => setFilterType("risks")}>New risks</FilterPill>
           </div>
 
-          <div className="p-6 space-y-1 max-h-[800px] overflow-y-auto">
+          <div className="p-4 space-y-1 max-h-[800px] overflow-y-auto">
             {rounds.map((round) => {
               const roundMessages = filtered.filter((m) => m.round === round);
               if (!roundMessages.length) return null;
               return (
                 <div key={round}>
-                  <div className="flex items-center gap-3 my-6">
-                    <div className="text-[11px] uppercase tracking-editorial text-muted-foreground font-medium">
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
                       {round === 1 ? "Round 1 — Independent Positions" : roundMessages.some(m => m.message_type === 'founder_message') ? `Round ${round} — Founder Follow-up` : `Round ${round} — Discussion`}
                     </div>
-                    <div className="flex-1 h-px bg-border/40" />
+                    <div className="flex-1 h-px bg-border/50" />
                   </div>
-                  <div className="space-y-6">
+                  <div className="space-y-5">
                     {roundMessages.map((msg, i) => (
                       <PinnableText
                         key={`${round}-${i}`}

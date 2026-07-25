@@ -67,37 +67,27 @@ module.exports = {
   			display: ['var(--font-display)'],
   			mono: ['var(--font-mono)']
   		},
-  		boxShadow: {
-  			'soft': 'var(--shadow-soft)',
-  			'card': 'var(--shadow-card)',
-  			'elevated': 'var(--shadow-elevated)',
-  			'hover': 'var(--shadow-hover)',
-  			'none-sm': '0 0 0 1px rgba(60,50,40,0.04)'
-  		},
   		keyframes: {
   			'accordion-down': {
-  				from: { height: '0' },
-  				to: { height: 'var(--radix-accordion-content-height)' }
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
   			},
   			'accordion-up': {
-  				from: { height: 'var(--radix-accordion-content-height)' },
-  				to: { height: '0' }
-  			},
-  			'gentle-fade': {
-  				from: { opacity: 0 },
-  				to: { opacity: 1 }
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
   			}
   		},
   		animation: {
-  			'accordion-down': 'accordion-down 0.25s ease-out',
-  			'accordion-up': 'accordion-up 0.25s ease-out',
-  			'gentle-fade': 'gentle-fade 0.6s ease-out both'
-  		},
-  		spacing: {
-  			'18': '4.5rem'
-  		},
-  		letterSpacing: {
-  			'editorial': '0.2em'
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out'
   		}
   	}
   },
