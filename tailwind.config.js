@@ -50,9 +50,10 @@ module.exports = {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
-  			olive: {
-  				DEFAULT: 'hsl(var(--accent-olive))',
-  				foreground: 'hsl(40 25% 97%)'
+  			brand: {
+  				DEFAULT: 'hsl(var(--brand))',
+  				foreground: 'hsl(var(--brand-foreground))',
+  				soft: 'hsl(var(--brand-soft))'
   			},
   			chart: {
   				'1': 'hsl(var(--chart-1))',
