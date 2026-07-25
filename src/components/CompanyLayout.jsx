@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Outlet, useParams, NavLink, useNavigate, useLocation, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { PinProvider } from "@/components/pins/PinContext";
 import {
   LayoutDashboard, Users, Landmark, FolderKanban, CheckSquare, BookOpen,
-  FileText, Search, Scale, CalendarClock, Settings, ChevronLeft, Menu, X } from
+  FileText, Search, Scale, CalendarClock, Settings, ChevronLeft, Menu, X, Pin } from
 "lucide-react";
 
 const NAV = [
@@ -12,6 +13,7 @@ const NAV = [
 { to: "boardroom", label: "Boardroom", icon: Landmark },
 { to: "projects", label: "Projects", icon: FolderKanban },
 { to: "tasks", label: "Tasks", icon: CheckSquare },
+{ to: "pins", label: "Pins", icon: Pin },
 { to: "knowledge", label: "Knowledge", icon: BookOpen },
 { to: "documents", label: "Documents", icon: FileText },
 { to: "research", label: "Research", icon: Search },
@@ -92,7 +94,7 @@ export default function CompanyLayout() {
           <span className="w-6" />
         </header>
         <main className="max-w-6xl mx-auto px-5 sm:px-8 py-8 lg:py-12">
-          {company && <Outlet context={{ company, setCompany }} />}
+          {company && <PinProvider companyId={companyId}><Outlet context={{ company, setCompany }} /></PinProvider>}
         </main>
       </div>
     </div>);

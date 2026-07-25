@@ -43,6 +43,18 @@ export default function Boardroom() {
   }, [companyId]);
 
   useEffect(() => {
+    const meetingId = new URLSearchParams(window.location.search).get("meeting");
+    if (!meetingId) return;
+    base44.entities.BoardMeeting.get(meetingId).then((m) => {
+      if (m) {
+        setResult(m);
+        setQuestion(m.question || "");
+        setPhase("result");
+      }
+    }).catch(() => {});
+  }, [companyId]);
+
+  useEffect(() => {
     if (phase !== "preparing" || !advisors?.length) return;
     const participants = advisors.filter(a => selectedIds?.includes(a.id));
     if (!participants.length) return;

@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import ReactMarkdown from "react-markdown";
+import PinnableText from "@/components/pins/PinnableText";
+import { usePin } from "@/components/pins/PinContext";
 import {
   Check, RefreshCw, Edit3, History, Paperclip, Archive, MessageSquare,
   Save, X, ChevronRight, FileText, AlertTriangle
@@ -17,6 +19,7 @@ import { STATUS_CONFIG, APPROVAL_CONFIG } from "@/lib/documents";
 export default function DocumentDetailDialog({
   doc, advisors, onClose, onRefresh, company
 }) {
+  const { createPin } = usePin();
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
   const [editTitle, setEditTitle] = useState("");
@@ -173,9 +176,21 @@ export default function DocumentDetailDialog({
             </div>
           </div>
         ) : (
-          <div className="prose prose-sm max-w-none text-foreground">
-            <ReactMarkdown>{doc.content || doc.description || "No content yet."}</ReactMarkdown>
-          </div>
+          <PinnableText
+            companyId={doc.company_id}
+            sourceType="document"
+            sourceId={doc.id}
+            sourceTitle={doc.title}
+            sourceUrl={`/company/${doc.company_id}/documents`}
+            documentId={doc.id}
+            advisorId={doc.created_by_advisor_id}
+            projectId={doc.project_id}
+            onPin={createPin}
+          >
+            <div className="prose prose-sm max-w-none text-foreground">
+              <ReactMarkdown>{doc.content || doc.description || "No content yet."}</ReactMarkdown>
+            </div>
+          </PinnableText>
         )}
 
         {/* Source references */}

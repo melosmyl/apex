@@ -4,6 +4,8 @@ import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical } from "lucid
 import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
+import PinnableText from "@/components/pins/PinnableText";
+import { usePin } from "@/components/pins/PinContext";
 
 function List({ icon: Icon, title, items }) {
   if (!items?.length) return null;
@@ -18,11 +20,15 @@ function List({ icon: Icon, title, items }) {
 }
 
 export default function MeetingResult({ result, advisors, companyId, onRecordDecision, onFollowup }) {
+  const { createPin } = usePin();
   const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
   const resolution = result.board_resolution || {};
   const independent = result.independent_responses || [];
   const challenges = result.challenge_responses || [];
   const conf = Math.round(resolution.overall_confidence_score || 0);
+  const meetingId = result.meeting_id;
+  const meetingTitle = result.question || "Board Meeting";
+  const sourceUrl = `/company/${companyId}/boardroom?meeting=${meetingId}`;
 
   return (
     <div className="space-y-8">
@@ -34,11 +40,13 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
             <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Confidence</div>
           </div>
         </div>
-        <p className="text-[15px] leading-relaxed mb-6">{resolution.executive_summary}</p>
-        <div className="bg-accent/50 rounded-xl p-5 mb-6">
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Direction</div>
-          <p className="font-display text-lg leading-snug">{resolution.recommended_direction}</p>
-        </div>
+        <PinnableText companyId={companyId} sourceType="board_resolution" sourceId={meetingId} sourceTitle={meetingTitle} sourceUrl={sourceUrl} meetingId={meetingId} onPin={createPin}>
+          <p className="text-[15px] leading-relaxed mb-6">{resolution.executive_summary}</p>
+          <div className="bg-accent/50 rounded-xl p-5 mb-6">
+            <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Direction</div>
+            <p className="font-display text-lg leading-snug">{resolution.recommended_direction}</p>
+          </div>
+        </PinnableText>
         {resolution.reasoning && (
           <div className="mb-4"><div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Reasoning</div><p className="text-sm leading-relaxed">{resolution.reasoning}</p></div>
         )}
@@ -72,7 +80,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         )}
       </div>
 
-      <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} />
+      <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 
       <FounderDecisionControls meetingId={result.meeting_id} nextActions={resolution.next_actions} companyId={companyId} />
 
@@ -81,7 +89,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         <div className="grid sm:grid-cols-2 gap-4">
           {independent.map((resp, i) => {
             const challenge = challenges.find(c => c.advisor_id === resp.advisor_id);
-            return <AdvisorResponseCard key={i} independent={resp} challenge={challenge} accent={accentOf(resp.advisor_name)} />;
+            return <AdvisorResponseCard key={i} independent={resp} challenge={challenge} accent={accentOf(resp.advisor_name)} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />;
           })}
         </div>
       </div>

@@ -9,12 +9,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
+import PinnableText from "@/components/pins/PinnableText";
+import { usePin } from "@/components/pins/PinContext";
 import { format } from "date-fns";
 
 const STATUS = { pending: "bg-amber-50 text-amber-800 border-amber-200", decided: "bg-emerald-50 text-emerald-800 border-emerald-200", reviewed: "bg-stone-100 text-stone-700 border-stone-200" };
 
 export default function Decisions() {
   const { companyId } = useParams();
+  const { createPin } = usePin();
   const [items, setItems] = useState(null);
   const [open, setOpen] = useState(null);
   const [form, setForm] = useState({ decision_taken: "", reasoning: "", outcome_review: "", status: "pending" });
@@ -66,9 +69,11 @@ export default function Decisions() {
           {open && <>
             <DialogHeader><DialogTitle className="font-display text-xl font-light leading-snug">{open.question}</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
-              {open.summary && <div><Label className="text-muted-foreground text-xs uppercase tracking-wider">Board Summary</Label><p className="text-sm mt-1">{open.summary}</p></div>}
-              {open.final_recommendation && <div className="bg-accent/50 rounded-xl p-4"><Label className="text-muted-foreground text-xs uppercase tracking-wider">Recommendation</Label><p className="text-sm mt-1">{open.final_recommendation}</p></div>}
-              {open.risks?.length > 0 && <div><Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1"><ShieldAlert className="w-3.5 h-3.5" /> Risks</Label><ul className="text-sm mt-1 space-y-1">{open.risks.map((r,i)=><li key={i}>— {r}</li>)}</ul></div>}
+              <PinnableText companyId={companyId} sourceType="decision_memo" sourceId={open.id} sourceTitle={open.question} sourceUrl={`/company/${companyId}/decisions?id=${open.id}`} decisionId={open.id} onPin={createPin}>
+                {open.summary && <div><Label className="text-muted-foreground text-xs uppercase tracking-wider">Board Summary</Label><p className="text-sm mt-1">{open.summary}</p></div>}
+                {open.final_recommendation && <div className="bg-accent/50 rounded-xl p-4"><Label className="text-muted-foreground text-xs uppercase tracking-wider">Recommendation</Label><p className="text-sm mt-1">{open.final_recommendation}</p></div>}
+                {open.risks?.length > 0 && <div><Label className="text-muted-foreground text-xs uppercase tracking-wider flex items-center gap-1"><ShieldAlert className="w-3.5 h-3.5" /> Risks</Label><ul className="text-sm mt-1 space-y-1">{open.risks.map((r,i)=><li key={i}>— {r}</li>)}</ul></div>}
+              </PinnableText>
               <div className="border-t border-border/60 pt-4 space-y-3">
                 <div><Label className="mb-1.5 block">Decision taken</Label><Textarea value={form.decision_taken} onChange={(e)=>setForm(f=>({...f,decision_taken:e.target.value}))} rows={2} placeholder="What did you decide?" /></div>
                 <div><Label className="mb-1.5 block">Reasoning</Label><Textarea value={form.reasoning} onChange={(e)=>setForm(f=>({...f,reasoning:e.target.value}))} rows={2} /></div>

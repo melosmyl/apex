@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import FounderReplyBox from "@/components/boardroom/FounderReplyBox";
+import PinnableText from "@/components/pins/PinnableText";
+import { usePin } from "@/components/pins/PinContext";
 import { ChevronDown, ChevronUp, MessageSquare, CornerDownRight, RefreshCw, AlertTriangle } from "lucide-react";
 
 const MESSAGE_TYPE_META = {
@@ -147,7 +149,8 @@ function DiscussionEvaluation({ evaluation }) {
   );
 }
 
-export default function ExecutiveDiscussion({ transcript = [], evaluation, advisors = [], onFollowup }) {
+export default function ExecutiveDiscussion({ transcript = [], evaluation, advisors = [], onFollowup, meetingId, companyId, meetingTitle }) {
+  const { createPin } = usePin();
   const [expanded, setExpanded] = useState(false);
   const [filterAdvisor, setFilterAdvisor] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -242,7 +245,19 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
                   </div>
                   <div className="space-y-5">
                     {roundMessages.map((msg, i) => (
-                      <DiscussionMessage key={`${round}-${i}`} msg={msg} accent={accentOf(msg.advisor_name)} />
+                      <PinnableText
+                        key={`${round}-${i}`}
+                        companyId={companyId}
+                        sourceType="executive_discussion"
+                        sourceId={meetingId}
+                        sourceTitle={meetingTitle || "Executive Discussion"}
+                        sourceUrl={meetingId ? `/company/${companyId}/boardroom?meeting=${meetingId}` : undefined}
+                        meetingId={meetingId}
+                        advisorId={msg.advisor_id}
+                        onPin={createPin}
+                      >
+                        <DiscussionMessage msg={msg} accent={accentOf(msg.advisor_name)} />
+                      </PinnableText>
                     ))}
                   </div>
                 </div>

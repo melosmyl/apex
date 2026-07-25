@@ -1,8 +1,11 @@
 import React from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Badge } from "@/components/ui/badge";
+import PinnableText from "@/components/pins/PinnableText";
+import { usePin } from "@/components/pins/PinContext";
 
-export default function AdvisorResponseCard({ independent, challenge, accent }) {
+export default function AdvisorResponseCard({ independent, challenge, accent, meetingId, companyId, meetingTitle }) {
+  const { createPin } = usePin();
   const conf = Math.round(independent.confidence_score || 0);
 
   return (
@@ -18,6 +21,7 @@ export default function AdvisorResponseCard({ independent, challenge, accent }) 
         </div>
       </div>
 
+      <PinnableText companyId={companyId} sourceType="advisor_perspective" sourceId={meetingId} sourceTitle={meetingTitle || independent.advisor_name} sourceUrl={meetingId ? `/company/${companyId}/boardroom?meeting=${meetingId}` : undefined} meetingId={meetingId} advisorId={independent.advisor_id} onPin={createPin}>
       <div className="space-y-3">
         <div>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Position</div>
@@ -53,11 +57,15 @@ export default function AdvisorResponseCard({ independent, challenge, accent }) 
         )}
       </div>
 
+      </PinnableText>
+
       {challenge && challenge.revised_position && (
         <div className="mt-4 pt-4 border-t border-border/50">
           <Badge variant="outline" className="text-[10px] font-normal mb-2">Challenge Round</Badge>
           {challenge.challenged_advisor && <p className="text-xs text-muted-foreground mb-1">Challenged {challenge.challenged_advisor}: {challenge.point_challenged}</p>}
-          <p className="text-sm italic">{challenge.revised_position}</p>
+          <PinnableText companyId={companyId} sourceType="challenge_round" sourceId={meetingId} sourceTitle={meetingTitle || "Challenge Round"} sourceUrl={meetingId ? `/company/${companyId}/boardroom?meeting=${meetingId}` : undefined} meetingId={meetingId} advisorId={independent.advisor_id} onPin={createPin}>
+            <p className="text-sm italic">{challenge.revised_position}</p>
+          </PinnableText>
         </div>
       )}
     </div>

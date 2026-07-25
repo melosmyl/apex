@@ -2,7 +2,7 @@ import React from "react";
 import { ADVISOR_LIBRARY, initialsOf } from "@/lib/advisorLibrary";
 import LineArtPortrait from "@/components/LineArtPortrait";
 
-const SIZES = { sm: "w-9 h-9 text-xs", md: "w-12 h-12 text-sm", lg: "w-16 h-16 text-lg", xl: "w-24 h-24 text-2xl" };
+const SIZES = { xs: "w-6 h-6 text-[10px]", sm: "w-9 h-9 text-xs", md: "w-12 h-12 text-sm", lg: "w-16 h-16 text-lg", xl: "w-24 h-24 text-2xl" };
 
 export default function AdvisorAvatar({ name, accent = "#7a5c3e", photo_url, size = "md", className = "" }) {
   const libraryAdvisor = ADVISOR_LIBRARY.find((a) => a.name === name);

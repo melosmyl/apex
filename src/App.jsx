@@ -23,6 +23,7 @@ import ExecutiveTeam from '@/pages/company/ExecutiveTeam';
 import Boardroom from '@/pages/company/Boardroom';
 import Projects from '@/pages/company/Projects';
 import Tasks from '@/pages/company/Tasks';
+import Pins from '@/pages/company/Pins';
 import Knowledge from '@/pages/company/Knowledge';
 import Documents from '@/pages/company/Documents';
 import Research from '@/pages/company/Research';
@@ -68,6 +69,7 @@ const AuthenticatedApp = () => {
           <Route path="boardroom" element={<Boardroom />} />
           <Route path="projects" element={<Projects />} />
           <Route path="tasks" element={<Tasks />} />
+          <Route path="pins" element={<Pins />} />
           <Route path="knowledge" element={<Knowledge />} />
           <Route path="documents" element={<Documents />} />
           <Route path="research" element={<Research />} />

@@ -1,0 +1,137 @@
+{
+  "name": "Pin",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "meeting_id": {
+      "type": "string"
+    },
+    "decision_id": {
+      "type": "string"
+    },
+    "document_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "advisor_id": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "board_resolution",
+        "executive_discussion",
+        "advisor_perspective",
+        "challenge_round",
+        "research_report",
+        "document",
+        "decision_memo",
+        "meeting_summary",
+        "task",
+        "project_discussion",
+        "ai_conversation"
+      ]
+    },
+    "source_id": {
+      "type": "string"
+    },
+    "source_title": {
+      "type": "string"
+    },
+    "source_url": {
+      "type": "string"
+    },
+    "selected_text": {
+      "type": "string"
+    },
+    "surrounding_context": {
+      "type": "string"
+    },
+    "pin_title": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "subcategory": {
+      "type": "string"
+    },
+    "themes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pin_type": {
+      "type": "string",
+      "enum": [
+        "Insight",
+        "Idea",
+        "Recommendation",
+        "Risk",
+        "Warning",
+        "Assumption",
+        "Evidence",
+        "Decision",
+        "Question",
+        "Action",
+        "Quote",
+        "Lesson"
+      ]
+    },
+    "importance": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "important",
+        "critical"
+      ],
+      "default": "normal"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "archived"
+      ],
+      "default": "active"
+    },
+    "category_confidence": {
+      "type": "number"
+    },
+    "related_pin_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "last_opened_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "company_id",
+    "selected_text",
+    "source_type"
+  ]
+}
