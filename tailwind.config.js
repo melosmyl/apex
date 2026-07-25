@@ -6,8 +6,15 @@ module.exports = {
   	extend: {
   		borderRadius: {
   			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			md: 'calc(var(--radius) - 4px)',
+  			sm: 'calc(var(--radius) - 8px)'
+  		},
+  		boxShadow: {
+  			soft: 'var(--shadow-soft)',
+  			card: 'var(--shadow-card)',
+  			elevated: 'var(--shadow-elevated)',
+  			'warm-glow': 'var(--shadow-warm-glow)',
+  			DEFAULT: 'var(--shadow-soft)'
   		},
   		colors: {
   			background: 'hsl(var(--background))',
@@ -43,6 +50,10 @@ module.exports = {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',
+  			olive: {
+  				DEFAULT: 'hsl(var(--accent-olive))',
+  				foreground: 'hsl(40 25% 97%)'
+  			},
   			chart: {
   				'1': 'hsl(var(--chart-1))',
   				'2': 'hsl(var(--chart-2))',
@@ -67,22 +78,18 @@ module.exports = {
   			display: ['var(--font-display)'],
   			mono: ['var(--font-mono)']
   		},
+  		letterSpacing: {
+  			'tightest': '-0.03em',
+  			'editorial': '-0.022em'
+  		},
   		keyframes: {
   			'accordion-down': {
-  				from: {
-  					height: '0'
-  				},
-  				to: {
-  					height: 'var(--radix-accordion-content-height)'
-  				}
+  				from: { height: '0' },
+  				to: { height: 'var(--radix-accordion-content-height)' }
   			},
   			'accordion-up': {
-  				from: {
-  					height: 'var(--radix-accordion-content-height)'
-  				},
-  				to: {
-  					height: '0'
-  				}
+  				from: { height: 'var(--radix-accordion-content-height)' },
+  				to: { height: '0' }
   			}
   		},
   		animation: {

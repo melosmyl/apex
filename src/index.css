@@ -1,106 +1,162 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Geist:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=Geist:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 40 5% 98%;
-    --foreground: 30 8% 16%;
-    --card: 40 33% 99%;
-    --card-foreground: 30 8% 16%;
-    --popover: 40 33% 99%;
-    --popover-foreground: 30 8% 16%;
-    --primary: 28 20% 20%;
-    --primary-foreground: 40 30% 97%;
-    --secondary: 38 24% 92%;
-    --secondary-foreground: 30 8% 20%;
-    --muted: 38 22% 93%;
-    --muted-foreground: 30 6% 44%;
-    --accent: 34 30% 88%;
-    --accent-foreground: 30 8% 20%;
-    --destructive: 8 52% 46%;
-    --destructive-foreground: 40 30% 97%;
-    --border: 34 18% 86%;
-    --input: 34 18% 86%;
-    --ring: 28 20% 30%;
-    --chart-1: 28 40% 45%;
-    --chart-2: 150 20% 40%;
-    --chart-3: 200 25% 40%;
-    --chart-4: 40 45% 60%;
-    --chart-5: 10 40% 55%;
-    --radius: 0.75rem;
+    /* Warm neutral palette — soft ivory, stone, sand */
+    --background: 38 18% 96%;
+    --foreground: 28 8% 15%;
+    --card: 40 30% 98.5%;
+    --card-foreground: 28 8% 15%;
+    --popover: 40 30% 99%;
+    --popover-foreground: 28 8% 15%;
+    --primary: 28 12% 17%;
+    --primary-foreground: 40 25% 97%;
+    --secondary: 36 20% 93%;
+    --secondary-foreground: 28 8% 20%;
+    --muted: 36 16% 94%;
+    --muted-foreground: 30 7% 44%;
+    --accent: 36 24% 90%;
+    --accent-foreground: 28 10% 20%;
+    --destructive: 8 35% 48%;
+    --destructive-foreground: 40 25% 97%;
+    --border: 34 12% 90%;
+    --input: 34 12% 90%;
+    --ring: 220 18% 32%;
+
+    /* Editorial accent — muted olive, used sparingly */
+    --accent-olive: 75 10% 40%;
+
+    /* Warm, soft shadows — never cold grey */
+    --shadow-soft: 0 1px 2px rgba(50,40,30,0.03), 0 2px 6px rgba(50,40,30,0.02);
+    --shadow-card: 0 1px 3px rgba(50,40,30,0.035), 0 4px 16px rgba(50,40,30,0.025);
+    --shadow-elevated: 0 2px 8px rgba(50,40,30,0.05), 0 10px 32px rgba(50,40,30,0.04);
+    --shadow-warm-glow: 0 0 0 1px rgba(50,40,30,0.02), 0 8px 32px rgba(50,40,30,0.06);
+
+    --radius: 0.875rem;
+
     --font-heading: "Cormorant Garamond", ui-serif, Georgia, serif;
     --font-body: "Geist", ui-sans-serif, system-ui, sans-serif;
     --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
     --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --sidebar-background: 36 16% 95%;
+    --sidebar-foreground: 28 8% 20%;
+    --sidebar-primary: 28 12% 17%;
+    --sidebar-primary-foreground: 40 25% 97%;
+    --sidebar-accent: 36 22% 92%;
+    --sidebar-accent-foreground: 28 8% 17%;
+    --sidebar-border: 34 12% 89%;
+    --sidebar-ring: 220 18% 32%;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Warm dark — graphite, not cold black */
+    --background: 28 6% 8%;
+    --foreground: 40 12% 93%;
+    --card: 28 8% 11.5%;
+    --card-foreground: 40 12% 93%;
+    --popover: 28 8% 11.5%;
+    --popover-foreground: 40 12% 93%;
+    --primary: 40 15% 95%;
+    --primary-foreground: 28 8% 12%;
+    --secondary: 28 8% 16%;
+    --secondary-foreground: 40 12% 93%;
+    --muted: 28 8% 16%;
+    --muted-foreground: 36 8% 58%;
+    --accent: 28 10% 18%;
+    --accent-foreground: 40 12% 93%;
+    --destructive: 8 30% 45%;
+    --destructive-foreground: 40 12% 93%;
+    --border: 28 8% 18%;
+    --input: 28 8% 18%;
+    --ring: 220 18% 40%;
+    --accent-olive: 75 12% 52%;
+
+    --shadow-soft: 0 1px 2px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.15);
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.2);
+    --shadow-elevated: 0 2px 8px rgba(0,0,0,0.3), 0 10px 32px rgba(0,0,0,0.25);
+    --shadow-warm-glow: 0 0 0 1px rgba(255,240,220,0.03), 0 8px 32px rgba(0,0,0,0.3);
+
+    --sidebar-background: 28 6% 10%;
+    --sidebar-foreground: 40 10% 85%;
+    --sidebar-primary: 40 15% 95%;
+    --sidebar-primary-foreground: 28 8% 12%;
+    --sidebar-accent: 28 8% 16%;
+    --sidebar-accent-foreground: 40 12% 93%;
+    --sidebar-border: 28 8% 16%;
+    --sidebar-ring: 220 18% 40%;
   }
 }
-
-
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground font-body;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.65;
+    font-feature-settings: "kern", "liga", "calt";
   }
+
   h1, h2, h3, h4 {
     @apply font-display;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    font-weight: 500;
+  }
+  h1 { letter-spacing: -0.028em; }
+  h2 { letter-spacing: -0.022em; }
+
+  ::selection {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.35);
   }
 }
 
 @layer utilities {
-  .fade-in { animation: fadeIn 0.6s ease both; }
+  .fade-in { animation: fadeIn 0.5s ease both; }
   .rise-in { animation: riseIn 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+  .gentle-in { animation: gentleIn 0.7s cubic-bezier(0.16,1,0.3,1) both; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes riseIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes riseIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes gentleIn { from { opacity: 0; transform: translateY(12px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
   @keyframes heartbeat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.2); } 30% { transform: scale(1); } 45% { transform: scale(1.1); } 60% { transform: scale(1); } }
+
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+  .reading-width { max-width: 68ch; }
+  .shadow-soft { box-shadow: var(--shadow-soft); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-elevated { box-shadow: var(--shadow-elevated); }
+  .shadow-warm-glow { box-shadow: var(--shadow-warm-glow); }
+
+  /* Editorial prose styling */
+  .prose-editorial { max-width: 68ch; }
+  .prose-editorial p { line-height: 1.8; margin-bottom: 1.25em; }
+  .prose-editorial h1, .prose-editorial h2, .prose-editorial h3 {
+    @apply font-display; font-weight: 500; margin-top: 1.8em; margin-bottom: 0.6em;
+  }
+  .prose-editorial blockquote {
+    border-left: 2px solid hsl(var(--accent));
+    padding-left: 1.25rem; font-style: italic; color: hsl(var(--muted-foreground));
+  }
 }
