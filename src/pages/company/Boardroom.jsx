@@ -11,6 +11,7 @@ import WorkingSession from "@/components/boardroom/WorkingSession";
 import BoardDebate from "@/components/boardroom/BoardDebate";
 import TaskRequest from "@/components/boardroom/TaskRequest";
 import ReviewMode from "@/components/boardroom/ReviewMode";
+import LiveConversation from "@/components/boardroom/LiveConversation";
 
 export default function Boardroom() {
   const { companyId } = useParams();
@@ -99,6 +100,9 @@ export default function Boardroom() {
           )}
           {mode === "review" && (
             <ReviewMode company={company} companyId={companyId} advisors={aiAdvisors} />
+          )}
+          {mode === "live_conversation" && (
+            <LiveConversation company={company} companyId={companyId} advisors={aiAdvisors} />
           )}
         </div>
       ) : (

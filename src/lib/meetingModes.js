@@ -45,6 +45,15 @@ export const MEETING_MODES = [
     minAdvisors: 1,
     maxAdvisors: 3,
     tagline: "For stress-testing work"
+  },
+  {
+    key: "live_conversation",
+    label: "Live Conversation",
+    icon: "Radio",
+    description: "Speak naturally with your advisors in a real voice meeting. They respond aloud, remember the conversation, and challenge each other.",
+    minAdvisors: 1,
+    maxAdvisors: 3,
+    tagline: "Talk it through"
   }
 ];
 
@@ -86,12 +95,13 @@ Meeting modes:
 - board_debate: For important strategic decisions needing rigorous multi-round debate. 3+ advisors.
 - task_request: When the founder needs a completed deliverable (document, report, plan).
 - review: When the founder wants feedback on an existing document, strategy or plan.
+- live_conversation: When the founder wants to talk through a problem verbally with advisors responding in real-time voice.
 
 Recommend the single most suitable mode and 1–3 relevant advisors. Return the advisor library keys.`,
     response_json_schema: {
       type: "object",
       properties: {
-        recommended_mode: { type: "string", enum: ["quick_ask", "working_session", "board_debate", "task_request", "review"] },
+        recommended_mode: { type: "string", enum: ["quick_ask", "working_session", "board_debate", "task_request", "review", "live_conversation"] },
         reason: { type: "string" },
         suggested_advisor_keys: { type: "array", items: { type: "string" } }
       }

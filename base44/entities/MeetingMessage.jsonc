@@ -1,0 +1,103 @@
+{
+  "name": "MeetingMessage",
+  "type": "object",
+  "properties": {
+    "meeting_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "speaker_type": {
+      "type": "string",
+      "enum": [
+        "founder",
+        "human_advisor",
+        "ai_advisor",
+        "facilitator"
+      ],
+      "default": "founder"
+    },
+    "speaker_id": {
+      "type": "string"
+    },
+    "speaker_name": {
+      "type": "string"
+    },
+    "message_text": {
+      "type": "string"
+    },
+    "sequence_number": {
+      "type": "number",
+      "default": 0
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "was_spoken": {
+      "type": "boolean",
+      "default": false
+    },
+    "was_interrupted": {
+      "type": "boolean",
+      "default": false
+    },
+    "response_type": {
+      "type": "string"
+    },
+    "spoken_portion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "speaker_type",
+    "message_text"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -15,7 +15,8 @@
         "working_session",
         "board_debate",
         "task_request",
-        "review"
+        "review",
+        "live_conversation"
       ],
       "default": "board_debate"
     },

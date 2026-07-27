@@ -1,0 +1,114 @@
+{
+  "name": "VoiceMeetingSession",
+  "type": "object",
+  "properties": {
+    "meeting_id": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "ended",
+        "failed"
+      ],
+      "default": "active"
+    },
+    "selected_advisor_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "meeting_topic": {
+      "type": "string"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "current_speaker_id": {
+      "type": "string"
+    },
+    "conversation_mode": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "manual"
+      ],
+      "default": "auto"
+    },
+    "allow_natural_joining": {
+      "type": "boolean",
+      "default": true
+    },
+    "audio_enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "transcript_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "complete"
+      ],
+      "default": "pending"
+    },
+    "meeting_settings": {
+      "type": "object"
+    },
+    "summary": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "company_id",
+    "meeting_topic"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -3,9 +3,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { MEETING_MODES, getMode, recommendMode } from "@/lib/meetingModes";
-import { Zap, MessagesSquare, Landmark, FileText, ClipboardCheck } from "lucide-react";
+import { Zap, MessagesSquare, Landmark, FileText, ClipboardCheck, Radio } from "lucide-react";
 
-const ICONS = { Zap, MessagesSquare, Landmark, FileText, ClipboardCheck };
+const ICONS = { Zap, MessagesSquare, Landmark, FileText, ClipboardCheck, Radio };
 
 export default function ModeSelector({ advisors, onSelectMode }) {
   const [question, setQuestion] = useState("");

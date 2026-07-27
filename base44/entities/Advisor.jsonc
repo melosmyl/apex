@@ -116,6 +116,17 @@
     },
     "email": {
       "type": "string"
+    },
+    "voice_name": {
+      "type": "string"
+    },
+    "voice_pitch": {
+      "type": "number",
+      "default": 1
+    },
+    "voice_rate": {
+      "type": "number",
+      "default": 0.97
     }
   },
   "required": [
