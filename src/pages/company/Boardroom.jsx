@@ -1,44 +1,29 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useOutletContext } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Landmark, Users, Sparkles } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
-import BoardTable from "@/components/boardroom/BoardTable";
-import MeetingResult from "@/components/boardroom/MeetingResult";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup } from "@/lib/boardroom";
-
-const PROMPTS = [
-  "Should we manufacture our products in Portugal or Vietnam?",
-  "Is now the right time to raise a funding round?",
-  "Should we launch a premium tier or stay focused on our core product?",
-];
-
-const PHASE_MESSAGES = {
-  preparing: "Reviewing company context",
-  discussion: "The board is in executive discussion",
-  resolution: "The Chair is preparing the resolution",
-};
+import ModeSelector from "@/components/boardroom/ModeSelector";
+import QuickAsk from "@/components/boardroom/QuickAsk";
+import WorkingSession from "@/components/boardroom/WorkingSession";
+import BoardDebate from "@/components/boardroom/BoardDebate";
+import TaskRequest from "@/components/boardroom/TaskRequest";
+import ReviewMode from "@/components/boardroom/ReviewMode";
 
 export default function Boardroom() {
   const { companyId } = useParams();
   const { company } = useOutletContext();
   const navigate = useNavigate();
   const [advisors, setAdvisors] = useState(null);
-  const [selectedIds, setSelectedIds] = useState(null);
-  const [hasInteracted, setHasInteracted] = useState(false);
+  const [mode, setMode] = useState(null);
   const [question, setQuestion] = useState("");
-  const [phase, setPhase] = useState("idle");
-  const [activeName, setActiveName] = useState(null);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [loadedMeeting, setLoadedMeeting] = useState(null);
 
   useEffect(() => {
     base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then((advs) => {
       setAdvisors(advs);
-      setSelectedIds(advs.filter(a => a.type !== "human").map(a => a.id));
     });
   }, [companyId]);
 
@@ -47,133 +32,77 @@ export default function Boardroom() {
     if (!meetingId) return;
     base44.entities.BoardMeeting.get(meetingId).then((m) => {
       if (m) {
-        setResult(m);
+        setLoadedMeeting(m);
+        setMode(m.meeting_mode || "board_debate");
         setQuestion(m.question || "");
-        setPhase("result");
       }
     }).catch(() => {});
   }, [companyId]);
 
-  useEffect(() => {
-    if (phase !== "preparing" || !advisors?.length) return;
-    const participants = advisors.filter(a => selectedIds?.includes(a.id));
-    if (!participants.length) return;
-    let i = 0;
-    const t = setInterval(() => { setActiveName(participants[i % participants.length].name); i++; }, 2000);
-    return () => clearInterval(t);
-  }, [phase, advisors, selectedIds]);
-
-  const toggleAdvisor = (a) => {
-    if (!hasInteracted) { setSelectedIds([a.id]); setHasInteracted(true); }
-    else { setSelectedIds(prev => prev.includes(a.id) ? prev.filter(id => id !== a.id) : [...prev, a.id]); }
-  };
-
-  const start = async () => {
-    if (!question.trim()) return;
-    const selected = advisors.filter(a => selectedIds?.includes(a.id) && a.type !== "human");
-    if (selected.length < 3) { setError("Select at least 3 advisors."); return; }
-    setPhase("preparing"); setError(null); setResult(null);
-    try {
-      const phase1 = await startMeeting({ companyId, question, advisorIds: selected.map(a => a.id) });
-      setPhase("discussion");
-      await runDiscussion(phase1.meeting_id);
-      setPhase("resolution");
-      const final = await runResolution(phase1.meeting_id);
-      setResult(final);
-      setPhase("result");
-      setActiveName(null);
-    } catch (e) {
-      setError(e.message || "The board could not convene.");
-      setPhase("idle");
-    }
-  };
-
-  const recordDecision = async () => {
-    const d = await base44.entities.Decision.create({
-      company_id: companyId, meeting_id: result?.meeting_id, question,
-      participants: result?.independent_responses?.map(r => r.advisor_name) || [],
-      summary: result?.board_resolution?.executive_summary,
-      final_recommendation: result?.board_resolution?.recommended_direction,
-      risks: result?.board_resolution?.main_risks || [],
-      confidence_level: result?.board_resolution?.overall_confidence_score,
-      status: "pending",
-    });
-    navigate(`/company/${companyId}/decisions?id=${d.id}`);
-  };
-
-  const handleFollowup = async (message) => {
-    if (!result?.meeting_id) return;
-    const res = await runFounderFollowup(result.meeting_id, message);
-    setResult(prev => ({ ...prev, discussion_transcript: res.discussion_transcript }));
-  };
-
   if (advisors === null) return <div className="h-64 rounded-2xl bg-secondary/60 animate-pulse" />;
 
-  const aiAdvisors = advisors.filter(a => a.type !== "human");
-  if (aiAdvisors.length < 3) {
+  const aiAdvisors = advisors.filter((a) => a.type !== "human");
+
+  if (aiAdvisors.length < 1) {
     return (
       <div>
         <PageHeader eyebrow="The signature experience" title="The Boardroom" />
-        <EmptyState icon={Users} title="Convene at least three advisors"
-          description="A board debate needs differing perspectives. Invite at least three AI advisors to your executive team."
-          action={<Button onClick={() => navigate(`/company/${companyId}/team`)} className="rounded-full px-6">Go to Executive Team</Button>} />
+        <EmptyState
+          icon={Users}
+          title="Assemble your executive team first"
+          description="Add at least one AI advisor to start using the Boardroom."
+          action={<Button onClick={() => navigate(`/company/${companyId}/team`)} className="rounded-full px-6">Go to Executive Team</Button>}
+        />
       </div>
     );
   }
 
-  const selectedCount = selectedIds?.length || 0;
+  const handleSelectMode = (selectedMode, q) => {
+    setMode(selectedMode);
+    if (q) setQuestion(q);
+  };
+
+  const backToModes = () => {
+    setMode(null);
+    setLoadedMeeting(null);
+    setQuestion("");
+  };
 
   return (
     <div>
-      <PageHeader eyebrow="The signature experience" title="The Boardroom"
-        description="Pose a strategic question. Your advisors will debate it — and reach a recommendation." />
+      <PageHeader
+        eyebrow="The signature experience"
+        title="The Boardroom"
+        description="Choose how you want to work with your advisors — from a quick question to a full board debate."
+      />
 
-      {phase !== "result" && (
-        <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
-          <BoardTable advisors={advisors} activeName={activeName} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
-          <p className="text-center text-xs text-muted-foreground mt-4">
-            {selectedCount} attending{selectedCount < 3 && " · At least 3 required"}
-          </p>
-          {error && <p className="text-center text-sm text-destructive mt-2">{error}</p>}
-          <div className="max-w-xl mx-auto mt-8">
-            {phase === "idle" ? (
-              <>
-                <Textarea value={question} onChange={e => setQuestion(e.target.value)} rows={3}
-                  placeholder="Ask your board a strategic question…"
-                  className="text-base resize-none bg-background rounded-2xl" />
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {PROMPTS.map(p => (
-                    <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
-                  ))}
-                </div>
-                <Button onClick={start} disabled={!question.trim() || selectedCount < 3} className="w-full mt-4 rounded-full h-11">
-                  <Landmark className="w-4 h-4 mr-2" /> Start Board Meeting
-                </Button>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <div className="inline-flex items-center gap-2 text-muted-foreground">
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  <span className="font-display text-lg">{PHASE_MESSAGES[phase]}</span>
-                </div>
-                {phase === "preparing" && activeName && (
-                  <p className="text-sm text-muted-foreground mt-2">{activeName} is evaluating…</p>
-                )}
-                <p className="font-display text-base mt-4 max-w-md mx-auto text-muted-foreground italic">"{question}"</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {mode ? (
+        <div className="rise-in">
+          <button
+            onClick={backToModes}
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 mb-6 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> All modes
+          </button>
 
-      {phase === "result" && result && (
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <p className="font-display text-xl max-w-2xl">"{question}"</p>
-            <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); }}>New question</Button>
-          </div>
-          <MeetingResult result={result} advisors={advisors.filter(a => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={recordDecision} onFollowup={handleFollowup} />
+          {mode === "quick_ask" && (
+            <QuickAsk company={company} companyId={companyId} advisors={aiAdvisors} initialQuestion={question} initialMeeting={loadedMeeting} />
+          )}
+          {mode === "working_session" && (
+            <WorkingSession company={company} companyId={companyId} advisors={aiAdvisors} />
+          )}
+          {mode === "board_debate" && (
+            <BoardDebate company={company} companyId={companyId} advisors={aiAdvisors} initialQuestion={question} loadedMeeting={loadedMeeting} />
+          )}
+          {mode === "task_request" && (
+            <TaskRequest company={company} companyId={companyId} advisors={aiAdvisors} />
+          )}
+          {mode === "review" && (
+            <ReviewMode company={company} companyId={companyId} advisors={aiAdvisors} />
+          )}
         </div>
+      ) : (
+        <ModeSelector advisors={aiAdvisors} company={company} onSelectMode={handleSelectMode} />
       )}
     </div>
   );

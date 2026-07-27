@@ -8,6 +8,20 @@
     "question": {
       "type": "string"
     },
+    "meeting_mode": {
+      "type": "string",
+      "enum": [
+        "quick_ask",
+        "working_session",
+        "board_debate",
+        "task_request",
+        "review"
+      ],
+      "default": "board_debate"
+    },
+    "mode_result": {
+      "type": "object"
+    },
     "participants": {
       "type": "array",
       "items": {
