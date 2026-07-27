@@ -189,7 +189,12 @@ export default function DocumentDetailDialog({
                   <Button variant="default" className="rounded-full"><FileSpreadsheet className="w-4 h-4 mr-1.5" /> Download Excel</Button>
                 </a>
               )}
-              {doc.native_file_url && doc.native_file_format !== "xlsx" && doc.native_file_url !== doc.pdf_file_url && (
+              {doc.native_file_url && doc.native_file_format === "docx" && (
+                <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
+                  <Button variant="default" className="rounded-full"><FileText className="w-4 h-4 mr-1.5" /> Download Word</Button>
+                </a>
+              )}
+              {doc.native_file_url && doc.native_file_format !== "xlsx" && doc.native_file_format !== "docx" && doc.native_file_url !== doc.pdf_file_url && (
                 <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
                   <Button variant="default" className="rounded-full"><Download className="w-4 h-4 mr-1.5" /> Download Original</Button>
                 </a>
@@ -231,7 +236,7 @@ export default function DocumentDetailDialog({
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                   <span className="text-[11px] uppercase tracking-widest text-amber-700">Assumptions Require Confirmation</span>
                 </div>
-                <p className="text-sm text-amber-900">Some assumptions in this model are AI estimates and require founder verification before reliance. See the Assumptions and Sources sheets in the Excel workbook for details.</p>
+                <p className="text-sm text-amber-900">Some assumptions are AI estimates and require founder verification before reliance. See the Assumptions table in this {doc.native_file_format === "xlsx" ? "Excel workbook" : "document"} for details.</p>
               </div>
             )}
 

@@ -5,8 +5,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { buildFinancialModelWorkbook, runExcelQualityChecks } from '../../shared/buildExcelModel.ts';
 import { buildPdfReport } from '../../shared/buildPdfReport.ts';
+import { buildDocxReport, runDocxQualityChecks } from '../../shared/buildDocxReport.ts';
 
 const FINANCIAL_TYPES = ['Financial Model', 'Budget', 'Forecast', 'Spreadsheet'];
+const PRESENTATION_TYPES = ['Pitch Deck', 'Presentation'];
 
 function buildCompanyContext(company, decisions, projects, knowledgeDocs) {
   let ctx = `Company: ${company.name || 'N/A'}\nIndustry: ${company.industry || 'N/A'}\n`;
@@ -109,6 +111,7 @@ export default async function (req) {
       const pdfUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: pdfFile });
       pdfFileUrl = pdfUpload.file_url;
     } else {
+      const isPresentation = PRESENTATION_TYPES.includes(resolvedDocType);
       const reportSpec = {
         ...spec,
         company,
@@ -117,18 +120,39 @@ export default async function (req) {
         version,
         status: 'Ready for Review',
       };
-      const pdfBytes = await buildPdfReport(reportSpec);
-      const pdfFile = new File([pdfBytes], `${baseName}.pdf`, { type: 'application/pdf' });
-      const pdfUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: pdfFile });
-      pdfFileUrl = pdfUpload.file_url;
-      nativeFileUrl = pdfUpload.file_url;
-      nativeFormat = 'pdf';
-      fileSize = pdfBytes.length;
-      qaResult = { passed: true, checks: [{ check: 'PDF generated successfully', passed: true, detail: 'Document rendered with professional formatting' }] };
+
+      if (isPresentation) {
+        // Presentation types: PDF only
+        const pdfBytes = await buildPdfReport(reportSpec);
+        const pdfFile = new File([pdfBytes], `${baseName}.pdf`, { type: 'application/pdf' });
+        const pdfUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: pdfFile });
+        pdfFileUrl = pdfUpload.file_url;
+        nativeFileUrl = pdfUpload.file_url;
+        nativeFormat = 'pdf';
+        fileSize = pdfBytes.length;
+        qaResult = { passed: true, checks: [{ check: 'PDF generated successfully', passed: true, detail: 'Document rendered with professional formatting' }] };
+      } else {
+        // Text-heavy types: editable DOCX + PDF companion
+        const docxBytes = await buildDocxReport(reportSpec);
+        const docxFile = new File([docxBytes], `${baseName}.docx`, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const docxUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: docxFile });
+        nativeFileUrl = docxUpload.file_url;
+        nativeFormat = 'docx';
+        fileSize = docxBytes.length;
+        qaResult = runDocxQualityChecks(spec);
+
+        // PDF companion
+        const pdfBytes = await buildPdfReport(reportSpec);
+        const pdfFile = new File([pdfBytes], `${baseName}.pdf`, { type: 'application/pdf' });
+        const pdfUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: pdfFile });
+        pdfFileUrl = pdfUpload.file_url;
+      }
     }
 
     // ─── Step 3: Determine assumptions status ───
-    const assumptionsStatus = isFinancial ? determineAssumptionsStatus(spec.assumptions) : 'complete';
+    const assumptionsStatus = isFinancial
+      ? determineAssumptionsStatus(spec.assumptions)
+      : (spec.assumptionsTable?.some((a) => a[2] === 'Requires confirmation') ? 'needs_confirmation' : 'complete');
     const sourceDataStatus = spec.narrative?.sources?.length ? 'verified' : 'estimated';
 
     // ─── Step 4: Create Document entity ───
@@ -142,10 +166,10 @@ export default async function (req) {
       description: spec.narrative?.executiveSummary?.slice(0, 300) || '',
       document_type: resolvedDocType,
       document_category: isFinancial ? 'Financials' : 'Other',
-      folder_path: getFolderForType(document_type),
+      folder_path: getFolderForType(resolvedDocType),
       tags: topic ? [topic] : [],
       status: qaResult.passed ? 'ready_for_review' : 'failed',
-      content_format: nativeFormat === 'xlsx' ? 'XLSX' : 'PDF',
+      content_format: nativeFormat === 'xlsx' ? 'XLSX' : nativeFormat === 'docx' ? 'DOCX' : 'PDF',
       content: spec.narrative?.executiveSummary || '',
       structured_content: spec,
       native_file_url: nativeFileUrl,
@@ -192,7 +216,7 @@ export default async function (req) {
         task_id: task_id || undefined,
         advisor_id: advisor_id || undefined,
         document_id: doc.id,
-        document_type,
+        document_type: resolvedDocType,
         provider: 'openai',
         model: 'gpt-4o',
         input_size: 0,
@@ -303,7 +327,15 @@ ${task?.description || ''}
 
 ${customInstructions ? `Additional instructions: ${customInstructions}\n` : ''}
 
-Produce a professional ${documentType} with structured content suitable for an institutional-quality PDF report. Include real analysis, properly formatted tables (as arrays of arrays), and cite only real sources.
+Produce a professional ${documentType} with comprehensive, institutional-quality analysis. This document will be generated as an editable Word document (.docx) with a companion PDF.
+
+Include:
+- A substantive executive summary (300+ words)
+- Key metrics table and assumptions table (as arrays of arrays)
+- 3-5 detailed analysis sections, each with a heading and 200+ words of substantive content
+- Actionable recommendations with rationale and priority
+- Real risks and limitations
+- Cite only real sources; if none, state so explicitly
 
 Return JSON.`;
 
@@ -326,6 +358,39 @@ Return JSON.`;
       cashFlowSummary: { type: 'string' },
       scenarioSummary: { type: 'string' },
       toc: { type: 'array', items: { type: 'string' } },
+      sections: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            heading: { type: 'string' },
+            content: { type: 'string' },
+            subsections: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  heading: { type: 'string' },
+                  content: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        description: '3-5 detailed analysis sections, each with 200+ words of substantive content',
+      },
+      recommendations: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            recommendation: { type: 'string' },
+            rationale: { type: 'string' },
+            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+          },
+        },
+        description: 'Actionable recommendations with rationale and priority',
+      },
     },
     required: ['narrative'],
   };

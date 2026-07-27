@@ -216,6 +216,32 @@ export async function buildPdfReport(spec) {
   if (spec.cashFlowSummary) { sectionHeading(doc, 'Cash Flow Summary', hf); bodyText(doc, spec.cashFlowSummary, hf); }
   if (spec.scenarioSummary) { sectionHeading(doc, 'Scenario & Sensitivity', hf); bodyText(doc, spec.scenarioSummary, hf); }
 
+  // Additional analysis sections
+  if (spec.sections?.length) {
+    for (const sec of spec.sections) {
+      sectionHeading(doc, sec.heading || 'Section', hf);
+      bodyText(doc, sec.content || '', hf);
+      if (sec.subsections?.length) {
+        for (const sub of sec.subsections) {
+          ensureSpace(doc, 20, hf);
+          setFont(doc, 'bold', 12, COLORS.ink);
+          doc.text(sub.heading || '', PAGE.margin, doc.y);
+          doc.y += 14;
+          bodyText(doc, sub.content || '', hf);
+        }
+      }
+    }
+  }
+
+  // Recommendations
+  if (spec.recommendations?.length) {
+    sectionHeading(doc, 'Recommendations', hf);
+    spec.recommendations.forEach((rec) => {
+      const text = typeof rec === 'string' ? rec : `${rec.recommendation}${rec.rationale ? ` — ${rec.rationale}` : ''}`;
+      bulletList(doc, [text], hf);
+    });
+  }
+
   // Risks
   sectionHeading(doc, 'Risks & Limitations', hf);
   if (spec.narrative?.risks?.length) {
