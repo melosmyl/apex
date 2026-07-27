@@ -50,6 +50,92 @@
       "items": {
         "type": "string"
       }
+    },
+    "business_model": {
+      "type": "string"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "idea_validation",
+        "pre_launch",
+        "early_revenue",
+        "growth",
+        "fundraising",
+        "product_launch",
+        "market_expansion",
+        "turnaround"
+      ]
+    },
+    "solo_founder": {
+      "type": "string"
+    },
+    "team_size": {
+      "type": "string"
+    },
+    "target_customer": {
+      "type": "string"
+    },
+    "primary_market": {
+      "type": "string"
+    },
+    "available_capital": {
+      "type": "string"
+    },
+    "available_time": {
+      "type": "string"
+    },
+    "existing_assets": {
+      "type": "string"
+    },
+    "current_challenges": {
+      "type": "string"
+    },
+    "immediate_goal": {
+      "type": "string"
+    },
+    "confidence_gaps": {
+      "type": "string"
+    },
+    "advisor_involvement": {
+      "type": "string",
+      "enum": [
+        "light",
+        "moderate",
+        "deep"
+      ]
+    },
+    "deadlines": {
+      "type": "string"
+    },
+    "company_type": {
+      "type": "string"
+    },
+    "recommended_journey": {
+      "type": "string",
+      "enum": [
+        "idea_validation",
+        "pre_launch",
+        "early_revenue",
+        "growth",
+        "fundraising",
+        "product_launch",
+        "market_expansion",
+        "turnaround"
+      ]
+    },
+    "onboarding_complete": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_plan": {
+      "type": "object"
+    },
+    "next_milestone": {
+      "type": "string"
+    },
+    "last_viewed": {
+      "type": "string"
     }
   },
   "required": [

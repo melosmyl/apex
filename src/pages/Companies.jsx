@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Plus, Building2, RefreshCw, Shield } from "lucide-react";
 import CompanyCard from "@/components/companies/CompanyCard";
-import CreateCompanyDialog from "@/components/companies/CreateCompanyDialog";
+import GuidedOnboarding from "@/components/onboarding/GuidedOnboarding";
 import EmptyState from "@/components/EmptyState";
 import HealthWidget from "@/components/HealthWidget";
 import StatsWidget from "@/components/StatsWidget";
@@ -13,7 +13,7 @@ export default function Companies() {
   const [companies, setCompanies] = useState(null);
   const [stats, setStats] = useState({});
   const [user, setUser] = useState(null);
-  const [dialog, setDialog] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
   const [error, setError] = useState(false);
   const [meetings, setMeetings] = useState([]);
   const [decisions, setDecisions] = useState([]);
@@ -84,7 +84,7 @@ export default function Companies() {
             {user?.role === "admin" && <Link to="/admin"><Button variant="ghost" className="rounded-full"><Shield className="w-4 h-4 mr-1.5" /> Admin</Button></Link>}
             <Link to="/pricing"><Button variant="ghost" className="rounded-full">Pricing</Button></Link>
             {companies?.length > 0 &&
-            <Button onClick={() => setDialog(true)} variant="brand" className="px-6 rounded-full text-[0.95rem]"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
+            <Button onClick={() => setOnboarding(true)} variant="brand" className="px-6 rounded-full text-[0.95rem]"><Plus className="w-4 h-4 mr-1.5" /> Create Your Next Venture</Button>
             }
           </div>
         </div>
@@ -101,7 +101,7 @@ export default function Companies() {
           icon={Building2}
           title="Establish your first company"
           description="Create a workspace, assemble your AI executive team, and start making better decisions together."
-          action={<Button onClick={() => setDialog(true)} variant="brand" className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :
+          action={<Button onClick={() => setOnboarding(true)} variant="brand" className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :
 
 
         <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-6">
@@ -112,7 +112,7 @@ export default function Companies() {
         }
       </div>
 
-      <CreateCompanyDialog open={dialog} onOpenChange={setDialog} onCreated={load} />
+      <GuidedOnboarding open={onboarding} onClose={() => setOnboarding(false)} />
     </div>);
 
 }
