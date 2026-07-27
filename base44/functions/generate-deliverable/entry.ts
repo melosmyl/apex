@@ -490,7 +490,10 @@ function buildPdfSpecFromModel(modelSpec) {
       dtcStartingUnits: 'DTC Starting Units', dtcMonthlyGrowthPct: 'DTC Growth %', wholesaleStartingUnits: 'Wholesale Starting Units', wholesaleMonthlyGrowthPct: 'Wholesale Growth %',
     };
     const isPct = key.toLowerCase().includes('pct') || key.toLowerCase().includes('growth') || key.toLowerCase().includes('discount') || key.toLowerCase().includes('rate');
-    const formatted = isPct ? `${((val?.value || 0) * 100).toFixed(1)}%` : `£${(val?.value || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    // LLM is inconsistent: sometimes 42 for 42%, sometimes 0.42. Normalise for display.
+    const rawPct = val?.value || 0;
+    const pctForDisplay = rawPct > 1 ? rawPct : rawPct * 100;
+    const formatted = isPct ? `${pctForDisplay.toFixed(1)}%` : `£${(val?.value || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return [labels[key] || key, formatted, val?.confidence || 'Requires confirmation'];
   });
 

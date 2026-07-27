@@ -155,7 +155,11 @@ function buildAssumptions(ws, spec) {
 
     const valCell = ws.getCell(`B${r}`);
     if (providedVal != null && providedVal.value != null) {
-      valCell.value = Number(providedVal.value);
+      // LLM is inconsistent: sometimes returns 42 for 42%, sometimes 0.42.
+      // Excel percent format needs the decimal (0.42), so normalise: if the
+      // raw value is > 1 treat it as a whole-number percentage and divide.
+      const raw = Number(providedVal.value);
+      valCell.value = def.unit === 'percent' ? (raw > 1 ? raw / 100 : raw) : raw;
     } else {
       valCell.value = 0;
     }
