@@ -10,8 +10,8 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import TaskCard from "@/components/tasks/TaskCard";
 import DocumentDetailDialog from "@/components/documents/DocumentDetailDialog";
-import { executeTask } from "@/lib/taskExecution";
-import { generateDocumentName, getFolderForType, formatDeliverableContent, DOCUMENT_TYPES } from "@/lib/documents";
+import { generateDeliverable } from "@/lib/deliverables";
+import { DOCUMENT_TYPES } from "@/lib/documents";
 
 const COLUMNS = [
   { key: "todo", label: "To Do" },
@@ -47,6 +47,13 @@ export default function Tasks() {
     await base44.entities.Task.update(task.id, { status: next }); load();
   };
 
+  const detectDocType = (task) => {
+    const text = `${task.title} ${task.description || ""}`.toLowerCase();
+    const financeTerms = ["financial model", "unit economics", "cash flow", "p&l", "profit and loss", "budget", "forecast", "margin", "breakeven", "break-even", "revenue model"];
+    if (financeTerms.some((t) => text.includes(t))) return "Financial Model";
+    return "Report";
+  };
+
   const execute = async (task) => {
     const advisor = advisors.find((a) => a.name === task.assigned_to);
     if (!advisor) return;
@@ -54,65 +61,16 @@ export default function Tasks() {
     await base44.entities.Task.update(task.id, { status: "in_progress", delegated_back: false });
     load();
     try {
-      // Gather relevant context for the advisor
-      const [knowledgeDocs, decisions] = await Promise.all([
-        base44.entities.Document.filter({ company_id: companyId, kind: "knowledge" }, "-created_date", 5),
-        base44.entities.Decision.filter({ company_id: companyId }, "-created_date", 3),
-      ]);
-      const context = [
-        knowledgeDocs.length ? "Company knowledge:\n" + knowledgeDocs.map(d => `- ${d.title}: ${(d.content || "").slice(0, 300)}`).join("\n") : "",
-        decisions.length ? "Recent decisions:\n" + decisions.map(d => `- ${d.question}: ${d.final_recommendation || d.summary || ""}`).join("\n") : "",
-      ].filter(Boolean).join("\n\n");
-
-      const res = await executeTask({ advisor, task, company, context });
-      if (res.outcome === "completed" && res.document_type) {
-        // Create a structured document deliverable
-        const docTitle = generateDocumentName(company.name, res.document_type, res.topic);
-        const folder = getFolderForType(res.document_type);
-        const content = formatDeliverableContent(res);
-        const tags = res.topic ? [res.topic] : [];
-        const doc = await base44.entities.Document.create({
-          company_id: companyId,
-          project_id: task.project_id || undefined,
-          task_id: task.id,
-          created_by_advisor_id: advisor.id,
-          title: docTitle,
-          description: res.executive_summary || "",
-          document_type: res.document_type,
-          folder_path: folder,
-          tags,
-          status: "ready_for_review",
-          approval_status: "pending",
-          content_format: "Markdown",
-          content,
-          source_references: res.source_references || [],
-          version_number: 1,
-          is_latest_version: true,
-          kind: "document",
-        });
-        // Log generation
-        await base44.entities.DeliverableGenerationLog.create({
-          company_id: companyId,
-          task_id: task.id,
-          advisor_id: advisor.id,
-          document_id: doc.id,
-          document_type: res.document_type,
-          provider: "automatic",
-          model: "automatic",
-          status: "success",
-        });
-        await base44.entities.Task.update(task.id, {
-          status: "review",
-          deliverable: res.executive_summary || res.topic || "Deliverable ready for review",
-          document_id: doc.id,
-          delegated_back: false,
-        });
-      } else if (res.outcome === "delegated") {
-        await base44.entities.Task.update(task.id, { delegated_back: true, blocker: res.blocker, assigned_to: "Founder", status: "todo" });
-      } else {
-        // Fallback: legacy string deliverable
-        await base44.entities.Task.update(task.id, { status: "review", deliverable: typeof res === "string" ? res : "Deliverable ready", delegated_back: false });
-      }
+      const result = await generateDeliverable({
+        companyId,
+        taskId: task.id,
+        advisorId: advisor.id,
+        documentType: detectDocType(task),
+        topic: task.title,
+      });
+      load();
+    } catch (e) {
+      await base44.entities.Task.update(task.id, { status: "todo", delegated_back: true, blocker: e.message || "Generation failed" });
       load();
     } finally {
       setExecutingId(null);

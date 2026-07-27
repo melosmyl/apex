@@ -85,12 +85,26 @@ export const CONTENT_FORMATS = [
 
 export const STATUS_CONFIG = {
   draft: { label: "Draft", color: "bg-slate-100 text-slate-600" },
+  generating: { label: "Generating File…", color: "bg-blue-100 text-blue-700" },
   in_progress: { label: "In Progress", color: "bg-blue-100 text-blue-700" },
   ready_for_review: { label: "Ready for Review", color: "bg-amber-100 text-amber-700" },
   revision_requested: { label: "Revision Requested", color: "bg-orange-100 text-orange-700" },
   approved: { label: "Approved", color: "bg-emerald-100 text-emerald-700" },
   superseded: { label: "Superseded", color: "bg-slate-100 text-slate-400" },
   archived: { label: "Archived", color: "bg-slate-100 text-slate-400" },
+  failed: { label: "Generation Failed", color: "bg-red-100 text-red-700" },
+};
+
+export const QUALITY_CONFIG = {
+  pending: { label: "Quality Check Pending", color: "bg-slate-100 text-slate-600" },
+  passed: { label: "Quality Check Passed", color: "bg-emerald-100 text-emerald-700" },
+  failed: { label: "Quality Check Failed", color: "bg-red-100 text-red-700" },
+};
+
+export const ASSUMPTIONS_CONFIG = {
+  complete: { label: "Assumptions Complete", color: "bg-emerald-100 text-emerald-700" },
+  needs_confirmation: { label: "Assumptions Need Confirmation", color: "bg-amber-100 text-amber-700" },
+  missing: { label: "Assumptions Missing", color: "bg-red-100 text-red-700" },
 };
 
 export const APPROVAL_CONFIG = {

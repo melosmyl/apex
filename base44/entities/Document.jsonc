@@ -85,12 +85,14 @@
       "type": "string",
       "enum": [
         "draft",
+        "generating",
         "in_progress",
         "ready_for_review",
         "revision_requested",
         "approved",
         "superseded",
-        "archived"
+        "archived",
+        "failed"
       ],
       "default": "draft"
     },
@@ -125,6 +127,51 @@
     },
     "preview_url": {
       "type": "string"
+    },
+    "native_file_format": {
+      "type": "string"
+    },
+    "native_file_url": {
+      "type": "string"
+    },
+    "pdf_file_url": {
+      "type": "string"
+    },
+    "template_id": {
+      "type": "string"
+    },
+    "quality_check_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "passed",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "quality_check_results": {
+      "type": "object"
+    },
+    "assumptions_status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "needs_confirmation",
+        "missing"
+      ],
+      "default": "needs_confirmation"
+    },
+    "source_data_status": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "estimated",
+        "missing"
+      ],
+      "default": "estimated"
+    },
+    "file_size": {
+      "type": "number"
     },
     "source_references": {
       "type": "array",
