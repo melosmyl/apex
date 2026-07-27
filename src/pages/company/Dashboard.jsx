@@ -4,12 +4,15 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight, Target, CheckSquare, Landmark, FileText, Scale,
-  TrendingUp, Sparkles, CircleDot, MapPin
+  TrendingUp, CircleDot
 } from "lucide-react";
-import { getJourney, STAGE_LABELS } from "@/lib/companyJourney";
+import { computeStreak, countRecentActivity, computeTimeSaved } from "@/lib/momentum";
+import MomentumWidget from "@/components/dashboard/MomentumWidget";
+import MilestoneTracker from "@/components/dashboard/MilestoneTracker";
+import TimeSavedWidget from "@/components/dashboard/TimeSavedWidget";
 
 export default function Dashboard() {
-  const { company } = useOutletContext();
+  const { company, setCompany } = useOutletContext();
   const { companyId } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -18,18 +21,26 @@ export default function Dashboard() {
     (async () => {
       const [decisions, tasks, docs, meetings] = await Promise.all([
         base44.entities.Decision.filter({ company_id: companyId }, "-created_date", 5),
-        base44.entities.Task.filter({ company_id: companyId }, "-created_date", 10),
-        base44.entities.Document.filter({ company_id: companyId }, "-created_date", 5),
-        base44.entities.BoardMeeting.filter({ company_id: companyId }, "-created_date", 4),
+        base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200),
+        base44.entities.Document.filter({ company_id: companyId }, "-created_date", 200),
+        base44.entities.BoardMeeting.filter({ company_id: companyId }, "-created_date", 200),
       ]);
       setData({ decisions, tasks, docs, meetings });
     })();
   }, [companyId]);
 
+  // Stage 2: compute momentum and time-saved from all activity
+  const allMeetings = data?.meetings || [];
+  const allDecisions = data?.decisions || [];
+  const allTasks = data?.tasks || [];
+  const allDocs = data?.docs || [];
+  const streak = computeStreak(allMeetings, allDecisions, allTasks, allDocs);
+  const recentCount = countRecentActivity(allMeetings, allDecisions, allTasks, allDocs, 7);
+  const timeSavedMin = computeTimeSaved(allMeetings, allDecisions, allTasks, allDocs);
+
   const go = (p) => navigate(`/company/${companyId}/${p}`);
 
   const plan = company?.onboarding_plan;
-  const journey = getJourney(company?.recommended_journey || company?.stage || "idea_validation");
 
   const openTasks = data?.tasks?.filter((t) => t.status !== "done") || [];
   const doneTasks = data?.tasks?.filter((t) => t.status === "done") || [];
@@ -153,24 +164,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Upcoming milestones */}
-      <div className="bg-card border border-border/70 rounded-2xl p-6 rise-in">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5">
-            <MapPin className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.75} />
-            <h3 className="font-display text-lg">Upcoming milestones</h3>
-          </div>
-          <span className="text-xs text-muted-foreground">{journey.label}</span>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          {journey.milestones.map((m, i) => (
-            <div key={i} className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs border ${i === 0 ? "border-brand/40 bg-brand-soft text-foreground" : "border-border/60 text-muted-foreground"}`}>
-              {i === 0 && <Sparkles className="w-3 h-3 text-brand" />}
-              {m}
-            </div>
-          ))}
-        </div>
+      {/* Momentum + Time Saved */}
+      <div className="grid sm:grid-cols-2 gap-5">
+        <MomentumWidget streak={streak} recentCount={recentCount} />
+        <TimeSavedWidget minutes={timeSavedMin} />
       </div>
+
+      {/* Interactive journey milestones */}
+      <MilestoneTracker company={company} companyId={companyId} onUpdate={setCompany} />
 
       {/* Quick access row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

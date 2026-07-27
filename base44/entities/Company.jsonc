@@ -134,6 +134,12 @@
     "next_milestone": {
       "type": "string"
     },
+    "milestone_progress": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "last_viewed": {
       "type": "string"
     }
