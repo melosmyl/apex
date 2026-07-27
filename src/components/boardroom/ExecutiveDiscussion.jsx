@@ -3,7 +3,8 @@ import AdvisorAvatar from "@/components/AdvisorAvatar";
 import FounderReplyBox from "@/components/boardroom/FounderReplyBox";
 import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
-import { ChevronDown, ChevronUp, MessageSquare, CornerDownRight, RefreshCw, AlertTriangle } from "lucide-react";
+import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
+import { ChevronDown, ChevronUp, MessageSquare, CornerDownRight, RefreshCw, AlertTriangle, Volume2, Square } from "lucide-react";
 
 const MESSAGE_TYPE_META = {
   initial: { label: "Initial", className: "bg-secondary text-muted-foreground" },
@@ -28,6 +29,20 @@ function FilterPill({ active, onClick, children }) {
       }`}
     >
       {children}
+    </button>
+  );
+}
+
+function SpeakButton({ text }) {
+  const { speaking, speak, stop, supported } = useSpeechSynthesis();
+  if (!supported) return null;
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); speaking ? stop() : speak(text); }}
+      className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full transition-colors ${speaking ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+      title={speaking ? "Stop" : "Listen"}
+    >
+      {speaking ? <Square className="w-2.5 h-2.5" /> : <Volume2 className="w-2.5 h-2.5" />}
     </button>
   );
 }
@@ -71,6 +86,7 @@ function DiscussionMessage({ msg, accent }) {
           <span className={`inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${typeMeta.className}`}>
             {typeMeta.label}
           </span>
+          <SpeakButton text={msg.message} />
           {msg.changed_opinion && (
             <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
               <RefreshCw className="w-2.5 h-2.5" /> Changed

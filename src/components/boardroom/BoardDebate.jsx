@@ -7,6 +7,7 @@ import { Landmark, Sparkles, Users } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import BoardTable from "@/components/boardroom/BoardTable";
 import MeetingResult from "@/components/boardroom/MeetingResult";
+import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import { startMeeting, runDiscussion, runResolution, runFounderFollowup } from "@/lib/boardroom";
 
 const PROMPTS = [
@@ -30,9 +31,13 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [activeName, setActiveName] = useState(null);
   const [result, setResult] = useState(loadedMeeting || null);
   const [error, setError] = useState(null);
+  const [pendingMeetingId, setPendingMeetingId] = useState(null);
+
+  const aiAdvisors = advisors.filter((a) => a.type !== "human");
+  const humanAdvisors = advisors.filter((a) => a.type === "human");
 
   useEffect(() => {
-    setSelectedIds(advisors.filter((a) => a.type !== "human").map((a) => a.id));
+    setSelectedIds(aiAdvisors.map((a) => a.id));
   }, [advisors]);
 
   useEffect(() => {
@@ -49,17 +54,21 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     else { setSelectedIds((prev) => prev.includes(a.id) ? prev.filter((id) => id !== a.id) : [...prev, a.id]); }
   };
 
-  const start = async () => {
-    if (!question.trim()) return;
-    const selected = advisors.filter((a) => selectedIds?.includes(a.id) && a.type !== "human");
-    if (selected.length < 3) { setError("Select at least 3 advisors."); return; }
-    setPhase("preparing"); setError(null); setResult(null);
+  const selectedAiAdvisors = aiAdvisors.filter((a) => selectedIds?.includes(a.id));
+  const selectedHumanAdvisors = humanAdvisors.filter((a) => selectedIds?.includes(a.id));
+
+  const continueToDiscussion = async (meetingId, humanPerspectives = []) => {
+    setPhase("discussion");
     try {
-      const phase1 = await startMeeting({ companyId, question, advisorIds: selected.map((a) => a.id) });
-      setPhase("discussion");
-      await runDiscussion(phase1.meeting_id);
+      // Merge human perspectives into the meeting's independent responses
+      if (humanPerspectives.length > 0) {
+        const meeting = await base44.entities.BoardMeeting.get(meetingId);
+        const updatedResponses = [...(meeting.independent_responses || []), ...humanPerspectives];
+        await base44.entities.BoardMeeting.update(meetingId, { independent_responses: updatedResponses });
+      }
+      await runDiscussion(meetingId);
       setPhase("resolution");
-      const final = await runResolution(phase1.meeting_id);
+      const final = await runResolution(meetingId);
       setResult(final);
       setPhase("result");
       setActiveName(null);
@@ -67,6 +76,33 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
       setError(e.message || "The board could not convene.");
       setPhase("idle");
     }
+  };
+
+  const start = async () => {
+    if (!question.trim()) return;
+    if (selectedAiAdvisors.length < 3) { setError("Select at least 3 AI advisors."); return; }
+    setPhase("preparing"); setError(null); setResult(null);
+    try {
+      const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id) });
+      setPendingMeetingId(phase1.meeting_id);
+      // If human advisors are selected, show the human perspective step
+      if (selectedHumanAdvisors.length > 0) {
+        setPhase("human_input");
+      } else {
+        await continueToDiscussion(phase1.meeting_id);
+      }
+    } catch (e) {
+      setError(e.message || "The board could not convene.");
+      setPhase("idle");
+    }
+  };
+
+  const handleHumanPerspectives = async (perspectives) => {
+    await continueToDiscussion(pendingMeetingId, perspectives);
+  };
+
+  const skipHumanInput = async () => {
+    await continueToDiscussion(pendingMeetingId, []);
   };
 
   const recordDecision = async () => {
@@ -90,7 +126,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
 
   const selectedCount = selectedIds?.length || 0;
 
-  if (advisors.length < 3 && phase === "idle") {
+  if (aiAdvisors.length < 3 && phase === "idle") {
     return (
       <EmptyState
         icon={Users}
@@ -101,13 +137,26 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     );
   }
 
+  // Human perspective step
+  if (phase === "human_input") {
+    return (
+      <HumanPerspectiveStep
+        humanAdvisors={selectedHumanAdvisors}
+        question={question}
+        onSubmit={handleHumanPerspectives}
+        onSkip={skipHumanInput}
+      />
+    );
+  }
+
   if (phase !== "result") {
     return (
       <div className="max-w-3xl">
         <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
           <BoardTable advisors={advisors} activeName={activeName} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
           <p className="text-center text-xs text-muted-foreground mt-4">
-            {selectedCount} attending{selectedCount < 3 && " · At least 3 required"}
+            {selectedCount} attending · {selectedAiAdvisors.length} AI{selectedHumanAdvisors.length > 0 && `, ${selectedHumanAdvisors.length} human`}
+            {selectedAiAdvisors.length < 3 && " · At least 3 AI advisors required"}
           </p>
           {error && <p className="text-center text-sm text-destructive mt-2">{error}</p>}
           <div className="max-w-xl mx-auto mt-8">
@@ -121,7 +170,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
                     <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
                   ))}
                 </div>
-                <Button onClick={start} disabled={!question.trim() || selectedCount < 3} className="w-full mt-4 rounded-full h-11">
+                <Button onClick={start} disabled={!question.trim() || selectedAiAdvisors.length < 3} className="w-full mt-4 rounded-full h-11">
                   <Landmark className="w-4 h-4 mr-2" /> Start Board Debate
                 </Button>
               </>

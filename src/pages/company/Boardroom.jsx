@@ -92,7 +92,7 @@ export default function Boardroom() {
             <WorkingSession company={company} companyId={companyId} advisors={aiAdvisors} />
           )}
           {mode === "board_debate" && (
-            <BoardDebate company={company} companyId={companyId} advisors={aiAdvisors} initialQuestion={question} loadedMeeting={loadedMeeting} />
+            <BoardDebate company={company} companyId={companyId} advisors={advisors} initialQuestion={question} loadedMeeting={loadedMeeting} />
           )}
           {mode === "task_request" && (
             <TaskRequest company={company} companyId={companyId} advisors={aiAdvisors} />
