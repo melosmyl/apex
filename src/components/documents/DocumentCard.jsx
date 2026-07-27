@@ -1,6 +1,7 @@
 import React from "react";
-import { FileText, Paperclip, User, Clock } from "lucide-react";
+import { FileText, Paperclip, User, Clock, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { STATUS_CONFIG } from "@/lib/documents";
 
@@ -52,6 +53,21 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
           <Clock className="w-3 h-3" />
           <span>{timeAgo(doc.updated_date || doc.created_date)}</span>
         </div>
+        {(doc.native_file_url || doc.pdf_file_url) && (
+          <a
+            href={doc.native_file_url || doc.pdf_file_url}
+            download
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0"
+            title={`Download ${doc.native_file_format?.toUpperCase() || "PDF"}`}
+          >
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+              <Download className="w-4 h-4" />
+            </Button>
+          </a>
+        )}
       </div>
     );
   }
@@ -85,6 +101,20 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
           <span>{timeAgo(doc.updated_date || doc.created_date)}</span>
         </div>
       </div>
+      {(doc.native_file_url || doc.pdf_file_url) && (
+        <a
+          href={doc.native_file_url || doc.pdf_file_url}
+          download
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title={`Download ${doc.native_file_format?.toUpperCase() || "PDF"}`}
+        >
+          <Button variant="outline" className="w-full rounded-full mt-3 group-hover:border-brand/40">
+            <Download className="w-4 h-4 mr-1.5" /> Download {doc.native_file_format?.toUpperCase() || "PDF"}
+          </Button>
+        </a>
+      )}
     </div>
   );
 }
