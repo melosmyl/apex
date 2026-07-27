@@ -1,9 +1,10 @@
-import React from "react";
-import { FileText, Paperclip, User, Clock, Download } from "lucide-react";
+import React, { useState } from "react";
+import { FileText, User, Clock, Download, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
-import { STATUS_CONFIG } from "@/lib/documents";
+import { STATUS_CONFIG, QUALITY_CONFIG } from "@/lib/documents";
+import { getFormatBadges, getPrimaryFormat, downloadDocumentFile } from "@/lib/documentDownloads";
 
 function timeAgo(dateStr) {
   if (!dateStr) return "";
@@ -17,9 +18,36 @@ function timeAgo(dateStr) {
   return mins > 0 ? `${mins}m ago` : "just now";
 }
 
+function FormatBadges({ doc }) {
+  const badges = getFormatBadges(doc);
+  if (badges.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {badges.map((b) => (
+        <span key={b} className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground uppercase tracking-wide">
+          {b}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
+  const [downloading, setDownloading] = useState(false);
   const statusConf = STATUS_CONFIG[doc.status] || STATUS_CONFIG.draft;
+  const qualityConf = QUALITY_CONFIG[doc.quality_check_status];
   const createdByName = doc.created_by_advisor_id && advisor ? advisor.name : doc.created_by_user_id ? "Founder" : "—";
+  const primaryFormat = getPrimaryFormat(doc);
+  const hasFile = !!primaryFormat;
+
+  const handleDownload = (e) => {
+    e.stopPropagation();
+    if (!primaryFormat || downloading) return;
+    downloadDocumentFile(doc.id, primaryFormat, {
+      onStart: () => setDownloading(true),
+      onEnd: () => setDownloading(false),
+    });
+  };
 
   if (view === "list") {
     return (
@@ -35,7 +63,7 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
           <p className="text-xs text-muted-foreground truncate">{doc.folder_path || "Unfiled"}</p>
         </div>
         <div className="hidden md:block w-32 shrink-0">
-          <span className="text-xs text-muted-foreground">{doc.document_type}</span>
+          <FormatBadges doc={doc} />
         </div>
         <div className="hidden lg:flex items-center gap-1.5 w-28 shrink-0">
           {doc.created_by_advisor_id && advisor ? (
@@ -53,20 +81,17 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
           <Clock className="w-3 h-3" />
           <span>{timeAgo(doc.updated_date || doc.created_date)}</span>
         </div>
-        {(doc.native_file_url || doc.pdf_file_url) && (
-          <a
-            href={doc.native_file_url || doc.pdf_file_url}
-            download
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="shrink-0"
-            title={`Download ${doc.native_file_format?.toUpperCase() || "PDF"}`}
+        {hasFile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full shrink-0"
+            onClick={handleDownload}
+            disabled={downloading}
+            title={`Download ${primaryFormat?.toUpperCase()}`}
           >
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-              <Download className="w-4 h-4" />
-            </Button>
-          </a>
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          </Button>
         )}
       </div>
     );
@@ -81,11 +106,31 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
         <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">
           <FileText className="w-5 h-5 text-muted-foreground" />
         </div>
-        <Badge variant="secondary" className={`rounded-full font-normal text-[10px] ${statusConf.color}`}>{statusConf.label}</Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge variant="secondary" className={`rounded-full font-normal text-[10px] ${statusConf.color}`}>{statusConf.label}</Badge>
+          {qualityConf && (
+            <Badge variant="outline" className={`rounded-full font-normal text-[9px] ${qualityConf.color}`}>
+              {qualityConf.status === "passed" ? <ShieldCheck className="w-2.5 h-2.5 mr-0.5" /> : <AlertTriangle className="w-2.5 h-2.5 mr-0.5" />}
+              QA
+            </Badge>
+          )}
+        </div>
       </div>
       <h3 className="font-display text-base leading-snug mb-1 line-clamp-2">{doc.title}</h3>
-      <p className="text-xs text-muted-foreground mb-3">{doc.document_type}</p>
+      <p className="text-xs text-muted-foreground mb-2">{doc.document_type}</p>
       {doc.description && <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{doc.description}</p>}
+
+      {/* Format badges + file info */}
+      <div className="flex items-center gap-2 mb-3">
+        <FormatBadges doc={doc} />
+        {doc.file_size > 0 && (
+          <span className="text-[10px] text-muted-foreground">{(doc.file_size / 1024).toFixed(0)} KB</span>
+        )}
+        {doc.version_number > 1 && (
+          <span className="text-[10px] text-muted-foreground">v{doc.version_number}</span>
+        )}
+      </div>
+
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5 min-w-0">
           {doc.created_by_advisor_id && advisor ? (
@@ -95,26 +140,28 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
           )}
           <span className="truncate">{createdByName.split(" ")[0]}</span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {doc.version_number > 1 && <span>v{doc.version_number}</span>}
-          {doc.file_url && <Paperclip className="w-3 h-3" />}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Clock className="w-3 h-3" />
           <span>{timeAgo(doc.updated_date || doc.created_date)}</span>
         </div>
       </div>
-      {(doc.native_file_url || doc.pdf_file_url) && (
-        <a
-          href={doc.native_file_url || doc.pdf_file_url}
-          download
-          target="_blank"
-          rel="noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          title={`Download ${doc.native_file_format?.toUpperCase() || "PDF"}`}
+
+      {hasFile ? (
+        <Button
+          variant="outline"
+          className="w-full rounded-full mt-3 group-hover:border-brand/40"
+          onClick={handleDownload}
+          disabled={downloading}
         >
-          <Button variant="outline" className="w-full rounded-full mt-3 group-hover:border-brand/40">
-            <Download className="w-4 h-4 mr-1.5" /> Download {doc.native_file_format?.toUpperCase() || "PDF"}
-          </Button>
-        </a>
-      )}
+          {downloading ? (
+            <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Preparing…</>
+          ) : (
+            <><Download className="w-4 h-4 mr-1.5" /> Download {primaryFormat?.toUpperCase()}</>
+          )}
+        </Button>
+      ) : doc.status === "failed" ? (
+        <div className="mt-3 text-center text-xs text-red-600 bg-red-50 rounded-lg py-2">Generation failed</div>
+      ) : null}
     </div>
   );
 }

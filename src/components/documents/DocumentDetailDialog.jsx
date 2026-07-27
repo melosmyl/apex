@@ -12,10 +12,11 @@ import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
 import {
   Check, RefreshCw, Edit3, History, Paperclip, Archive, MessageSquare,
-  Save, X, ChevronRight, FileText, AlertTriangle, Download, FileSpreadsheet, FileDown, ShieldCheck, Loader2, Presentation
+  Save, X, ChevronRight, FileText, AlertTriangle, Download, FileSpreadsheet, FileDown, ShieldCheck, Loader2, Presentation, Eye, Share2, GitBranch
 } from "lucide-react";
 import { STATUS_CONFIG, APPROVAL_CONFIG, QUALITY_CONFIG, ASSUMPTIONS_CONFIG } from "@/lib/documents";
 import { regenerateDeliverable } from "@/lib/deliverables";
+import DocumentDownloadButton from "@/components/documents/DocumentDownloadButton";
 
 export default function DocumentDetailDialog({
   doc, advisors, onClose, onRefresh, company
@@ -142,6 +143,39 @@ export default function DocumentDetailDialog({
           </div>
         </DialogHeader>
 
+        {/* Actions bar — visible near title */}
+        <div className="flex flex-wrap items-center gap-2 py-3 border-b border-border/50">
+          <DocumentDownloadButton doc={doc} variant="default" size="sm" />
+          {doc.native_file_url && (
+            <Button variant="ghost" size="sm" className="rounded-full" onClick={() => window.open(doc.native_file_url, "_blank")}>
+              <Eye className="w-3.5 h-3.5 mr-1" /> Open Preview
+            </Button>
+          )}
+          {doc.status !== "approved" && doc.status !== "archived" && !showRevision && (
+            <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setShowRevision(true)}>
+              <RefreshCw className="w-3.5 h-3.5 mr-1" /> Request Revision
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="rounded-full" disabled={regenerating} onClick={async () => {
+            setRegenerating(true);
+            try {
+              await regenerateDeliverable({ companyId: doc.company_id, documentId: doc.id });
+              onRefresh(); onClose();
+            } catch { setRegenerating(false); }
+          }}>
+            <GitBranch className="w-3.5 h-3.5 mr-1" /> New Version
+          </Button>
+          <Button variant="ghost" size="sm" className="rounded-full" onClick={() => {
+            const url = `${window.location.origin}/company/${doc.company_id}/documents`;
+            navigator.clipboard?.writeText(url).catch(() => {});
+          }}>
+            <Share2 className="w-3.5 h-3.5 mr-1" /> Share
+          </Button>
+          <Button variant="ghost" size="sm" className="rounded-full ml-auto" onClick={archive} disabled={busy || doc.status === "archived"}>
+            <Archive className="w-3.5 h-3.5 mr-1" /> Archive
+          </Button>
+        </div>
+
         {/* Metadata bar */}
         <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground py-2 border-y border-border/50">
           {advisor && (
@@ -182,39 +216,27 @@ export default function DocumentDetailDialog({
               )}
             </div>
 
-            {/* Download buttons */}
-            <div className="flex flex-wrap gap-2">
-              {doc.native_file_url && doc.native_file_format === "xlsx" && (
-                <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
-                  <Button variant="default" className="rounded-full"><FileSpreadsheet className="w-4 h-4 mr-1.5" /> Download Excel</Button>
-                </a>
-              )}
-              {doc.native_file_url && doc.native_file_format === "docx" && (
-                <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
-                  <Button variant="default" className="rounded-full"><FileText className="w-4 h-4 mr-1.5" /> Download Word</Button>
-                </a>
-              )}
-              {doc.native_file_url && doc.native_file_format === "pptx" && (
-                <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
-                  <Button variant="default" className="rounded-full"><Presentation className="w-4 h-4 mr-1.5" /> Download PowerPoint</Button>
-                </a>
-              )}
-              {doc.native_file_url && doc.native_file_format !== "xlsx" && doc.native_file_format !== "docx" && doc.native_file_format !== "pptx" && doc.native_file_url !== doc.pdf_file_url && (
-                <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
-                  <Button variant="default" className="rounded-full"><Download className="w-4 h-4 mr-1.5" /> Download Original</Button>
-                </a>
-              )}
-              {doc.pdf_file_url && (
-                <a href={doc.pdf_file_url} download target="_blank" rel="noreferrer">
-                  <Button variant="outline" className="rounded-full"><FileDown className="w-4 h-4 mr-1.5" /> Download PDF</Button>
-                </a>
-              )}
-              {doc.native_file_url && (
-                <a href={doc.native_file_url} target="_blank" rel="noreferrer">
-                  <Button variant="ghost" className="rounded-full"><FileText className="w-4 h-4 mr-1.5" /> Open Preview</Button>
-                </a>
-              )}
-            </div>
+            {/* Download actions */}
+            <DocumentDownloadButton doc={doc} />
+
+            {/* Generate file for documents without native files */}
+            {!doc.native_file_url && !doc.pdf_file_url && doc.status !== "generating" && doc.status !== "failed" && (
+              <Button
+                variant="default"
+                className="rounded-full"
+                disabled={regenerating}
+                onClick={async () => {
+                  setRegenerating(true);
+                  try {
+                    await regenerateDeliverable({ companyId: doc.company_id, documentId: doc.id });
+                    onRefresh(); onClose();
+                  } catch { setRegenerating(false); }
+                }}
+              >
+                {regenerating ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Download className="w-4 h-4 mr-1.5" />}
+                {regenerating ? "Generating…" : "Generate File"}
+              </Button>
+            )}
 
             {/* Quality check details */}
             {doc.quality_check_results?.checks?.length > 0 && (
@@ -319,6 +341,9 @@ export default function DocumentDetailDialog({
                     {v.is_latest_version && <Badge className="rounded-full text-[10px] font-normal">Latest</Badge>}
                     <span className="text-muted-foreground text-xs flex-1">{new Date(v.updated_date || v.created_date).toLocaleDateString("en-GB")}</span>
                     <Badge variant="outline" className="rounded-full text-[10px] font-normal">{(STATUS_CONFIG[v.status] || {}).label || v.status}</Badge>
+                    {(v.native_file_url || v.pdf_file_url) && (
+                      <DocumentDownloadButton doc={v} variant="ghost" size="sm" className="h-7 px-3" />
+                    )}
                   </div>
                 ))}
               </div>

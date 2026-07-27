@@ -1,0 +1,55 @@
+{
+  "name": "DocumentDownloadLog",
+  "type": "object",
+  "properties": {
+    "document_id": {
+      "type": "string"
+    },
+    "company_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "file_format": {
+      "type": "string"
+    },
+    "version_number": {
+      "type": "number",
+      "default": 1
+    },
+    "filename": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "document_id",
+    "company_id",
+    "file_format"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": true,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
