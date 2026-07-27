@@ -49,8 +49,16 @@ export default function Tasks() {
 
   const detectDocType = (task) => {
     const text = `${task.title} ${task.description || ""}`.toLowerCase();
-    const financeTerms = ["financial model", "unit economics", "cash flow", "p&l", "profit and loss", "budget", "forecast", "margin", "breakeven", "break-even", "revenue model"];
-    if (financeTerms.some((t) => text.includes(t))) return "Financial Model";
+    if (["pitch deck", "investor deck", "slide deck", "presentation", "slides"].some((t) => text.includes(t))) return "Pitch Deck";
+    if (["financial model", "unit economics", "cash flow", "p&l", "profit and loss", "budget", "forecast", "margin", "breakeven", "break-even", "revenue model"].some((t) => text.includes(t))) return "Financial Model";
+    if (["market research", "market analysis", "market size", "tam sam som"].some((t) => text.includes(t))) return "Market Research";
+    if (["competitor", "competition", "competitive analysis"].some((t) => text.includes(t))) return "Competitor Analysis";
+    if (["business plan"].some((t) => text.includes(t))) return "Business Plan";
+    if (["strategy", "strategic plan", "go-to-market", "go to market", "expansion plan"].some((t) => text.includes(t))) return "Strategy";
+    if (["risk", "risk assessment", "risk analysis"].some((t) => text.includes(t))) return "Risk Assessment";
+    if (["proposal", "proposal draft"].some((t) => text.includes(t))) return "Proposal";
+    if (["marketing plan", "campaign plan", "marketing strategy"].some((t) => text.includes(t))) return "Marketing Plan";
+    if (["meeting summary", "board resolution", "decision memo", "minutes"].some((t) => text.includes(t))) return "Meeting Summary";
     return "Report";
   };
 

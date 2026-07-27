@@ -12,7 +12,7 @@ import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
 import {
   Check, RefreshCw, Edit3, History, Paperclip, Archive, MessageSquare,
-  Save, X, ChevronRight, FileText, AlertTriangle, Download, FileSpreadsheet, FileDown, ShieldCheck, Loader2
+  Save, X, ChevronRight, FileText, AlertTriangle, Download, FileSpreadsheet, FileDown, ShieldCheck, Loader2, Presentation
 } from "lucide-react";
 import { STATUS_CONFIG, APPROVAL_CONFIG, QUALITY_CONFIG, ASSUMPTIONS_CONFIG } from "@/lib/documents";
 import { regenerateDeliverable } from "@/lib/deliverables";
@@ -194,7 +194,12 @@ export default function DocumentDetailDialog({
                   <Button variant="default" className="rounded-full"><FileText className="w-4 h-4 mr-1.5" /> Download Word</Button>
                 </a>
               )}
-              {doc.native_file_url && doc.native_file_format !== "xlsx" && doc.native_file_format !== "docx" && doc.native_file_url !== doc.pdf_file_url && (
+              {doc.native_file_url && doc.native_file_format === "pptx" && (
+                <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
+                  <Button variant="default" className="rounded-full"><Presentation className="w-4 h-4 mr-1.5" /> Download PowerPoint</Button>
+                </a>
+              )}
+              {doc.native_file_url && doc.native_file_format !== "xlsx" && doc.native_file_format !== "docx" && doc.native_file_format !== "pptx" && doc.native_file_url !== doc.pdf_file_url && (
                 <a href={doc.native_file_url} download target="_blank" rel="noreferrer">
                   <Button variant="default" className="rounded-full"><Download className="w-4 h-4 mr-1.5" /> Download Original</Button>
                 </a>

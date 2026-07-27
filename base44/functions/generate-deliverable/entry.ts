@@ -6,6 +6,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { buildFinancialModelWorkbook, runExcelQualityChecks } from '../../shared/buildExcelModel.ts';
 import { buildPdfReport } from '../../shared/buildPdfReport.ts';
 import { buildDocxReport, runDocxQualityChecks } from '../../shared/buildDocxReport.ts';
+import { buildPptxDeck, runPptxQualityChecks } from '../../shared/buildPptxDeck.ts';
 
 const FINANCIAL_TYPES = ['Financial Model', 'Budget', 'Forecast', 'Spreadsheet'];
 const PRESENTATION_TYPES = ['Pitch Deck', 'Presentation'];
@@ -67,12 +68,15 @@ export default async function (req) {
 
     const companyContext = buildCompanyContext(company, decisions, projects, knowledgeDocs);
     const isFinancial = FINANCIAL_TYPES.includes(resolvedDocType);
+    const isPresentation = PRESENTATION_TYPES.includes(resolvedDocType);
     const taskTitle = task?.title || topic || resolvedDocType;
 
     // ─── Step 1: Generate structured document specification via LLM ───
     const spec = isFinancial
       ? await generateFinancialSpec(base44, company, advisor, task, taskTitle, companyContext, custom_instructions)
-      : await generateReportSpec(base44, company, advisor, task, taskTitle, resolvedDocType, companyContext, custom_instructions);
+      : isPresentation
+        ? await generatePresentationSpec(base44, company, advisor, task, taskTitle, companyContext, custom_instructions)
+        : await generateReportSpec(base44, company, advisor, task, taskTitle, resolvedDocType, companyContext, custom_instructions);
 
     const version = revision_of ? await determineVersion(base44, company_id, revision_of) : 1;
     const baseName = `${cleanFileName(company.name)}_${cleanFileName(taskTitle)}_v${version}.0`;
@@ -111,7 +115,6 @@ export default async function (req) {
       const pdfUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: pdfFile });
       pdfFileUrl = pdfUpload.file_url;
     } else {
-      const isPresentation = PRESENTATION_TYPES.includes(resolvedDocType);
       const reportSpec = {
         ...spec,
         company,
@@ -122,15 +125,20 @@ export default async function (req) {
       };
 
       if (isPresentation) {
-        // Presentation types: PDF only
+        // Presentation types: editable PPTX + PDF companion
+        const pptxBytes = await buildPptxDeck(reportSpec);
+        const pptxFile = new File([pptxBytes], `${baseName}.pptx`, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+        const pptxUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: pptxFile });
+        nativeFileUrl = pptxUpload.file_url;
+        nativeFormat = 'pptx';
+        fileSize = pptxBytes.length;
+        qaResult = runPptxQualityChecks(spec);
+
+        // PDF companion
         const pdfBytes = await buildPdfReport(reportSpec);
         const pdfFile = new File([pdfBytes], `${baseName}.pdf`, { type: 'application/pdf' });
         const pdfUpload = await base44.asServiceRole.integrations.Core.UploadFile({ file: pdfFile });
         pdfFileUrl = pdfUpload.file_url;
-        nativeFileUrl = pdfUpload.file_url;
-        nativeFormat = 'pdf';
-        fileSize = pdfBytes.length;
-        qaResult = { passed: true, checks: [{ check: 'PDF generated successfully', passed: true, detail: 'Document rendered with professional formatting' }] };
       } else {
         // Text-heavy types: editable DOCX + PDF companion
         const docxBytes = await buildDocxReport(reportSpec);
@@ -169,7 +177,7 @@ export default async function (req) {
       folder_path: getFolderForType(resolvedDocType),
       tags: topic ? [topic] : [],
       status: qaResult.passed ? 'ready_for_review' : 'failed',
-      content_format: nativeFormat === 'xlsx' ? 'XLSX' : nativeFormat === 'docx' ? 'DOCX' : 'PDF',
+      content_format: nativeFormat === 'xlsx' ? 'XLSX' : nativeFormat === 'docx' ? 'DOCX' : nativeFormat === 'pptx' ? 'PPTX' : 'PDF',
       content: spec.narrative?.executiveSummary || '',
       structured_content: spec,
       native_file_url: nativeFileUrl,
@@ -399,6 +407,77 @@ Return JSON.`;
   return res;
 }
 
+async function generatePresentationSpec(base44, company, advisor, task, taskTitle, companyContext, customInstructions) {
+  const prompt = `You are ${advisor?.name || 'an advisor'}, ${advisor?.role || 'Advisor'} on the executive board of ${company.name}.
+
+=== COMPANY CONTEXT ===
+${companyContext}
+
+=== TASK ===
+${taskTitle}
+${task?.description || ''}
+
+${customInstructions ? `Additional instructions: ${customInstructions}\n` : ''}
+
+Produce a professional pitch deck / presentation as a slide-by-slide specification. This will be generated as an editable PowerPoint (.pptx) with a companion PDF.
+
+Design 8-12 slides:
+- 1 title slide (layout: "title" — include title and subtitle)
+- 1 agenda slide (layout: "bullets" — 4-5 agenda items)
+- 1-2 executive summary slides (layout: "bullets" — 3-5 concise points each)
+- 1-2 key metrics or data slides (layout: "table" with headers and 3-6 rows)
+- 2-3 analysis slides (layout: "bullets" or "two_column" for comparisons)
+- 1 recommendations slide (layout: "bullets")
+- 1 risks slide (layout: "bullets" or "two_column" for risks vs mitigations)
+
+Rules:
+- Each bullet slide should have 3-5 concise, impactful bullet points (max 15 words each)
+- Table slides should have clear headers and 3-6 data rows
+- Two-column slides should have left/right headings with 2-4 bullets each
+- Keep text concise — this is a presentation, not a document
+
+Also provide a narrative with executiveSummary, risks, and sources for the companion PDF.
+
+Return JSON.`;
+
+  const schema = {
+    type: 'object',
+    properties: {
+      slides: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            layout: { type: 'string', enum: ['title', 'section', 'bullets', 'table', 'two_column'] },
+            title: { type: 'string' },
+            subtitle: { type: 'string' },
+            bullets: { type: 'array', items: { type: 'string' } },
+            headers: { type: 'array', items: { type: 'string' } },
+            rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+            left: { type: 'object', properties: { heading: { type: 'string' }, bullets: { type: 'array', items: { type: 'string' } } } },
+            right: { type: 'object', properties: { heading: { type: 'string' }, bullets: { type: 'array', items: { type: 'string' } } } },
+          },
+          required: ['layout', 'title'],
+        },
+      },
+      narrative: {
+        type: 'object',
+        properties: {
+          executiveSummary: { type: 'string' },
+          risks: { type: 'array', items: { type: 'string' } },
+          sources: { type: 'array', items: { type: 'string' } },
+          limitations: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      toc: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['slides', 'narrative'],
+  };
+
+  const res = await base44.asServiceRole.integrations.Core.InvokeLLM({ prompt, response_json_schema: schema, model: 'gpt_5_mini' });
+  return res;
+}
+
 function buildPdfSpecFromModel(modelSpec) {
   const assumptions = modelSpec.assumptions || {};
   const assumptionsTable = Object.entries(assumptions).map(([key, val]) => {
@@ -470,6 +549,12 @@ function getFolderForType(docType) {
     'Competitor Analysis': '02 Research / Competitor Analysis',
     'Board Resolution': '12 Meetings and Decisions / Board Resolutions',
     'Decision Memo': '12 Meetings and Decisions / Decision Memos',
+    'Pitch Deck': '04 Fundraising / Pitch Decks',
+    'Presentation': '04 Fundraising / Presentations',
+    'Proposal': '01 Strategy / Proposals',
+    'Risk Assessment': '06 Risk / Assessments',
+    'Marketing Plan': '05 Marketing / Plans',
+    'Meeting Summary': '12 Meetings and Decisions / Summaries',
   };
   return map[docType] || '01 Strategy / General';
 }
