@@ -5,9 +5,11 @@ module.exports = {
   theme: {
   	extend: {
   		borderRadius: {
+  			sm: '0.1875rem',
+  			md: '0.25rem',
   			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 4px)',
-  			sm: 'calc(var(--radius) - 8px)'
+  			xl: '0.5rem',
+  			'2xl': '0.625rem'
   		},
   		boxShadow: {
   			soft: 'var(--shadow-soft)',
