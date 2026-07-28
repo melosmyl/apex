@@ -23,7 +23,7 @@ export default function ForgotPassword() {
       setLoading(false);
       setSent(true);
     }
-  };
+  }; 
 
   return (
     <AuthLayout
