@@ -30,6 +30,7 @@ import Research from '@/pages/company/Research';
 import Decisions from '@/pages/company/Decisions';
 import Meetings from '@/pages/company/Meetings';
 import CompanySettings from '@/pages/company/CompanySettings';
+// import CompanySettings from '@/pages/company/CompanySettings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
