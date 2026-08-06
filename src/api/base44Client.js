@@ -177,4 +177,12 @@ const auth = {
   },
 };
 
-export const base44 = { entities, auth };
+const functions = {
+  async invoke(name, body) {
+    const { data, error } = await supabase.functions.invoke(name, { body });
+    if (error) throw error;
+    return { data };
+  },
+};
+
+export const base44 = { entities, auth, functions };
