@@ -93,11 +93,8 @@ const entities = Object.fromEntries(
 );
 
 async function fetchProfile(authUser) {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', authUser.id)
-    .single();
+  const { data: profile, error } = await supabase.rpc('get_my_profile');
+  if (error) throw error;
   return {
     id: authUser.id,
     email: authUser.email,
