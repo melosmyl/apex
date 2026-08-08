@@ -8,7 +8,26 @@ import EmptyState from "@/components/EmptyState";
 import BoardTable from "@/components/boardroom/BoardTable";
 import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
+import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
 import { startMeeting, runDiscussion, runResolution, runFounderFollowup } from "@/lib/boardroom";
+
+const POLL_INTERVAL_MS = 3000;
+
+function toRoundOneMessages(responses = []) {
+  return responses.map((r) => ({
+    round: 1,
+    advisor_id: r.advisor_id,
+    advisor_name: r.advisor_name,
+    role: r.role,
+    message: r.position || r.recommendation || "",
+    message_type: "initial",
+    reply_to_advisor: null,
+    changed_opinion: false,
+    new_position: null,
+    new_risks: r.risks || [],
+    confidence_score: r.confidence_score || 0,
+  }));
+}
 
 const PROMPTS = [
   "Should we manufacture our products in Portugal or Vietnam?",
@@ -32,6 +51,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [result, setResult] = useState(loadedMeeting || null);
   const [error, setError] = useState(null);
   const [pendingMeetingId, setPendingMeetingId] = useState(null);
+  const [liveTranscript, setLiveTranscript] = useState([]);
 
   const aiAdvisors = advisors.filter((a) => a.type !== "human");
   const humanAdvisors = advisors.filter((a) => a.type === "human");
@@ -49,6 +69,24 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     return () => clearInterval(t);
   }, [phase, advisors, selectedIds]);
 
+  useEffect(() => {
+    if (phase !== "discussion" || !pendingMeetingId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const meeting = await base44.entities.BoardMeeting.get(pendingMeetingId);
+        if (!cancelled && meeting?.discussion_transcript?.length) {
+          setLiveTranscript(meeting.discussion_transcript);
+        }
+      } catch {
+        // A dropped poll is cosmetic — the discussion continues server-side regardless.
+      }
+    };
+    poll();
+    const t = setInterval(poll, POLL_INTERVAL_MS);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [phase, pendingMeetingId]);
+
   const toggleAdvisor = (a) => {
     if (!hasInteracted) { setSelectedIds([a.id]); setHasInteracted(true); }
     else { setSelectedIds((prev) => prev.includes(a.id) ? prev.filter((id) => id !== a.id) : [...prev, a.id]); }
@@ -65,6 +103,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         const meeting = await base44.entities.BoardMeeting.get(meetingId);
         const updatedResponses = [...(meeting.independent_responses || []), ...humanPerspectives];
         await base44.entities.BoardMeeting.update(meetingId, { independent_responses: updatedResponses });
+        setLiveTranscript(toRoundOneMessages(updatedResponses));
       }
       await runDiscussion(meetingId);
       setPhase("resolution");
@@ -81,10 +120,11 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const start = async () => {
     if (!question.trim()) return;
     if (selectedAiAdvisors.length < 3) { setError("Select at least 3 AI advisors."); return; }
-    setPhase("preparing"); setError(null); setResult(null);
+    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]);
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id) });
       setPendingMeetingId(phase1.meeting_id);
+      setLiveTranscript(toRoundOneMessages(phase1.independent_responses));
       // If human advisors are selected, show the human perspective step
       if (selectedHumanAdvisors.length > 0) {
         setPhase("human_input");
@@ -176,18 +216,23 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
               </>
             ) : (
               <div className="text-center py-8">
-                <div className="inline-flex items-center gap-2 text-muted-foreground">
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  <span className="font-display text-lg">{PHASE_MESSAGES[phase]}</span>
-                </div>
-                {phase === "preparing" && activeName && (
-                  <p className="text-sm text-muted-foreground mt-2">{activeName} is evaluating…</p>
+                {!liveTranscript.length && (
+                  <>
+                    <div className="inline-flex items-center gap-2 text-muted-foreground">
+                      <Sparkles className="w-4 h-4 animate-pulse" />
+                      <span className="font-display text-lg">{PHASE_MESSAGES[phase]}</span>
+                    </div>
+                    {phase === "preparing" && activeName && (
+                      <p className="text-sm text-muted-foreground mt-2">{activeName} is evaluating…</p>
+                    )}
+                  </>
                 )}
                 <p className="font-display text-base mt-4 max-w-md mx-auto text-muted-foreground italic">"{question}"</p>
               </div>
             )}
           </div>
         </div>
+        <LiveDiscussion transcript={liveTranscript} advisors={advisors} phase={phase} />
       </div>
     );
   }
@@ -196,7 +241,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     <div>
       <div className="flex items-center justify-between mb-6">
         <p className="font-display text-xl max-w-2xl">"{question}"</p>
-        <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); }}>New question</Button>
+        <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); }}>New question</Button>
       </div>
       <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={recordDecision} onFollowup={handleFollowup} />
     </div>

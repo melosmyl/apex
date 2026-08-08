@@ -47,7 +47,7 @@ function SpeakButton({ text }) {
   );
 }
 
-function DiscussionMessage({ msg, accent }) {
+export function DiscussionMessage({ msg, accent }) {
   if (msg.message_type === 'founder_message') {
     return (
       <div className="flex gap-3 group">
