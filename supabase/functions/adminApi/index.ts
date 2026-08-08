@@ -5,6 +5,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Unlike the other Edge Functions, this one keeps Supabase's "Enforce JWT
+// Verification" setting ON, and must stay that way — do not deploy it with
+// --no-verify-jwt. The others need it off because they are invoked
+// server-to-server with the service-role key; this one is only ever called
+// from the frontend with a user JWT, so platform verification costs nothing
+// and keeps a second gate in front of the service-role key used below.
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
