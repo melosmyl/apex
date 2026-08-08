@@ -125,6 +125,7 @@ Deno.serve(async (req) => {
           provider_used: d?.provider_used || null, model_used: d?.model_used || null, used_fallback: d?.used_fallback || false,
           position: 'This advisor was temporarily unavailable.', recommendation: 'No recommendation available.',
           key_arguments: [], assumptions: [], risks: [], missing_information: [], suggested_actions: [], confidence_score: 0,
+          unavailable: true,
         };
       }
       const resp = d.response;

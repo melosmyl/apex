@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import FounderReplyBox from "@/components/boardroom/FounderReplyBox";
 import PinnableText from "@/components/pins/PinnableText";
+import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
+import { absenteesByRound } from "@/lib/boardroom";
 import { usePin } from "@/components/pins/PinContext";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { ChevronDown, ChevronUp, MessageSquare, CornerDownRight, RefreshCw, AlertTriangle, Volume2, Square } from "lucide-react";
@@ -48,6 +50,23 @@ function SpeakButton({ text }) {
 }
 
 export function DiscussionMessage({ msg, accent }) {
+  if (msg.unavailable) {
+    return (
+      <div className="flex gap-3">
+        <div className="shrink-0 pt-0.5 opacity-50">
+          <AdvisorAvatar name={msg.advisor_name} accent={accent} size="sm" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="font-display text-sm font-medium text-muted-foreground">{msg.advisor_name}</span>
+            <span className="text-xs text-muted-foreground">{msg.role}</span>
+          </div>
+          <UnavailableNotice>Could not be reached — gave no position. The board continued without them.</UnavailableNotice>
+        </div>
+      </div>
+    );
+  }
+
   if (msg.message_type === 'founder_message') {
     return (
       <div className="flex gap-3 group">
@@ -207,6 +226,8 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
     return { rounds: rounds.length, messages: transcript.length, challenges, changed };
   }, [transcript, rounds]);
 
+  const absentees = useMemo(() => absenteesByRound(transcript), [transcript]);
+
   if (!transcript.length) return null;
 
   return (
@@ -259,6 +280,11 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
                     </div>
                     <div className="flex-1 h-px bg-border/50" />
                   </div>
+                  {absentees[round] && (
+                    <UnavailableNotice className="mb-4">
+                      {absentees[round].join(", ")} could not be reached for this round — the debate continued without them.
+                    </UnavailableNotice>
+                  )}
                   <div className="space-y-5">
                     {roundMessages.map((msg, i) => (
                       <PinnableText

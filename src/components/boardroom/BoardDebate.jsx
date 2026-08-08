@@ -26,6 +26,7 @@ function toRoundOneMessages(responses = []) {
     new_position: null,
     new_risks: r.risks || [],
     confidence_score: r.confidence_score || 0,
+    unavailable: r.unavailable || false,
   }));
 }
 
@@ -52,6 +53,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [error, setError] = useState(null);
   const [pendingMeetingId, setPendingMeetingId] = useState(null);
   const [liveTranscript, setLiveTranscript] = useState([]);
+  const [resolutionStartedAt, setResolutionStartedAt] = useState(null);
 
   const aiAdvisors = advisors.filter((a) => a.type !== "human");
   const humanAdvisors = advisors.filter((a) => a.type === "human");
@@ -106,6 +108,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         setLiveTranscript(toRoundOneMessages(updatedResponses));
       }
       await runDiscussion(meetingId);
+      setResolutionStartedAt(Date.now());
       setPhase("resolution");
       const final = await runResolution(meetingId);
       setResult(final);
@@ -120,7 +123,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const start = async () => {
     if (!question.trim()) return;
     if (selectedAiAdvisors.length < 3) { setError("Select at least 3 AI advisors."); return; }
-    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]);
+    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setResolutionStartedAt(null);
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id) });
       setPendingMeetingId(phase1.meeting_id);
@@ -232,7 +235,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
             )}
           </div>
         </div>
-        <LiveDiscussion transcript={liveTranscript} advisors={advisors} phase={phase} />
+        <LiveDiscussion transcript={liveTranscript} advisors={advisors} phase={phase} resolutionStartedAt={resolutionStartedAt} />
       </div>
     );
   }

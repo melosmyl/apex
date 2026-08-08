@@ -3,10 +3,32 @@ import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Badge } from "@/components/ui/badge";
 import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
+import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
 
 export default function AdvisorResponseCard({ independent, challenge, accent, meetingId, companyId, meetingTitle }) {
   const { createPin } = usePin();
   const conf = Math.round(independent.confidence_score || 0);
+  const unavailable = independent.unavailable;
+
+  if (unavailable) {
+    return (
+      <div className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
+        <div className="flex items-start gap-3 mb-4">
+          <AdvisorAvatar name={independent.advisor_name} accent={accent} size="md" />
+          <div className="flex-1 min-w-0">
+            <h4 className="font-display text-lg leading-tight">{independent.advisor_name}</h4>
+            <p className="text-xs text-muted-foreground">{independent.role}</p>
+          </div>
+          <div className="text-center shrink-0">
+            <div className="font-display text-xl text-muted-foreground">—</div>
+          </div>
+        </div>
+        <UnavailableNotice>
+          This advisor could not be reached, so they gave no position on this question. The board continued without them — the resolution does not reflect their view.
+        </UnavailableNotice>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-card border border-border/70 rounded-2xl p-5 rise-in">

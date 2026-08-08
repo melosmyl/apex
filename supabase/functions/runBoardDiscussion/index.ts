@@ -115,6 +115,7 @@ Deno.serve(async (req) => {
       reply_to_advisor: null, changed_opinion: false, new_position: null,
       new_risks: r.risks || [], confidence_score: r.confidence_score || 0,
       provider_used: r.provider_used, model_used: r.model_used,
+      unavailable: r.unavailable || false,
     }));
 
     const discussionSchema = {

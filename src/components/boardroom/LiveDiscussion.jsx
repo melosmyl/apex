@@ -1,14 +1,35 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DiscussionMessage } from "@/components/boardroom/ExecutiveDiscussion";
+import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
+import { absenteesByRound } from "@/lib/boardroom";
 import { MessageSquare } from "lucide-react";
 
 const PHASE_STATUS = {
   preparing: "Advisors are forming their independent positions…",
   discussion: "The board is debating…",
-  resolution: "The Chair is weighing the discussion and preparing the resolution…",
 };
 
-export default function LiveDiscussion({ transcript = [], advisors = [], phase }) {
+const CHAIR_IS_WEIGHING = [
+  "Which arguments held up under challenge",
+  "Which were weakened or disproven",
+  "Which assumptions remain uncertain",
+  "Whether there is real consensus or a minority view to preserve",
+];
+
+function ElapsedTime({ since }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const seconds = Math.max(0, Math.floor((now - since) / 1000));
+  const label = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  return <span className="font-mono text-xs text-muted-foreground tabular-nums">{label}</span>;
+}
+
+export default function LiveDiscussion({ transcript = [], advisors = [], phase, resolutionStartedAt }) {
   const scrollRef = useRef(null);
 
   const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
@@ -23,6 +44,8 @@ export default function LiveDiscussion({ transcript = [], advisors = [], phase }
     const changed = transcript.filter((m) => m.changed_opinion).length;
     return { challenges, changed };
   }, [transcript]);
+
+  const absentees = useMemo(() => absenteesByRound(transcript), [transcript]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -58,6 +81,11 @@ export default function LiveDiscussion({ transcript = [], advisors = [], phase }
                 </div>
                 <div className="flex-1 h-px bg-border/50" />
               </div>
+              {absentees[round] && (
+                <UnavailableNotice className="mb-4">
+                  {absentees[round].join(", ")} could not be reached for this round — the debate continued without them.
+                </UnavailableNotice>
+              )}
               <div className="space-y-5">
                 {roundMessages.map((msg, i) => (
                   <DiscussionMessage key={`${round}-${i}`} msg={msg} accent={accentOf(msg.advisor_name)} />
@@ -69,16 +97,32 @@ export default function LiveDiscussion({ transcript = [], advisors = [], phase }
       </div>
 
       {phase !== "result" && (
-        <div className="flex items-center gap-2.5 px-5 py-4 border-t border-border/50 bg-secondary/30">
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-          </span>
-          <p className="text-sm text-muted-foreground">
-            {phase === "discussion" && latestRound > 1
-              ? `Round ${latestRound} complete — the board is continuing…`
-              : PHASE_STATUS[phase]}
-          </p>
+        <div className="px-5 py-4 border-t border-border/50 bg-secondary/30">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            </span>
+            <p className="text-sm text-muted-foreground flex-1">
+              {phase === "resolution"
+                ? "The Chair is weighing the discussion and preparing the resolution…"
+                : phase === "discussion" && latestRound > 1
+                  ? `Round ${latestRound} complete — the board is continuing…`
+                  : PHASE_STATUS[phase]}
+            </p>
+            {phase === "resolution" && resolutionStartedAt && <ElapsedTime since={resolutionStartedAt} />}
+          </div>
+
+          {phase === "resolution" && (
+            <ul className="mt-3 pl-[18px] space-y-1">
+              {CHAIR_IS_WEIGHING.map((item) => (
+                <li key={item} className="text-xs text-muted-foreground flex gap-2">
+                  <span>—</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>

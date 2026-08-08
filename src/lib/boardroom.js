@@ -1,5 +1,25 @@
 import { base44 } from "@/api/base44Client";
 
+// Every attending advisor is called in every discussion round, so an advisor
+// absent from a round is one whose call failed and was dropped server-side.
+export function absenteesByRound(transcript = []) {
+  const attending = [...new Set(
+    transcript.filter((m) => m.round === 1 && m.advisor_name).map((m) => m.advisor_name)
+  )];
+  if (!attending.length) return {};
+
+  const result = {};
+  for (const round of [...new Set(transcript.map((m) => m.round))]) {
+    if (round === 1) continue;
+    const messages = transcript.filter((m) => m.round === round);
+    if (messages.every((m) => m.message_type === "founder_message")) continue;
+    const spoke = new Set(messages.map((m) => m.advisor_name));
+    const missing = attending.filter((name) => !spoke.has(name));
+    if (missing.length) result[round] = missing;
+  }
+  return result;
+}
+
 export async function startMeeting({ companyId, question, advisorIds }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
