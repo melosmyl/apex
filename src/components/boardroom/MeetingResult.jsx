@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical } from "lucide-react";
+import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical, Share2 } from "lucide-react";
 import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
@@ -9,6 +9,50 @@ import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
 import BoardUncertaintyNote from "@/components/boardroom/BoardUncertaintyNote";
 import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
+import { base44 } from "@/api/base44Client";
+import { toast } from "@/components/ui/use-toast";
+
+function ShareMeetingControl({ meetingId, initialToken, status }) {
+  const [token, setToken] = useState(initialToken || null);
+  const [busy, setBusy] = useState(false);
+
+  const copy = (t) => {
+    const url = `${window.location.origin}/share/meeting/${t}`;
+    try { navigator.clipboard.writeText(url).catch(() => {}); } catch { /* clipboard unavailable */ }
+    toast({ title: "Link copied", description: t === token && initialToken ? undefined : "Anyone with this link can view this meeting, no account needed." });
+  };
+
+  const enable = async () => {
+    if (!meetingId || status !== "complete") return;
+    setBusy(true);
+    try {
+      const newToken = crypto.randomUUID();
+      await base44.entities.BoardMeeting.update(meetingId, { share_token: newToken });
+      setToken(newToken);
+      copy(newToken);
+    } finally { setBusy(false); }
+  };
+
+  const revoke = async () => {
+    setBusy(true);
+    try {
+      await base44.entities.BoardMeeting.update(meetingId, { share_token: null });
+      setToken(null);
+      toast({ title: "Sharing revoked", description: "The old link no longer works." });
+    } finally { setBusy(false); }
+  };
+
+  if (status !== "complete") return null;
+
+  return token ? (
+    <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" className="rounded-full" onClick={() => copy(token)}><Share2 className="w-3.5 h-3.5 mr-1.5" /> Copy Public Link</Button>
+      <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" disabled={busy} onClick={revoke}>Revoke</Button>
+    </div>
+  ) : (
+    <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={enable}><Share2 className="w-3.5 h-3.5 mr-1.5" /> Share Publicly</Button>
+  );
+}
 
 function List({ icon: Icon, title, items }) {
   if (!items?.length) return null;
@@ -29,7 +73,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
   const independent = result.independent_responses || [];
   const challenges = result.challenge_responses || [];
   const conf = Math.round(resolution.overall_confidence_score || 0);
-  const meetingId = result.meeting_id;
+  const meetingId = result.meeting_id || result.id;
   const meetingTitle = result.question || "Board Meeting";
   const sourceUrl = `/company/${companyId}/boardroom?meeting=${meetingId}`;
 
@@ -44,6 +88,9 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
             <div className="font-display text-3xl">{conf}<span className="text-lg text-muted-foreground">%</span></div>
             <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Confidence</div>
           </div>
+        </div>
+        <div className="mb-6">
+          <ShareMeetingControl meetingId={meetingId} initialToken={result.share_token} status={result.status || "complete"} />
         </div>
         <PinnableText companyId={companyId} sourceType="board_resolution" sourceId={meetingId} sourceTitle={meetingTitle} sourceUrl={sourceUrl} meetingId={meetingId} onPin={createPin}>
           <p className="text-[15px] leading-relaxed mb-6">{resolution.executive_summary}</p>

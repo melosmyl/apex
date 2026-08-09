@@ -32,6 +32,31 @@ export default function DocumentDetailDialog({
   const [showRevision, setShowRevision] = useState(false);
   const [busy, setBusy] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [sharingBusy, setSharingBusy] = useState(false);
+
+  const copyToClipboard = (url, description) => {
+    try { navigator.clipboard.writeText(url).catch(() => {}); } catch { /* clipboard unavailable */ }
+    toast({ title: "Link copied", description });
+  };
+
+  const enableSharing = async () => {
+    setSharingBusy(true);
+    try {
+      const token = crypto.randomUUID();
+      await base44.entities.Document.update(doc.id, { share_token: token });
+      await onRefresh();
+      copyToClipboard(`${window.location.origin}/share/document/${token}`, "Anyone with this link can view this document, no account needed.");
+    } finally { setSharingBusy(false); }
+  };
+
+  const revokeSharing = async () => {
+    setSharingBusy(true);
+    try {
+      await base44.entities.Document.update(doc.id, { share_token: null });
+      await onRefresh();
+      toast({ title: "Sharing revoked", description: "The old link no longer works." });
+    } finally { setSharingBusy(false); }
+  };
 
   const advisor = advisors?.find(a => a.id === doc?.created_by_advisor_id);
   const statusConf = doc ? (STATUS_CONFIG[doc.status] || STATUS_CONFIG.draft) : null;
@@ -166,21 +191,20 @@ export default function DocumentDetailDialog({
           }}>
             <GitBranch className="w-3.5 h-3.5 mr-1" /> New Version
           </Button>
-          <Button variant="ghost" size="sm" className="rounded-full" onClick={() => {
-            // Not a public link — opens this document for anyone already
-            // logged in as a member of the company. Public sharing is a
-            // separate, larger feature (see Phase 4.2 in the build plan).
-            const url = `${window.location.origin}/company/${doc.company_id}/documents?doc=${doc.id}`;
-            try {
-              // navigator.clipboard can exist without writeText being callable
-              // (permissions, non-HTTPS) — optional chaining alone doesn't
-              // guard that, so this still needs a try/catch around the call.
-              navigator.clipboard.writeText(url).catch(() => {});
-            } catch { /* clipboard unavailable in this browser/context */ }
-            toast({ title: "Link copied", description: "Works for anyone already signed in to this company." });
-          }}>
-            <Share2 className="w-3.5 h-3.5 mr-1" /> Share
-          </Button>
+          {doc.share_token ? (
+            <>
+              <Button variant="ghost" size="sm" className="rounded-full" onClick={() => copyToClipboard(`${window.location.origin}/share/document/${doc.share_token}`, "Public link copied — anyone with it can view this document, no account needed.")}>
+                <Share2 className="w-3.5 h-3.5 mr-1" /> Copy Public Link
+              </Button>
+              <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" disabled={sharingBusy} onClick={revokeSharing}>
+                Revoke
+              </Button>
+            </>
+          ) : (
+            <Button variant="ghost" size="sm" className="rounded-full" disabled={sharingBusy} onClick={enableSharing}>
+              <Share2 className="w-3.5 h-3.5 mr-1" /> Share Publicly
+            </Button>
+          )}
           <Button variant="ghost" size="sm" className="rounded-full ml-auto" onClick={archive} disabled={busy || doc.status === "archived"}>
             <Archive className="w-3.5 h-3.5 mr-1" /> Archive
           </Button>

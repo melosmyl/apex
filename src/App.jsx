@@ -15,6 +15,8 @@ import ResetPassword from '@/pages/ResetPassword';
 import SubscriptionConfirmed from '@/pages/SubscriptionConfirmed';
 import Pricing from '@/pages/Pricing';
 import Admin from '@/pages/Admin';
+import SharedDocumentView from '@/pages/share/SharedDocumentView';
+import SharedMeetingView from '@/pages/share/SharedMeetingView';
 
 import Companies from '@/pages/Companies';
 import CompanyLayout from '@/components/CompanyLayout';
@@ -60,6 +62,8 @@ const AuthenticatedApp = () => {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/subscription-confirmed" element={<SubscriptionConfirmed />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/share/document/:token" element={<SharedDocumentView />} />
+      <Route path="/share/meeting/:token" element={<SharedMeetingView />} />
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/" element={<Companies />} />
         <Route path="/admin" element={<Admin />} />
