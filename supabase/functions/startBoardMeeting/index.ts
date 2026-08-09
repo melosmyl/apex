@@ -18,7 +18,11 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
       const when = d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'date unknown';
       ctx += `- [${when}] ${d.question}: ${d.final_recommendation || d.summary || 'N/A'}\n`;
     });
-    ctx += `You may refer to these directly if they bear on the question.\n`;
+    ctx += `MEMORY PRINCIPLE — this is mandatory, not optional:\n`;
+    ctx += `- You MUST state explicitly whether your recommendation is consistent with these past decisions or departs from them.\n`;
+    ctx += `- If it departs, say so directly, name the decision, and explain what has changed to justify reversing it. A board that quietly contradicts its own past decisions is worse than useless.\n`;
+    ctx += `- If it is consistent, say which decision it builds on.\n`;
+    ctx += `- If none of them genuinely bear on this question, say that explicitly rather than staying silent.\n`;
   }
   if (meetings?.length) {
     ctx += `\nPrevious Board Meetings:\n`;
