@@ -154,9 +154,27 @@ Deno.serve(async (req) => {
 
     const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, limits.max_context_size || 8000);
 
+    // What the board is drawing on, recorded so the founder can see it later.
+    const memoryContext = {
+      retrieval: recalled.retrieval,
+      recalled_decisions: (decisions || []).slice(0, 5).map(d => ({
+        id: d.id,
+        question: d.question,
+        decided_at: d.created_at,
+        similarity: d.similarity ?? null,
+      })),
+      open_commitments: (commitments || []).map(c => ({
+        title: c.title,
+        days_open: c.days_open,
+        overdue: c.days_open >= OVERDUE_AFTER_DAYS,
+        meeting_question: c.meeting_question,
+      })),
+    };
+
     const { data: meeting, error: createErr } = await db.from('board_meetings').insert({
       company_id, created_by_id: user.id, question, participants: selectedAdvisors.map(a => a.name),
       status: 'preparing', independent_responses: [], challenge_responses: [],
+      memory_context: memoryContext,
     }).select().single();
     if (createErr) throw createErr;
 
@@ -215,6 +233,7 @@ Deno.serve(async (req) => {
       meeting_id: meeting.id, status: 'independent_complete',
       independent_responses: independentResponses,
       advisor_names: selectedAdvisors.map(a => a.name),
+      memory_context: memoryContext,
     }, { headers: corsHeaders });
   } catch (error) {
     console.error('startBoardMeeting error:', error);

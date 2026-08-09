@@ -4,6 +4,7 @@ import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical } from "lucid
 import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
+import BoardMemoryNote from "@/components/boardroom/BoardMemoryNote";
 import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
 
@@ -79,6 +80,8 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
           </div>
         )}
       </div>
+
+      <BoardMemoryNote memoryContext={result.memory_context} companyId={companyId} />
 
       <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 
