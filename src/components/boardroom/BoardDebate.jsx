@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ const PHASE_MESSAGES = {
   resolution: "The Chair is preparing the resolution",
 };
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -139,6 +139,18 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
       setPhase("idle");
     }
   };
+
+  // Arriving from the Boardroom front door with a question already typed and
+  // confirmed — skip the manual "Start Board Debate" click rather than making
+  // the founder submit the same question twice.
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current) return;
+    if (phase !== "idle" || !question.trim() || !selectedIds) return;
+    if (selectedAiAdvisors.length < 3) return;
+    autoStartedRef.current = true;
+    start();
+  }, [autoStart, phase, question, selectedIds, selectedAiAdvisors.length]);
 
   const handleHumanPerspectives = async (perspectives) => {
     await continueToDiscussion(pendingMeetingId, perspectives);

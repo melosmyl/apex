@@ -57,10 +57,6 @@ export const MEETING_MODES = [
   }
 ];
 
-export function getMode(key) {
-  return MEETING_MODES.find((m) => m.key === key);
-}
-
 export function buildCompanyContext(company) {
   if (!company) return "";
   const parts = [`Company: ${company.name}`];
@@ -73,41 +69,6 @@ export function buildCompanyContext(company) {
   if (company.current_challenges) parts.push(`Current challenges: ${company.current_challenges}`);
   if (company.immediate_goal) parts.push(`Immediate goal: ${company.immediate_goal}`);
   return parts.join("\n");
-}
-
-export async function recommendMode(question, advisors) {
-  const advisorList = advisors
-    .filter((a) => a.type !== "human")
-    .map((a) => `- ${a.library_key || a.name}: ${a.role}`)
-    .join("\n");
-
-  const res = await base44.integrations.Core.InvokeLLM({
-    prompt: `You are analysing a founder's request on Apex, an AI executive board platform.
-
-The founder's request: "${question}"
-
-Available advisors:
-${advisorList}
-
-Meeting modes:
-- quick_ask: For simple questions needing a fast response. One advisor.
-- working_session: For live, iterative conversation. Up to 3 advisors.
-- board_debate: For important strategic decisions needing rigorous multi-round debate. 3+ advisors.
-- task_request: When the founder needs a completed deliverable (document, report, plan).
-- review: When the founder wants feedback on an existing document, strategy or plan.
-- live_conversation: When the founder wants to talk through a problem verbally with advisors responding in real-time voice.
-
-Recommend the single most suitable mode and 1–3 relevant advisors. Return the advisor library keys.`,
-    response_json_schema: {
-      type: "object",
-      properties: {
-        recommended_mode: { type: "string", enum: ["quick_ask", "working_session", "board_debate", "task_request", "review", "live_conversation"] },
-        reason: { type: "string" },
-        suggested_advisor_keys: { type: "array", items: { type: "string" } }
-      }
-    }
-  });
-  return typeof res === "string" ? JSON.parse(res) : res;
 }
 
 export async function runQuickAsk({ company, question, advisor }) {

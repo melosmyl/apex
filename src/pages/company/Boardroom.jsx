@@ -5,13 +5,8 @@ import { ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
-import ModeSelector from "@/components/boardroom/ModeSelector";
-import QuickAsk from "@/components/boardroom/QuickAsk";
-import WorkingSession from "@/components/boardroom/WorkingSession";
+import BoardroomHome from "@/components/boardroom/BoardroomHome";
 import BoardDebate from "@/components/boardroom/BoardDebate";
-import TaskRequest from "@/components/boardroom/TaskRequest";
-import ReviewMode from "@/components/boardroom/ReviewMode";
-import LiveConversation from "@/components/boardroom/LiveConversation";
 
 export default function Boardroom() {
   const { companyId } = useParams();
@@ -20,6 +15,7 @@ export default function Boardroom() {
   const [advisors, setAdvisors] = useState(null);
   const [mode, setMode] = useState(null);
   const [question, setQuestion] = useState("");
+  const [autoStart, setAutoStart] = useState(false);
   const [loadedMeeting, setLoadedMeeting] = useState(null);
 
   useEffect(() => {
@@ -32,9 +28,12 @@ export default function Boardroom() {
     const meetingId = new URLSearchParams(window.location.search).get("meeting");
     if (!meetingId) return;
     base44.entities.BoardMeeting.get(meetingId).then((m) => {
+      // Always routes to BoardDebate — the only mode that can currently
+      // produce a meeting to link back to, since the others are disabled.
+      // Revisit this once another mode is restored.
       if (m) {
         setLoadedMeeting(m);
-        setMode(m.meeting_mode || "board_debate");
+        setMode("board_debate");
         setQuestion(m.question || "");
       }
     }).catch(() => {});
@@ -58,15 +57,17 @@ export default function Boardroom() {
     );
   }
 
-  const handleSelectMode = (selectedMode, q) => {
-    setMode(selectedMode);
-    if (q) setQuestion(q);
+  const startDebate = (q) => {
+    setQuestion(q);
+    setAutoStart(true);
+    setMode("board_debate");
   };
 
-  const backToModes = () => {
+  const backToHome = () => {
     setMode(null);
     setLoadedMeeting(null);
     setQuestion("");
+    setAutoStart(false);
   };
 
   return (
@@ -74,39 +75,29 @@ export default function Boardroom() {
       <PageHeader
         eyebrow="The signature experience"
         title="The Boardroom"
-        description="Choose how you want to work with your advisors — from a quick question to a full board debate."
+        description="Bring a question to your board — they'll debate it and come back with a resolution."
       />
 
       {mode ? (
         <div className="rise-in">
           <button
-            onClick={backToModes}
+            onClick={backToHome}
             className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 mb-6 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> All modes
+            <ArrowLeft className="w-4 h-4" /> Boardroom
           </button>
 
-          {mode === "quick_ask" && (
-            <QuickAsk company={company} companyId={companyId} advisors={aiAdvisors} initialQuestion={question} initialMeeting={loadedMeeting} />
-          )}
-          {mode === "working_session" && (
-            <WorkingSession company={company} companyId={companyId} advisors={aiAdvisors} />
-          )}
-          {mode === "board_debate" && (
-            <BoardDebate company={company} companyId={companyId} advisors={advisors} initialQuestion={question} loadedMeeting={loadedMeeting} />
-          )}
-          {mode === "task_request" && (
-            <TaskRequest company={company} companyId={companyId} advisors={aiAdvisors} />
-          )}
-          {mode === "review" && (
-            <ReviewMode company={company} companyId={companyId} advisors={aiAdvisors} />
-          )}
-          {mode === "live_conversation" && (
-            <LiveConversation company={company} companyId={companyId} advisors={aiAdvisors} />
-          )}
+          <BoardDebate
+            company={company}
+            companyId={companyId}
+            advisors={advisors}
+            initialQuestion={question}
+            loadedMeeting={loadedMeeting}
+            autoStart={autoStart}
+          />
         </div>
       ) : (
-        <ModeSelector advisors={aiAdvisors} company={company} onSelectMode={handleSelectMode} />
+        <BoardroomHome onStartDebate={startDebate} />
       )}
     </div>
   );
