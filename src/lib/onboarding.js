@@ -4,85 +4,9 @@ import { buildAdvisorRecord, recommendAdvisorsHeuristic, getJourney } from "@/li
 
 const VALID_KEYS = ADVISOR_LIBRARY.map((a) => a.key);
 
-const RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    company_type: { type: "string", description: "A short label for the type of company, e.g. 'DTC Consumer Brand' or 'B2B SaaS Startup'" },
-    recommended_journey: {
-      type: "string",
-      enum: ["idea_validation", "pre_launch", "early_revenue", "growth", "fundraising", "product_launch", "market_expansion", "turnaround"]
-    },
-    executive_briefing: { type: "string", description: "A warm, concise 2-3 sentence personalised briefing for the founder" },
-    recommended_advisors: {
-      type: "array",
-      description: "4 to 6 advisors from the provided library, including the chair",
-      items: {
-        type: "object",
-        properties: {
-          key: { type: "string", description: "Must be one of the valid advisor keys provided" },
-          name: { type: "string" },
-          role: { type: "string" },
-          reason: { type: "string", description: "One sentence explaining why this advisor is recommended for this specific founder" }
-        }
-      }
-    },
-    suggested_meetings: {
-      type: "array",
-      description: "Exactly 3 strategic questions the founder should bring to their board",
-      items: { type: "string" }
-    },
-    suggested_tasks: {
-      type: "array",
-      description: "3 to 5 concrete first tasks",
-      items: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          assigned_to: { type: "string", description: "The advisor role or 'Founder'" }
-        }
-      }
-    },
-    start_here_action: { type: "string", description: "One clear, specific primary action the founder should take first" }
-  }
-};
-
-function buildPrompt(answers) {
-  const advisorList = ADVISOR_LIBRARY.map((a) => `- ${a.key}: ${a.name}, ${a.role} — ${a.expertise.join(", ")}`).join("\n");
-  const answersText = Object.entries(answers)
-    .filter(([, v]) => v && String(v).trim())
-    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
-    .join("\n");
-
-  return `You are an expert startup coach helping a founder set up their AI executive board on Apex.
-
-Here is what the founder has shared:
-${answersText}
-
-Available advisors (use ONLY these keys):
-${advisorList}
-
-Based on the founder's situation, generate a personalised onboarding plan:
-1. Recommend 4–6 advisors (always include "chair" — Margaret Ashworth synthesises the board). Pick advisors whose expertise directly addresses the founder's stage, challenges and confidence gaps.
-2. Write a warm, specific reason for each recommendation — tie it to what the founder shared.
-3. Suggest exactly 3 strategic questions for their first board meetings.
-4. Suggest 3–5 concrete first tasks. Assign each to the most relevant advisor role or "Founder".
-5. Give ONE clear primary action labelled as the start_here_action — the single most important thing to do first.
-6. Write a warm 2-3 sentence executive briefing that makes the founder feel understood and supported.
-7. Classify the company type in a short label.
-8. Choose the recommended_journey that best fits their current stage.
-
-Be specific and personal. Never generic. Never use placeholder text.`;
-}
-
 export async function generateOnboardingPlan(answers) {
   try {
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: buildPrompt(answers),
-      response_json_schema: RESPONSE_SCHEMA,
-      model: "claude-sonnet-5"
-    });
-
-    const plan = typeof res === "string" ? JSON.parse(res) : res;
+    const { data: plan } = await base44.functions.invoke("generateOnboardingPlan", { answers });
 
     // Validate advisor keys — filter out invalid ones
     if (plan.recommended_advisors) {

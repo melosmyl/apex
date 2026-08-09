@@ -7,22 +7,9 @@ import { ArrowRight, ArrowLeft, Sparkles, Check } from "lucide-react";
 import OnboardingReview from "@/components/onboarding/OnboardingReview";
 import { generateOnboardingPlan } from "@/lib/onboarding";
 
-const INDUSTRIES = ["Consumer Goods", "Technology", "Fashion & Apparel", "Food & Beverage", "Health & Wellness", "Financial Services", "Media", "Manufacturing", "Services", "Other"];
-
 const QUESTIONS = [
   { id: "name", type: "text", question: "What's the name of your company or idea?", placeholder: "e.g. Lumen & Co.", hint: "Don't worry — you can change this later.", required: true },
   { id: "description", type: "textarea", question: "In a sentence or two, what does it do?", placeholder: "We help…", hint: "Just the gist — your advisors will learn the rest.", required: true },
-  { id: "industry", type: "choice", question: "What industry are you in?", options: INDUSTRIES.map((i) => ({ value: i, label: i })), required: true },
-  { id: "business_model", type: "choice", question: "How does the business work?", options: [
-    { value: "B2B SaaS", label: "B2B SaaS" },
-    { value: "B2C / Consumer", label: "B2C / Consumer" },
-    { value: "Marketplace", label: "Marketplace" },
-    { value: "DTC / E-commerce", label: "DTC / E-commerce" },
-    { value: "Services / Agency", label: "Services / Agency" },
-    { value: "Hardware / Manufacturing", label: "Hardware / Manufacturing" },
-    { value: "Media / Content", label: "Media / Content" },
-    { value: "Other", label: "Other" }
-  ], required: true },
   { id: "stage", type: "choice", question: "Where are you right now?", options: [
     { value: "idea_validation", label: "Idea stage" },
     { value: "pre_launch", label: "Pre-launch" },
@@ -33,45 +20,7 @@ const QUESTIONS = [
     { value: "market_expansion", label: "Market expansion" },
     { value: "turnaround", label: "Turnaround" }
   ], required: true },
-  { id: "solo_founder", type: "choice", question: "Are you building this alone or with a team?", options: [
-    { value: "Solo founder", label: "Solo founder" },
-    { value: "Co-founder(s)", label: "Co-founder(s)" },
-    { value: "Small team", label: "Small team" },
-    { value: "Larger team", label: "Larger team" }
-  ], required: true },
-  { id: "team_size", type: "choice", question: "How many people are on the team?", options: [
-    { value: "2–5", label: "2–5" },
-    { value: "6–15", label: "6–15" },
-    { value: "16–50", label: "16–50" },
-    { value: "50+", label: "50+" }
-  ], showIf: (a) => a.solo_founder && a.solo_founder !== "Solo founder" },
-  { id: "target_customer", type: "text", question: "Who is your target customer?", placeholder: "e.g. Independent creative agencies", hint: "Be specific — 'everyone' is rarely the right answer.", required: true },
-  { id: "primary_market", type: "text", question: "What's your primary market or geography?", placeholder: "e.g. UK, then Europe", required: true },
-  { id: "available_capital", type: "choice", question: "What capital do you have available?", options: [
-    { value: "Bootstrapping", label: "Bootstrapping" },
-    { value: "Under £10k", label: "Under £10k" },
-    { value: "£10k–£50k", label: "£10k–£50k" },
-    { value: "£50k–£250k", label: "£50k–£250k" },
-    { value: "£250k–£1m", label: "£250k–£1m" },
-    { value: "Over £1m", label: "Over £1m" },
-    { value: "Prefer not to say", label: "Prefer not to say" }
-  ], required: true },
-  { id: "available_time", type: "choice", question: "How much time can you commit?", options: [
-    { value: "Nights & weekends", label: "Nights & weekends" },
-    { value: "Part-time", label: "Part-time" },
-    { value: "Full-time", label: "Full-time" },
-    { value: "Multiple full-time", label: "Multiple full-time" }
-  ], required: true },
-  { id: "existing_assets", type: "textarea", question: "What do you already have?", placeholder: "A prototype, early customers, a domain, a co-founder, IP…", hint: "Anything that gives you a head start.", required: false },
-  { id: "current_challenges", type: "textarea", question: "What's keeping you up at night?", placeholder: "The thing you most need help with right now.", required: true },
-  { id: "immediate_goal", type: "text", question: "What's your most immediate goal?", placeholder: "e.g. Validate the idea before spending more", required: true },
-  { id: "confidence_gaps", type: "textarea", question: "Where do you lack confidence?", placeholder: "Finance, hiring, marketing, legal…", hint: "Your board will fill these gaps.", required: false },
-  { id: "advisor_involvement", type: "choice", question: "How involved do you want your advisors?", options: [
-    { value: "light", label: "Light touch — a few quick questions" },
-    { value: "moderate", label: "Moderate — regular check-ins" },
-    { value: "deep", label: "Deep — treat them as my real board" }
-  ], required: true },
-  { id: "deadlines", type: "text", question: "Any important deadlines?", placeholder: "e.g. Investor meeting in September", hint: "Optional — skip if nothing's pressing.", required: false }
+  { id: "current_challenges", type: "textarea", question: "What's keeping you up at night?", placeholder: "The thing you most need help with right now.", hint: "Your board will ask for more detail as it gets to know you.", required: true }
 ];
 
 const PHASE_MESSAGES = [
@@ -176,7 +125,7 @@ export default function GuidedOnboarding({ open, onClose }) {
                 Let's build your board.
               </h1>
               <p className="text-muted-foreground text-base sm:text-lg leading-relaxed max-w-md mx-auto mb-8">
-                A few questions about your company and where you're headed. We'll assemble the right advisors and map your first steps — together.
+                Four quick questions. We'll assemble the right advisors and map your first steps — the rest, your board will ask you directly.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button onClick={beginQuestions} variant="brand" className="rounded-full px-8 h-12 text-[0.95rem]">
@@ -184,7 +133,7 @@ export default function GuidedOnboarding({ open, onClose }) {
                 </Button>
                 <Button onClick={onClose} variant="ghost" className="rounded-full px-6">Maybe later</Button>
               </div>
-              <p className="text-xs text-muted-foreground/70 mt-8">Takes about 2 minutes. One question at a time.</p>
+              <p className="text-xs text-muted-foreground/70 mt-8">Takes about a minute. One question at a time.</p>
             </div>
           )}
 

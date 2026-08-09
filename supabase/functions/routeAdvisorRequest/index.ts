@@ -144,14 +144,34 @@ Deno.serve(async (req) => {
 
     const db = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
-    const { advisor_id, company_id, meeting_id, system_instructions, company_context, meeting_context,
+    const { advisor_id, advisor_override, company_id, meeting_id, system_instructions, company_context, meeting_context,
       user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier } = await req.json();
 
-    if (!advisor_id || !user_question)
-      return Response.json({ error: 'advisor_id and user_question are required' }, { status: 400, headers: corsHeaders });
+    if ((!advisor_id && !advisor_override) || !user_question)
+      return Response.json({ error: 'advisor_id (or advisor_override) and user_question are required' }, { status: 400, headers: corsHeaders });
 
-    const { data: advisor, error: advErr } = await db.from('advisors').select('*').eq('id', advisor_id).single();
-    if (advErr || !advisor) return Response.json({ error: 'Advisor not found' }, { status: 404, headers: corsHeaders });
+    let advisor;
+    if (advisor_id) {
+      const { data, error: advErr } = await db.from('advisors').select('*').eq('id', advisor_id).single();
+      if (advErr || !data) return Response.json({ error: 'Advisor not found' }, { status: 404, headers: corsHeaders });
+      advisor = data;
+    } else {
+      // No real advisor row exists yet — used only for pre-company calls like onboarding,
+      // where the caller supplies a fixed persona inline instead of a DB-backed advisor.
+      advisor = {
+        name: advisor_override.name, role: advisor_override.role,
+        system_instructions: advisor_override.system_instructions, biography: advisor_override.biography,
+        decision_style: advisor_override.decision_style, communication_style: advisor_override.communication_style,
+        strengths: advisor_override.strengths || [],
+        blind_spots: advisor_override.blind_spots || advisor_override.weaknesses || [],
+        default_provider: advisor_override.default_provider || 'openai',
+        default_model: advisor_override.default_model || 'gpt-4o',
+        fallback_provider: advisor_override.fallback_provider,
+        fallback_model: advisor_override.fallback_model,
+        temperature: advisor_override.temperature,
+        maximum_output_length: advisor_override.maximum_output_length,
+      };
+    }
 
     const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
     const limits = limitsList?.[0] || { retry_count: 1, request_timeout_ms: 60000, max_output_length: 2000 };
@@ -229,7 +249,7 @@ Deno.serve(async (req) => {
     const logStatus = result ? (result.used_fallback ? 'fallback_used' : 'success') : 'error';
     try {
       await db.from('ai_usage_logs').insert({
-        user_id: user_id || null, company_id: company_id || null, meeting_id: meeting_id || null, advisor_id,
+        user_id: user_id || null, company_id: company_id || null, meeting_id: meeting_id || null, advisor_id: advisor_id || null,
         provider: result ? result.provider_used : provider, model: result ? result.model_used : model,
         request_type: request_type || 'unknown',
         input_size: result ? result.input_tokens : 0, output_size: result ? result.output_tokens : 0,
