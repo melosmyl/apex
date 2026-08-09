@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
       discussion_transcript: discussionTranscript,
       board_resolution: resolution, meeting: updated,
       memory_context: meeting.memory_context || null,
+      chair_opening: meeting.chair_opening || null,
     }, { headers: corsHeaders });
   } catch (error) {
     console.error('runChairSynthesis error:', error);

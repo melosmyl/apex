@@ -5,6 +5,7 @@ import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
 import BoardMemoryNote from "@/components/boardroom/BoardMemoryNote";
+import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
 import BoardUncertaintyNote from "@/components/boardroom/BoardUncertaintyNote";
 import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
@@ -34,6 +35,8 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
 
   return (
     <div className="space-y-8">
+      <ChairOpeningNote chairOpening={result.chair_opening} />
+
       <div className="bg-card border border-border/70 rounded-2xl p-6 sm:p-8 rise-in">
         <div className="flex items-start justify-between gap-4 mb-5">
           <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-primary" /><h3 className="font-display text-2xl">Board Resolution</h3></div>

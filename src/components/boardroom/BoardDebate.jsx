@@ -9,6 +9,7 @@ import BoardTable from "@/components/boardroom/BoardTable";
 import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
+import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
 import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground } from "@/lib/boardroom";
 
 const POLL_INTERVAL_MS = 3000;
@@ -54,6 +55,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [pendingMeetingId, setPendingMeetingId] = useState(null);
   const [liveTranscript, setLiveTranscript] = useState([]);
   const [resolutionStartedAt, setResolutionStartedAt] = useState(null);
+  const [chairOpening, setChairOpening] = useState(loadedMeeting?.chair_opening || null);
 
   const aiAdvisors = advisors.filter((a) => a.type !== "human");
   const humanAdvisors = advisors.filter((a) => a.type === "human");
@@ -123,11 +125,12 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const start = async () => {
     if (!question.trim()) return;
     if (selectedAiAdvisors.length < 3) { setError("Select at least 3 AI advisors."); return; }
-    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setResolutionStartedAt(null);
+    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setResolutionStartedAt(null); setChairOpening(null);
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id) });
       setPendingMeetingId(phase1.meeting_id);
       setLiveTranscript(toRoundOneMessages(phase1.independent_responses));
+      setChairOpening(phase1.chair_opening || null);
       // If human advisors are selected, show the human perspective step
       if (selectedHumanAdvisors.length > 0) {
         setPhase("human_input");
@@ -248,6 +251,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
             )}
           </div>
         </div>
+        {chairOpening && <div className="mb-6"><ChairOpeningNote chairOpening={chairOpening} /></div>}
         <LiveDiscussion transcript={liveTranscript} advisors={advisors} phase={phase} resolutionStartedAt={resolutionStartedAt} />
       </div>
     );

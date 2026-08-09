@@ -38,7 +38,7 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
       const overdue = c.days_open >= OVERDUE_AFTER_DAYS ? ' [OVERDUE]' : '';
       ctx += `- "${c.title}" — agreed ${c.days_open} day${c.days_open === 1 ? '' : 's'} ago after the meeting on "${c.meeting_question}", still not done${overdue}\n`;
     });
-    ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not.\n`;
+    ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not. This meeting's own opening already covers outstanding commitments as a status check; you do not need to force one in here if it does not fit.\n`;
   }
   if (documents?.length) {
     ctx += `\nRelevant Documents:\n`;
@@ -99,6 +99,99 @@ async function recallRelatedDecisions(db, companyId, question) {
     console.error('Relevance recall failed, falling back to recency:', e.message);
   }
   return { decisions: recencyFallback, retrieval: 'recency' };
+}
+
+// Tasks the founder actually finished since the last meeting — the raw
+// material for the Chair's opening. Distinct from open commitments (which are
+// what's still outstanding); this is what moved.
+async function loadRecentlyCompletedTasks(db, companyId, sinceIso) {
+  if (!sinceIso) return [];
+  const { data } = await db.from('tasks')
+    .select('title, source_meeting_id, updated_at')
+    .eq('company_id', companyId).eq('status', 'done')
+    .gt('updated_at', sinceIso)
+    .order('updated_at', { ascending: false }).limit(20);
+  return data || [];
+}
+
+// The Chair opens with what has changed since the last meeting: work
+// finished, how the founder responded to the last resolution, and — this is
+// the one place accountability follow-up is reliable — outstanding
+// commitments. Unlike the per-advisor context (competing against whatever the
+// founder actually asked this time), this is the Chair's own dedicated
+// moment, so a mandatory, direct ask about overdue items has somewhere to
+// live instead of losing out to the day's actual question.
+async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, meetingId, newQuestion, previousMeeting, commitments }) {
+  if (!previousMeeting) return null; // first meeting ever — nothing to open with
+  const completedTasks = await loadRecentlyCompletedTasks(db, companyId, previousMeeting.created_at);
+
+  let prompt = `You are opening this board meeting for ${company.name}, before the founder's actual question is addressed.\n\n`;
+  prompt += `IMPORTANT: today's question is "${newQuestion}" — do NOT discuss, answer, or reference it. That is the rest of the board's job, not yours here. Your only job is a brief status check on what has happened since the last meeting.\n\n`;
+  prompt += `Last meeting's question was: "${previousMeeting.question}" (already resolved — do not re-litigate it, only reference what came after it).\n`;
+  if (previousMeeting.founder_decision && previousMeeting.founder_decision !== 'undecided') {
+    prompt += `The founder's response to that resolution: ${previousMeeting.founder_decision}${previousMeeting.founder_decision_notes ? ` — "${previousMeeting.founder_decision_notes}"` : ''}\n`;
+  }
+  if (completedTasks.length) {
+    prompt += `\nCompleted since then:\n`;
+    completedTasks.forEach(t => { prompt += `- ${t.title}\n`; });
+  } else {
+    prompt += `\nNothing has been marked done since then.\n`;
+  }
+  const overdue = (commitments || []).filter(c => c.days_open >= OVERDUE_AFTER_DAYS);
+  const notYetOverdue = (commitments || []).filter(c => c.days_open < OVERDUE_AFTER_DAYS);
+  if (overdue.length) {
+    prompt += `\nStill outstanding and overdue:\n`;
+    overdue.forEach(c => { prompt += `- "${c.title}" — ${c.days_open} days, from the meeting on "${c.meeting_question}"\n`; });
+    prompt += `\nThis is mandatory, not optional: your opening_statement text must literally contain each overdue item's exact title in quotes, immediately followed by a direct question about it. Curious, not accusatory — "What happened with '${overdue[0].title}' — did priorities shift, or did it just not get done?" is the right shape. A vague "I'd like to follow up on outstanding items" is NOT acceptable — name it.\n`;
+    prompt += `List every overdue title you named in overdue_items_named — it must exactly match commitments_raised.length === the number of overdue items above.\n`;
+  }
+  if (notYetOverdue.length) {
+    prompt += `\nAlso still open, not yet overdue (mention only if it fits naturally, no need to chase):\n`;
+    notYetOverdue.forEach(c => { prompt += `- "${c.title}" — ${c.days_open} days\n`; });
+  }
+  if (!completedTasks.length && !overdue.length && !notYetOverdue.length) {
+    prompt += `\nThere is nothing notable to report since last time — a short, honest "quiet since we last met" is fine.\n`;
+  }
+  prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question.`;
+
+  const schema = {
+    type: 'object',
+    properties: {
+      opening_statement: { type: 'string' },
+      overdue_items_named: { type: 'array', items: { type: 'string' }, description: 'Exact titles of every overdue commitment named in opening_statement — must match the overdue list exactly, empty array if none were overdue.' },
+    },
+    required: ['opening_statement', 'overdue_items_named'],
+  };
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({
+        advisor_id: chairAdvisor.id, company_id: companyId, meeting_id: meetingId, user_id: userId,
+        system_instructions: chairAdvisor.system_instructions, company_context: null, meeting_context: null,
+        user_question: prompt, previous_responses: [], output_schema: schema,
+        temperature: 0.4, max_output_length: 500, request_type: 'chair_opening',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.response) return null;
+    // If the model claims it named the overdue items but didn't actually
+    // include their titles verbatim, don't ship a statement that only
+    // pretends to be specific — better to surface nothing than a vague one.
+    const stated = data.response.opening_statement || null;
+    if (overdue.length && stated) {
+      const namedAll = overdue.every(c => stated.includes(c.title));
+      if (!namedAll) {
+        console.error('Chair opening dropped: claimed to name overdue items but did not include their exact titles.');
+        return null;
+      }
+    }
+    return stated;
+  } catch (e) {
+    console.error('Chair opening failed (non-fatal):', e.message);
+    return null;
+  }
 }
 
 async function callAdvisor(supabaseUrl, serviceKey, payload) {
@@ -197,15 +290,28 @@ Deno.serve(async (req) => {
       required: ['position', 'recommendation', 'key_arguments', 'confidence_score'],
     };
 
-    const independentResults = await Promise.all(selectedAdvisors.map(advisor =>
-      callAdvisor(supabaseUrl, serviceKey, {
-        advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id,
-        system_instructions: advisor.system_instructions, company_context: contextPackage,
-        user_question: question, previous_responses: [], output_schema: independentSchema,
-        temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,
-        request_type: 'independent',
-      }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
-    ));
+    // The company's standing Chair persona, regardless of whether they were
+    // specifically selected for this debate — matches how runChairSynthesis
+    // resolves the Chair for the final resolution.
+    let chairAdvisor = (advisors || []).find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
+    if (!chairAdvisor) chairAdvisor = selectedAdvisors[0];
+    const previousMeeting = meetings?.[0] || null;
+
+    const [independentResults, chairOpening] = await Promise.all([
+      Promise.all(selectedAdvisors.map(advisor =>
+        callAdvisor(supabaseUrl, serviceKey, {
+          advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id,
+          system_instructions: advisor.system_instructions, company_context: contextPackage,
+          user_question: question, previous_responses: [], output_schema: independentSchema,
+          temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,
+          request_type: 'independent',
+        }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
+      )),
+      buildChairOpening({
+        supabaseUrl, serviceKey, db, chairAdvisor, company, companyId: company_id, userId: user.id,
+        meetingId: meeting.id, newQuestion: question, previousMeeting, commitments,
+      }),
+    ]);
 
     const independentResponses = independentResults.map(r => {
       const d = r.data;
@@ -231,6 +337,7 @@ Deno.serve(async (req) => {
 
     await db.from('board_meetings').update({
       status: 'independent_complete', independent_responses: independentResponses,
+      chair_opening: chairOpening,
     }).eq('id', meeting.id);
 
     return Response.json({
@@ -238,6 +345,7 @@ Deno.serve(async (req) => {
       independent_responses: independentResponses,
       advisor_names: selectedAdvisors.map(a => a.name),
       memory_context: memoryContext,
+      chair_opening: chairOpening,
     }, { headers: corsHeaders });
   } catch (error) {
     console.error('startBoardMeeting error:', error);
