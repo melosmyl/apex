@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2, Undo2, Check, ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { Sparkles, Loader2, Undo2, Check, ChevronDown, ChevronUp, FileText, MessageCircle } from "lucide-react";
 
-export default function TaskCard({ task, advisors, executing, onExecute, onCompleteFounder, onMove, canBack, canForward, onOpenDocument }) {
+export default function TaskCard({ task, advisors, executing, acknowledging, onExecute, onCompleteFounder, onMove, canBack, canForward, onOpenDocument }) {
   const [expanded, setExpanded] = useState(false);
   const advisor = advisors.find((a) => a.name === task.assigned_to);
   const isDelegated = task.delegated_back;
@@ -12,6 +12,8 @@ export default function TaskCard({ task, advisors, executing, onExecute, onCompl
   const canExecute = advisor && !isDone && !isDelegated && !executing && task.status !== "review";
   const canComplete = !isDone && (isDelegated || isFounderTask || task.status === "review");
   const hasDocument = !!task.document_id;
+  const isCommitment = !!task.source_meeting_id;
+  const acknowledgingAdvisor = advisors.find((a) => a.name === task.advisor_acknowledgment_by);
 
   return (
     <div className={`bg-card border rounded-xl p-3 rise-in ${isDelegated ? "border-amber-300 bg-amber-50/40" : "border-border/70"}`}>
@@ -44,6 +46,24 @@ export default function TaskCard({ task, advisors, executing, onExecute, onCompl
         >
           <FileText className="w-3 h-3" /> Open deliverable
         </button>
+      )}
+
+      {isDone && isCommitment && (task.advisor_acknowledgment || acknowledging) && (
+        <div className="flex gap-2 mb-2 mt-1">
+          {task.advisor_acknowledgment ? (
+            <>
+              <AdvisorAvatar name={task.advisor_acknowledgment_by} accent={acknowledgingAdvisor?.accent || "#7a5c3e"} size="sm" />
+              <div className="flex-1 min-w-0 bg-secondary/60 rounded-lg p-2.5">
+                <div className="text-[10px] font-medium text-muted-foreground mb-0.5">{task.advisor_acknowledgment_by}</div>
+                <p className="text-xs leading-relaxed text-foreground/90">{task.advisor_acknowledgment}</p>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <MessageCircle className="w-3 h-3 animate-pulse" /> {task.assigned_to || "The board"} is responding…
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex items-center justify-between gap-2">

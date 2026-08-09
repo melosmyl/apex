@@ -28,6 +28,7 @@ export default function Tasks() {
   const [projects, setProjects] = useState([]);
   const [open, setOpen] = useState(false);
   const [executingId, setExecutingId] = useState(null);
+  const [acknowledgingId, setAcknowledgingId] = useState(null);
   const [viewDoc, setViewDoc] = useState(null);
   const [form, setForm] = useState({ title: "", assigned_to: "", project_id: "" });
 
@@ -40,10 +41,35 @@ export default function Tasks() {
     setForm({ title: "", assigned_to: "", project_id: "" }); setOpen(false); load();
   };
 
+  // A task with source_meeting_id is a real commitment the founder selected
+  // from a board resolution — see FounderDecisionControls. Only those get an
+  // advisor acknowledgment; ad-hoc tasks completing is not a board moment.
+  const acknowledgeCompletion = async (task) => {
+    if (!task.source_meeting_id) return;
+    setAcknowledgingId(task.id);
+    try {
+      const res = await base44.functions.invoke("acknowledgeTaskCompletion", { task_id: task.id });
+      if (res.data?.advisor_acknowledgment) {
+        setItems((prev) => prev?.map((t) => (t.id === task.id ? { ...t, ...res.data } : t)) || prev);
+      }
+    } catch {
+      // Silent — a missing acknowledgment is a lesser loss than blocking completion on it.
+    } finally {
+      setAcknowledgingId(null);
+    }
+  };
+
+  const markDone = async (task) => {
+    await base44.entities.Task.update(task.id, { status: "done" });
+    load();
+    acknowledgeCompletion(task);
+  };
+
   const move = async (task, dir) => {
     const idx = COLUMNS.findIndex((c) => c.key === task.status);
     const next = dir === "forward" ? COLUMNS[idx + 1]?.key : COLUMNS[idx - 1]?.key;
     if (!next) return;
+    if (next === "done") { await markDone(task); return; }
     await base44.entities.Task.update(task.id, { status: next }); load();
   };
 
@@ -86,7 +112,7 @@ export default function Tasks() {
   };
 
   const completeForFounder = async (task) => {
-    await base44.entities.Task.update(task.id, { status: "done" }); load();
+    await markDone(task);
   };
 
   return (
@@ -113,6 +139,7 @@ export default function Tasks() {
                       task={t}
                       advisors={advisors}
                       executing={executingId === t.id}
+                      acknowledging={acknowledgingId === t.id}
                       onExecute={execute}
                       onCompleteFounder={completeForFounder}
                       onMove={move}
