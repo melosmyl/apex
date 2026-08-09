@@ -56,6 +56,14 @@ export async function generateOnboardingPlan(answers) {
   }
 }
 
+function resolveAssignee(roleOrName, advisors) {
+  if (!roleOrName || roleOrName === "Founder") return "Founder";
+  const byName = advisors.find((a) => a.name === roleOrName);
+  if (byName) return byName.name;
+  const byRole = advisors.find((a) => (a.role || "").toLowerCase() === roleOrName.toLowerCase());
+  return byRole ? byRole.name : "Founder";
+}
+
 export async function createCompanyFromOnboarding(answers, plan) {
   // 1. Create the company
   const company = await base44.entities.Company.create({
@@ -102,11 +110,15 @@ export async function createCompanyFromOnboarding(answers, plan) {
   const advisorIds = createdAdvisors.map((a) => a.id);
   await base44.entities.Company.update(company.id, { advisor_ids: advisorIds });
 
-  // 3. Create suggested tasks
+  // 3. Create suggested tasks — the plan assigns tasks by role ("Legal
+  // Advisor"), but TaskCard resolves an assignee by matching the advisor's
+  // actual name, so resolve here or the task can never be executed or
+  // completed by anyone. Falls back to the founder rather than leaving an
+  // unresolvable role string, since that would be a permanently stuck task.
   const tasks = (plan.suggested_tasks || []).map((t) => ({
     company_id: company.id,
     title: t.title,
-    assigned_to: t.assigned_to || "Founder",
+    assigned_to: resolveAssignee(t.assigned_to, createdAdvisors),
     status: "todo"
   }));
 
