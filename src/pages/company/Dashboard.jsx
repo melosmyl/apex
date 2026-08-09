@@ -10,6 +10,7 @@ import { computeStreak, countRecentActivity, computeTimeSaved } from "@/lib/mome
 import MomentumWidget from "@/components/dashboard/MomentumWidget";
 import OpenCommitmentsWidget from "@/components/dashboard/OpenCommitmentsWidget";
 import MilestoneTracker from "@/components/dashboard/MilestoneTracker";
+import BuildStateWidget from "@/components/dashboard/BuildStateWidget";
 import TimeSavedWidget from "@/components/dashboard/TimeSavedWidget";
 
 export default function Dashboard() {
@@ -20,13 +21,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     (async () => {
-      const [decisions, tasks, docs, meetings] = await Promise.all([
+      const [decisions, tasks, docs, meetings, advisors] = await Promise.all([
         base44.entities.Decision.filter({ company_id: companyId }, "-created_date", 5),
         base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200),
         base44.entities.Document.filter({ company_id: companyId }, "-created_date", 200),
         base44.entities.BoardMeeting.filter({ company_id: companyId }, "-created_date", 200),
+        base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100),
       ]);
-      setData({ decisions, tasks, docs, meetings });
+      setData({ decisions, tasks, docs, meetings, advisors });
     })();
   }, [companyId]);
 
@@ -35,6 +37,7 @@ export default function Dashboard() {
   const allDecisions = data?.decisions || [];
   const allTasks = data?.tasks || [];
   const allDocs = data?.docs || [];
+  const allAdvisors = data?.advisors || [];
   const streak = computeStreak(allMeetings, allDecisions, allTasks, allDocs);
   const recentCount = countRecentActivity(allMeetings, allDecisions, allTasks, allDocs, 7);
   const timeSavedMin = computeTimeSaved(allMeetings, allDecisions, allTasks, allDocs);
@@ -173,8 +176,11 @@ export default function Dashboard() {
 
       <OpenCommitmentsWidget tasks={allTasks} meetings={allMeetings} companyId={companyId} />
 
-      {/* Interactive journey milestones */}
-      <MilestoneTracker company={company} companyId={companyId} onUpdate={setCompany} />
+      {/* Where you're going (self-reported) vs what's actually happened (computed) */}
+      <div className="grid lg:grid-cols-2 gap-5">
+        <MilestoneTracker company={company} companyId={companyId} onUpdate={setCompany} />
+        <BuildStateWidget advisors={allAdvisors} meetings={allMeetings} decisions={allDecisions} docs={allDocs} tasks={allTasks} />
+      </div>
 
       {/* Quick access row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

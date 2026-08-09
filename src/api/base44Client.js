@@ -39,9 +39,24 @@ function applySort(query, sort) {
   return query.order(parsed.field, { ascending: parsed.ascending });
 }
 
+// The frontend still calls entities the Base44 way (~40 files, per
+// AGENTS.md), which means every row is expected to carry created_date /
+// updated_date. Real Postgres rows only have created_at / updated_at — this
+// was previously translated for sort-key strings (parseSort) but never for
+// the data actually returned, so every consumer reading row.created_date
+// silently got undefined. Alias both directions here, once, rather than
+// patching each of the ~15 call sites that read the old names.
+function withDateAliases(row) {
+  if (!row || typeof row !== 'object') return row;
+  if (row.created_at !== undefined && row.created_date === undefined) row.created_date = row.created_at;
+  if (row.updated_at !== undefined && row.updated_date === undefined) row.updated_date = row.updated_at;
+  return row;
+}
+
 function unwrap({ data, error }) {
   if (error) throw error;
-  return data;
+  if (Array.isArray(data)) return data.map(withDateAliases);
+  return withDateAliases(data);
 }
 
 function createEntityClient(tableName) {

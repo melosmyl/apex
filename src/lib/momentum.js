@@ -25,35 +25,48 @@ function collectActivityDates(meetings = [], decisions = [], tasks = [], docs = 
 }
 
 /**
- * Compute the current activity streak (consecutive days with ≥1 activity).
+ * Compute activity streaks. Unlike a typical "streak" that zeroes out the
+ * moment a day is missed, this never punishes an absence: `current` is the
+ * length of the most recent consecutive-day run and holds that value
+ * indefinitely (it is not reset by the passage of time, only ever replaced
+ * by a new run once activity resumes); `best` is the longest run ever seen.
+ * `daysSinceLastActivity` is provided purely for display framing (e.g. a
+ * "welcome back" state), never to zero anything out.
  */
 export function computeStreak(meetings, decisions, tasks, docs) {
   const dates = collectActivityDates(meetings, decisions, tasks, docs);
-  if (!dates.length) return 0;
+  if (!dates.length) return { current: 0, best: 0, daysSinceLastActivity: null };
 
   // Unique day keys (YYYY-MM-DD), most recent first.
   const dayKeys = [...new Set(dates.map((d) => new Date(d).toISOString().slice(0, 10)))];
 
-  let streak = 0;
-  let cursor = new Date();
-  // Allow today OR yesterday as the start of a streak (grace period).
-  const lastActivityDay = new Date(dayKeys[0]);
-  const dayDiff = Math.floor((cursor.setHours(0, 0, 0, 0) - new Date(dayKeys[0]).setHours(0, 0, 0, 0)) / MS_PER_DAY);
-  if (dayDiff > 1) return 0; // last activity was more than 1 day ago — streak broken
-
-  cursor = new Date(dayKeys[0]);
-  for (const dayKey of dayKeys) {
-    const activityDay = new Date(dayKey);
-    const diff = Math.floor((cursor.setHours(0, 0, 0, 0) - activityDay.setHours(0, 0, 0, 0)) / MS_PER_DAY);
-    if (diff === 0) {
-      streak++;
-      cursor = new Date(activityDay);
-      cursor.setDate(cursor.getDate() - 1);
+  // Scan every run of consecutive days to find the most recent run's length
+  // and the longest run ever, in one pass over the sorted (desc) day keys.
+  let current = 1;
+  let best = 1;
+  let runLength = 1;
+  for (let i = 1; i < dayKeys.length; i++) {
+    const prevDay = new Date(dayKeys[i - 1]);
+    const thisDay = new Date(dayKeys[i]);
+    const diff = Math.round((prevDay.setHours(0, 0, 0, 0) - thisDay.setHours(0, 0, 0, 0)) / MS_PER_DAY);
+    if (diff === 1) {
+      runLength++;
     } else {
-      break;
+      if (i === runLength) current = runLength; // first break — that run is the "most recent"
+      best = Math.max(best, runLength);
+      runLength = 1;
     }
   }
-  return streak;
+  best = Math.max(best, runLength);
+  if (current === 1 && dayKeys.length > 0 && runLength === dayKeys.length) current = runLength; // no break at all — one continuous run
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const lastActivityDay = new Date(dayKeys[0]);
+  lastActivityDay.setHours(0, 0, 0, 0);
+  const daysSinceLastActivity = Math.round((today - lastActivityDay) / MS_PER_DAY);
+
+  return { current, best, daysSinceLastActivity };
 }
 
 /**

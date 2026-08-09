@@ -9,9 +9,16 @@ const TONE_STYLES = {
   idle: { bg: "bg-secondary", text: "text-muted-foreground", ring: "ring-border" },
 };
 
+// Absence is never a penalty: past a short grace period we stop implying
+// "you should have been here" and switch to welcoming the founder back,
+// still showing the streak they already earned rather than a reset "0".
+const AWAY_AFTER_DAYS = 2;
+
 export default function MomentumWidget({ streak, recentCount }) {
-  const momentum = momentumLabel(streak, recentCount);
-  const tone = TONE_STYLES[momentum.tone] || TONE_STYLES.idle;
+  const { current = 0, best = 0, daysSinceLastActivity } = streak || {};
+  const isAway = daysSinceLastActivity !== null && daysSinceLastActivity >= AWAY_AFTER_DAYS;
+  const momentum = momentumLabel(isAway ? 0 : current, recentCount);
+  const tone = isAway ? TONE_STYLES.idle : (TONE_STYLES[momentum.tone] || TONE_STYLES.idle);
 
   // Mini sparkline bars for the last 7 days (simulated from recentCount)
   const bars = Array.from({ length: 7 }, (_, i) => {
@@ -26,15 +33,25 @@ export default function MomentumWidget({ streak, recentCount }) {
         <h3 className="font-display text-lg">Momentum</h3>
       </div>
 
-      <div className="flex items-end gap-4 mb-4">
-        <div>
-          <div className="font-display text-3xl">{streak}</div>
-          <div className="text-xs text-muted-foreground">day streak</div>
+      {isAway ? (
+        <div className="mb-4">
+          <div className="font-display text-lg mb-1">Welcome back</div>
+          <p className="text-sm text-muted-foreground">
+            Your last streak was <span className="font-medium text-foreground">{current} {current === 1 ? "day" : "days"}</span>
+            {best > current && <span> — your best is {best}</span>}. Pick up whenever you're ready.
+          </p>
         </div>
-        <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone.bg} ${tone.text} ring-1 ${tone.ring}`}>
-          {momentum.label}
+      ) : (
+        <div className="flex items-end gap-4 mb-4">
+          <div>
+            <div className="font-display text-3xl">{current}</div>
+            <div className="text-xs text-muted-foreground">day streak{best > current && ` · best ${best}`}</div>
+          </div>
+          <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone.bg} ${tone.text} ring-1 ${tone.ring}`}>
+            {momentum.label}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-end gap-1.5 h-10 mb-2">
         {bars.map((h, i) => (
