@@ -5,7 +5,7 @@ import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Check } from "lucide-react";
 
-export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = [], onAdd, requiresPayment = false }) {
+export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = [], onAdd, atCap = false, maxAdvisors = 6 }) {
   const [adding, setAdding] = useState(null);
 
   const add = async (lib) => {
@@ -21,9 +21,9 @@ export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = []
           <DialogTitle className="font-display text-2xl font-light">Invite an advisor</DialogTitle>
           <p className="text-sm text-muted-foreground">
             Choose a specialist to join your executive team.
-            {requiresPayment
-              ? " You've used your two free advisors — additional advisors are £9/month each."
-              : " Your first two advisors are included free."}
+            {atCap
+              ? ` Your board is at its current limit of ${maxAdvisors} AI advisors — more coming soon.`
+              : ` Your board can include up to ${maxAdvisors} AI advisors.`}
           </p>
         </DialogHeader>
         <div className="grid sm:grid-cols-2 gap-3 pt-2">
@@ -38,9 +38,11 @@ export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = []
                 </div>
                 {on ? (
                   <span className="text-xs text-muted-foreground flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Added</span>
+                ) : atCap ? (
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Coming soon</span>
                 ) : (
                   <Button size="sm" variant="outline" onClick={() => add(a)} disabled={adding === a.key}>
-                    {adding === a.key ? "…" : requiresPayment ? "Add · £9/mo" : "Invite"}
+                    {adding === a.key ? "…" : "Invite"}
                   </Button>
                 )}
               </div>

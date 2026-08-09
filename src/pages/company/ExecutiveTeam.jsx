@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Users, Trash2, Loader2, Mail, RefreshCw } from "lucide-react";
+import { UserPlus, Users, Trash2, Mail, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
@@ -12,10 +12,13 @@ import { ADVISOR_PROVIDER_CONFIG } from "@/lib/advisorLibrary";
 import InvitePersonDialog from "@/components/team/InvitePersonDialog";
 import AdvisorProfileDialog from "@/components/team/AdvisorProfileDialog";
 
+// Hard cap while pricing and packaging are undecided — every advisor turn is
+// a real API call. Extra slots show as "coming soon", not a paid upgrade.
+const MAX_AI_ADVISORS = 6;
+
 export default function ExecutiveTeam() {
   const { companyId } = useParams();
   const [advisors, setAdvisors] = useState(null);
-  const [subscriptions, setSubscriptions] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -24,12 +27,8 @@ export default function ExecutiveTeam() {
   const load = async () => {
     setLoadError(null);
     try {
-      const [advs, subs] = await Promise.all([
-      base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100),
-      base44.entities.Subscription.filter({ company_id: companyId }, "-created_date", 100)]
-      );
+      const advs = await base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100);
       setAdvisors(advs);
-      setSubscriptions(subs);
     } catch (e) {
       console.error("ExecutiveTeam load failed", e);
       setLoadError(e?.message || "Network Error");
@@ -37,16 +36,13 @@ export default function ExecutiveTeam() {
   };
   useEffect(() => {load();}, [companyId]);
 
-  const subFor = (advisorId) => subscriptions.find((s) => s.advisor_id === advisorId);
-  const freeAdvisors = (advisors || []).filter((a) => {
-    const s = subFor(a.id);
-    return !s || s.status === "canceled";
-  });
-  const requiresPayment = freeAdvisors.length >= 6;
+  const aiAdvisorCount = (advisors || []).filter((a) => a.type !== "human").length;
+  const atCap = aiAdvisorCount >= MAX_AI_ADVISORS;
 
   const addAdvisor = async (lib) => {
+    if (atCap) return;
     const config = ADVISOR_PROVIDER_CONFIG[lib.key] || {};
-    const created = await base44.entities.Advisor.create({
+    await base44.entities.Advisor.create({
       company_id: companyId, library_key: lib.key, name: lib.name, role: lib.role,
       biography: lib.biography, short_bio: lib.biography, decision_style: lib.decision_style, communication_style: lib.communication_style,
       strengths: lib.strengths, weaknesses: lib.weaknesses, blind_spots: lib.weaknesses, expertise: lib.expertise,
@@ -57,14 +53,7 @@ export default function ExecutiveTeam() {
       temperature: config.temperature ?? 0.7, maximum_output_length: config.maximum_output_length ?? 2000,
       is_premium: config.is_premium || false, is_active: true, version: 1,
     });
-    if (requiresPayment) {
-      const res = await base44.functions.invoke("create-checkout", {
-        company_id: companyId, advisor_id: created.id, advisor_name: lib.name, origin: window.location.origin
-      });
-      window.location.href = res.data.redirectUrl;
-    } else {
-      await load();
-    }
+    await load();
   };
 
   const invitePerson = async ({ name, role, email }) => {
@@ -74,10 +63,6 @@ export default function ExecutiveTeam() {
   };
 
   const remove = async (advisor) => {
-    const sub = subFor(advisor.id);
-    if (sub && sub.status === "active" && sub.subscription_id) {
-      try {await base44.functions.invoke("cancel-subscription", { subscription_id: sub.subscription_id });} catch (e) {/* ignore */}
-    }
     await base44.entities.Advisor.delete(advisor.id);
     setSelected(null);
     load();
@@ -88,7 +73,7 @@ export default function ExecutiveTeam() {
   return (
     <div>
       <PageHeader eyebrow="The heart of the platform" title="Executive Team"
-      description="Assemble your executive team — add specialist AI advisors or invite real collaborators. Your first six AI advisors are free, then £9/month each.">
+      description="Assemble your executive team — add up to 6 specialist AI advisors, or invite real collaborators.">
         <div className="flex gap-2">
           <Button onClick={() => setAddOpen(true)} className="rounded-full px-5 bg-[#3b6e21]"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
           <Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
@@ -107,11 +92,7 @@ export default function ExecutiveTeam() {
       action={<div className="flex gap-2 justify-center"><Button onClick={() => setAddOpen(true)} className="rounded-full px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button><Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-6"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button></div>} /> :
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {advisors.map((a) => {
-          const sub = subFor(a.id);
-          const isPending = sub && sub.status === "pending";
-          const isActive = sub && sub.status === "active";
-          return (
+          {advisors.map((a) => (
             <div key={a.id} className="group bg-card border border-border/70 rounded-2xl p-5 hover:shadow-lg transition-all rise-in cursor-pointer" onClick={() => setSelected(a)}>
                 <div className="flex items-start justify-between mb-3">
                   <AdvisorAvatar name={a.name} accent={a.accent} size="lg" />
@@ -119,19 +100,16 @@ export default function ExecutiveTeam() {
                 </div>
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-display text-lg">{a.name}</h3>
-                  {isPending && <Badge variant="outline" className="text-[10px] font-normal bg-amber-50 text-amber-700 border-amber-200"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Activating</Badge>}
-                  {isActive && <Badge variant="outline" className="text-[10px] font-normal">£9/mo</Badge>}
                   {a.type === "human" && <Badge variant="secondary" className="text-[10px] font-normal">Member</Badge>}
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">{a.role}</p>
                 <p className="text-xs text-muted-foreground line-clamp-2">{a.biography}</p>
-              </div>);
-
-        })}
+              </div>
+          ))}
         </div>
       }
 
-      <AddAdvisorDialog open={addOpen} onOpenChange={setAddOpen} existingKeys={existingKeys} onAdd={addAdvisor} requiresPayment={requiresPayment} />
+      <AddAdvisorDialog open={addOpen} onOpenChange={setAddOpen} existingKeys={existingKeys} onAdd={addAdvisor} atCap={atCap} maxAdvisors={MAX_AI_ADVISORS} />
       <InvitePersonDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={invitePerson} />
       <AdvisorProfileDialog advisor={selected} open={!!selected} onOpenChange={(o) => !o && setSelected(null)}
       onAction={remove} actionLabel="Remove from team" actionVariant="destructive" />
