@@ -35,26 +35,15 @@ const FOLDER_MAP = {
   "Budget": { folder: "03 Finance", subfolder: "Budgets" },
   "Forecast": { folder: "03 Finance", subfolder: "Forecasts" },
   "Spreadsheet": { folder: "03 Finance", subfolder: "Spreadsheets" },
-  "Brand Brief": { folder: "04 Brand and Creative", subfolder: "Brand Briefs" },
   "Creative Brief": { folder: "04 Brand and Creative", subfolder: "Creative Briefs" },
   "Marketing Plan": { folder: "05 Marketing", subfolder: "Marketing Plans" },
-  "Campaign Plan": { folder: "05 Marketing", subfolder: "Campaign Plans" },
   "Launch Plan": { folder: "05 Marketing", subfolder: "Launch Plans" },
   "Product Specification": { folder: "06 Product", subfolder: "Product Specs" },
   "Supplier Comparison": { folder: "07 Operations", subfolder: "Suppliers" },
   "Presentation": { folder: "08 Sales", subfolder: "Presentations" },
   "Pitch Deck": { folder: "09 Investors and Fundraising", subfolder: "Pitch Decks" },
-  "Contract Draft": { folder: "10 Legal and Compliance", subfolder: "Contracts" },
-  "Policy": { folder: "10 Legal and Compliance", subfolder: "Policies" },
-  "Letter": { folder: "10 Legal and Compliance", subfolder: "Letters" },
-  "Email Draft": { folder: "11 People and Culture", subfolder: "Email Drafts" },
   "Meeting Summary": { folder: "12 Meetings and Decisions", subfolder: "Meeting Summaries" },
-  "Board Resolution": { folder: "12 Meetings and Decisions", subfolder: "Board Resolutions" },
-  "Decision Memo": { folder: "12 Meetings and Decisions", subfolder: "Decision Memos" },
   "Project Plan": { folder: "13 Projects", subfolder: "Project Plans" },
-  "Timeline": { folder: "13 Projects", subfolder: "Timelines" },
-  "Checklist": { folder: "14 Templates", subfolder: "Checklists" },
-  "Template": { folder: "14 Templates", subfolder: "Templates" },
   "Other": { folder: "01 Strategy", subfolder: "General" },
 };
 
@@ -68,13 +57,23 @@ export function getTopFolder(folderPath) {
   return folderPath.split(" / ")[0];
 }
 
+// Trimmed from 34 to what's actually reachable: everything advisor-generated
+// deliverables can auto-detect as (see detectDocType in Tasks.jsx), what
+// native/xlsx/pptx routing needs (see FINANCIAL_TYPES/PRESENTATION_TYPES in
+// generate-deliverable), and a few genuinely distinct types with real
+// template support. Dropped: near-duplicates (Research Paper, Campaign Plan,
+// Brand Brief, Timeline), meta/utility types (Checklist, Template),
+// low-value admin types (Email Draft, Letter), Decision Memo/Board Resolution
+// (redundant with the app's own Decision Centre and Chair synthesis), and
+// Contract Draft/Policy (an AI board drafting "legal documents" with no
+// lawyer review is a liability risk for a non-technical founder, not just
+// unused clutter).
 export const DOCUMENT_TYPES = [
-  "Report", "Research Paper", "Strategy", "Business Plan", "Pitch Deck",
+  "Report", "Strategy", "Business Plan", "Pitch Deck",
   "Presentation", "Spreadsheet", "Financial Model", "Budget", "Forecast",
-  "Competitor Analysis", "Market Research", "Marketing Plan", "Campaign Plan",
-  "Brand Brief", "Creative Brief", "Product Specification", "Project Plan",
-  "Timeline", "Meeting Summary", "Board Resolution", "Decision Memo", "Proposal",
-  "Email Draft", "Letter", "Contract Draft", "Policy", "Checklist", "Template",
+  "Competitor Analysis", "Market Research", "Marketing Plan",
+  "Creative Brief", "Product Specification", "Project Plan",
+  "Meeting Summary", "Proposal",
   "Supplier Comparison", "Customer Persona", "Launch Plan", "Risk Assessment", "Other",
 ];
 
@@ -133,12 +132,6 @@ export const DOCUMENT_TEMPLATES = {
   },
   "Strategy": {
     sections: ["Executive Summary", "Current Situation", "Strategic Objectives", "Options Analysis", "Recommended Strategy", "Implementation Roadmap", "Resource Requirements", "Key Risks", "Success Metrics"],
-  },
-  "Decision Memo": {
-    sections: ["Decision Required", "Background", "Options Considered", "Analysis", "Recommendation", "Risks", "Next Actions"],
-  },
-  "Board Resolution": {
-    sections: ["Resolution Title", "Date", "Board Members Present", "Question", "Discussion Summary", "Areas of Agreement", "Areas of Disagreement", "Resolution", "Dissenting Opinions", "Action Items"],
   },
   "Meeting Summary": {
     sections: ["Meeting Title", "Date", "Attendees", "Agenda", "Key Discussion Points", "Decisions Made", "Action Items", "Next Meeting"],

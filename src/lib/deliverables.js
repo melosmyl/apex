@@ -28,22 +28,6 @@ export async function regenerateDeliverable({ companyId, documentId, customInstr
   return res.data;
 }
 
-// Document types that produce native Excel workbooks
-export const EXCEL_TYPES = ["Financial Model", "Budget", "Forecast", "Spreadsheet"];
-
-// Document types that produce editable Word documents
-export const DOCX_TYPES = [
-  "Report", "Strategy", "Business Plan", "Market Research", "Competitor Analysis",
-  "Board Resolution", "Decision Memo", "Risk Assessment", "Proposal", "Research Paper",
-  "Marketing Plan", "Campaign Plan", "Brand Brief", "Creative Brief", "Product Specification",
-  "Project Plan", "Timeline", "Meeting Summary", "Email Draft", "Letter", "Contract Draft",
-  "Policy", "Checklist", "Template", "Supplier Comparison", "Customer Persona", "Launch Plan",
-  "Other",
-];
-
-// Document types that produce PDF-only (slide-based / visual)
-export const PRESENTATION_TYPES = ["Pitch Deck", "Presentation"];
-
 export function getNativeFormatLabel(doc) {
   const fmt = doc?.native_file_format;
   if (fmt === "xlsx") return "Excel Workbook (.xlsx)";
