@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function buildContext(company, documents, decisions, meetings, projects, maxSize) {
+function buildContext(company, documents, decisions, meetings, projects, commitments, maxSize) {
   let ctx = `Company: ${company.name || 'N/A'}\nIndustry: ${company.industry || 'N/A'}\n`;
   ctx += `Description: ${company.description || company.tagline || 'N/A'}\n`;
   if (company.tagline) ctx += `Tagline: ${company.tagline}\n`;
@@ -28,12 +28,46 @@ function buildContext(company, documents, decisions, meetings, projects, maxSize
     ctx += `\nActive Projects:\n`;
     projects.slice(0, 5).forEach(p => { ctx += `- ${p.name} (${p.status}): ${p.description || ''}\n`; });
   }
+  if (commitments?.length) {
+    ctx += `\nOutstanding commitments the founder made after previous board meetings:\n`;
+    commitments.forEach(c => {
+      const overdue = c.days_open >= OVERDUE_AFTER_DAYS ? ' [OVERDUE]' : '';
+      ctx += `- "${c.title}" — agreed ${c.days_open} day${c.days_open === 1 ? '' : 's'} ago after the meeting on "${c.meeting_question}", still not done${overdue}\n`;
+    });
+    ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not.\n`;
+  }
   if (documents?.length) {
     ctx += `\nRelevant Documents:\n`;
     documents.slice(0, 10).forEach(d => { ctx += `- ${d.title} (${d.category}): ${(d.content || '').slice(0, 400)}\n`; });
   }
   if (ctx.length > maxSize) ctx = ctx.slice(0, maxSize) + '... [truncated]';
   return ctx;
+}
+
+// A commitment is a task the founder explicitly took on after a board meeting.
+// Advisors get the full list with an age on each, rather than a hard cutoff, so
+// they can judge for themselves when something is worth raising.
+const OVERDUE_AFTER_DAYS = 14;
+
+async function loadOpenCommitments(db, companyId) {
+  const { data, error } = await db.from('tasks')
+    .select('title, status, created_at, board_meetings!inner(question)')
+    .eq('company_id', companyId)
+    .not('source_meeting_id', 'is', null)
+    .neq('status', 'done')
+    .order('created_at', { ascending: true })
+    .limit(20);
+  if (error) {
+    console.error('Could not load open commitments:', error.message);
+    return [];
+  }
+  const now = Date.now();
+  return (data || []).map(t => ({
+    title: t.title,
+    status: t.status,
+    days_open: Math.max(0, Math.floor((now - new Date(t.created_at).getTime()) / 86400000)),
+    meeting_question: t.board_meetings?.question || 'a previous meeting',
+  }));
 }
 
 // Board memory: find past decisions related to the question being asked, rather
@@ -104,12 +138,13 @@ Deno.serve(async (req) => {
     const { data: company } = await db.from('companies').select('*').eq('id', company_id).single();
     if (!company) return Response.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
 
-    const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled] = await Promise.all([
+    const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments] = await Promise.all([
       db.from('documents').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(20),
       db.from('board_meetings').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(5),
       db.from('projects').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(10),
       db.from('advisors').select('*').eq('company_id', company_id).limit(100),
       recallRelatedDecisions(db, company_id, question),
+      loadOpenCommitments(db, company_id),
     ]);
     const decisions = recalled.decisions;
 
@@ -117,7 +152,7 @@ Deno.serve(async (req) => {
     if (selectedAdvisors.length < minAdv)
       return Response.json({ error: 'Not enough AI advisors selected' }, { status: 400, headers: corsHeaders });
 
-    const contextPackage = buildContext(company, documents, decisions, meetings, projects, limits.max_context_size || 8000);
+    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, limits.max_context_size || 8000);
 
     const { data: meeting, error: createErr } = await db.from('board_meetings').insert({
       company_id, created_by_id: user.id, question, participants: selectedAdvisors.map(a => a.name),

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { computeStreak, countRecentActivity, computeTimeSaved } from "@/lib/momentum";
 import MomentumWidget from "@/components/dashboard/MomentumWidget";
+import OpenCommitmentsWidget from "@/components/dashboard/OpenCommitmentsWidget";
 import MilestoneTracker from "@/components/dashboard/MilestoneTracker";
 import TimeSavedWidget from "@/components/dashboard/TimeSavedWidget";
 
@@ -169,6 +170,8 @@ export default function Dashboard() {
         <MomentumWidget streak={streak} recentCount={recentCount} />
         <TimeSavedWidget minutes={timeSavedMin} />
       </div>
+
+      <OpenCommitmentsWidget tasks={allTasks} meetings={allMeetings} companyId={companyId} />
 
       {/* Interactive journey milestones */}
       <MilestoneTracker company={company} companyId={companyId} onUpdate={setCompany} />
