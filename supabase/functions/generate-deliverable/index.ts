@@ -44,6 +44,9 @@ async function uploadFile(db, companyId, fileName, bytes, format) {
 
 // Routes spec generation through routeAdvisorRequest, matching the board
 // discussion functions — retry, provider fallback and usage logging included.
+// Runs on the cheap tier: extracting structured numbers and paragraphs into a
+// schema is routine work, not the reasoning a board debate needs, and it still
+// speaks in the advisor's voice via system_instructions.
 async function invokeSpecLLM({ advisor, companyId, userId, prompt, schema }) {
   const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/routeAdvisorRequest`, {
     method: 'POST',
@@ -64,6 +67,7 @@ async function invokeSpecLLM({ advisor, companyId, userId, prompt, schema }) {
       temperature: 0.4,
       max_output_length: SPEC_MAX_OUTPUT,
       request_type: 'deliverable_spec',
+      model_tier: 'cheap',
     }),
   });
   const data = await res.json();

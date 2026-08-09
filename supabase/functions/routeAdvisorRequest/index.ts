@@ -72,13 +72,38 @@ function validateAndParse(content, requiredFields) {
   return { parsed, valid: true };
 }
 
-function estimateCost(provider, inputTokens, outputTokens) {
-  const rates = {
+// Per-model rates where they differ meaningfully from the provider default —
+// the cheap tier is roughly 30x cheaper than gpt-4o, so pricing it at the
+// provider-level rate would hide the entire point of routing to it.
+const MODEL_RATES = {
+  'openai:gpt-4o-mini': { input: 0.00000015, output: 0.0000006 },
+};
+
+function estimateCost(provider, model, inputTokens, outputTokens) {
+  const providerRates = {
     openai: { input: 0.000005, output: 0.000015 },
     anthropic: { input: 0.000003, output: 0.000015 },
   };
-  const r = rates[provider] || rates.openai;
+  const r = MODEL_RATES[`${provider}:${model}`] || providerRates[provider] || providerRates.openai;
   return Math.round((inputTokens * r.input + outputTokens * r.output) * 10000) / 10000;
+}
+
+// The cheap/fast tier for routine, non-strategic calls (e.g. document-spec
+// generation) — never used for board debate or chair synthesis, where
+// reasoning quality is the entire product. Configurable via
+// ai_model_configurations (purpose='cheap_tier', is_active=true); falls back
+// to a hardcoded default so this never breaks if that table is edited to empty.
+const DEFAULT_CHEAP_TIER = { provider: 'openai', model: 'gpt-4o-mini' };
+
+async function resolveCheapTier(db) {
+  try {
+    const { data } = await db.from('ai_model_configurations')
+      .select('provider, model_name')
+      .eq('purpose', 'cheap_tier').eq('is_active', true)
+      .order('created_at', { ascending: false }).limit(1);
+    if (data?.length) return { provider: data[0].provider, model: data[0].model_name };
+  } catch { /* table may be empty — use the default */ }
+  return DEFAULT_CHEAP_TIER;
 }
 
 function buildSystemPrompt(advisor, customInstructions, companyContext, meetingContext, outputSchema) {
@@ -120,7 +145,7 @@ Deno.serve(async (req) => {
     const db = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     const { advisor_id, company_id, meeting_id, system_instructions, company_context, meeting_context,
-      user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id } = await req.json();
+      user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier } = await req.json();
 
     if (!advisor_id || !user_question)
       return Response.json({ error: 'advisor_id and user_question are required' }, { status: 400, headers: corsHeaders });
@@ -137,8 +162,18 @@ Deno.serve(async (req) => {
 
     let provider = advisor.default_provider || 'openai';
     let model = advisor.default_model || 'gpt-4o';
-    const fbProvider = advisor.fallback_provider;
-    const fbModel = advisor.fallback_model;
+    let fbProvider = advisor.fallback_provider;
+    let fbModel = advisor.fallback_model;
+
+    if (model_tier === 'cheap') {
+      const cheap = await resolveCheapTier(db);
+      // If the cheap tier fails outright, fall back to this advisor's own
+      // strong model rather than leaving the call with no fallback at all.
+      fbProvider = provider;
+      fbModel = model;
+      provider = cheap.provider;
+      model = cheap.model;
+    }
 
     try {
       const { data: configs } = await db.from('ai_model_configurations').select('*').eq('provider', provider).eq('model_name', model).order('created_at', { ascending: false }).limit(1);
@@ -198,7 +233,7 @@ Deno.serve(async (req) => {
         provider: result ? result.provider_used : provider, model: result ? result.model_used : model,
         request_type: request_type || 'unknown',
         input_size: result ? result.input_tokens : 0, output_size: result ? result.output_tokens : 0,
-        estimated_cost: estimateCost(result ? result.provider_used : provider, result ? result.input_tokens : 0, result ? result.output_tokens : 0),
+        estimated_cost: estimateCost(result ? result.provider_used : provider, result ? result.model_used : model, result ? result.input_tokens : 0, result ? result.output_tokens : 0),
         latency_ms: result ? result.latency_ms : 0, status: logStatus, error_code: !result ? lastError : null,
       });
     } catch (logErr) { console.error('Usage log failed:', logErr.message); }
