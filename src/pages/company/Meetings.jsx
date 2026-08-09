@@ -32,7 +32,9 @@ export default function Meetings() {
         <Button variant="ghost" className="mb-4 -ml-2" onClick={() => setActive(null)}><ChevronLeft className="w-4 h-4 mr-1" /> All meetings</Button>
         <h1 className="font-display text-2xl sm:text-3xl font-light mb-1">"{active.question}"</h1>
         <p className="text-sm text-muted-foreground mb-8">{active.created_date ? format(new Date(active.created_date), "d MMMM yyyy") : ""} · {active.participants?.length} participants</p>
-        <MeetingResult result={active} advisors={advisors} />
+        {/* Stored rows key the meeting as `id`; MeetingResult expects the
+            live boardroom shape, which uses `meeting_id`. */}
+        <MeetingResult result={{ ...active, meeting_id: active.id }} advisors={advisors} companyId={companyId} />
       </div>
     );
   }

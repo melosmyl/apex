@@ -31,6 +31,7 @@ export default function FounderDecisionControls({ meetingId, nextActions = [], c
           selectedTasks.map(i => ({
             company_id: companyId, title: nextActions[i].title,
             assigned_to: nextActions[i].assigned_to || "", created_by: "Boardroom", status: "todo",
+            source_meeting_id: meetingId,
           }))
         );
       }
