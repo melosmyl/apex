@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -166,8 +167,17 @@ export default function DocumentDetailDialog({
             <GitBranch className="w-3.5 h-3.5 mr-1" /> New Version
           </Button>
           <Button variant="ghost" size="sm" className="rounded-full" onClick={() => {
-            const url = `${window.location.origin}/company/${doc.company_id}/documents`;
-            navigator.clipboard?.writeText(url).catch(() => {});
+            // Not a public link — opens this document for anyone already
+            // logged in as a member of the company. Public sharing is a
+            // separate, larger feature (see Phase 4.2 in the build plan).
+            const url = `${window.location.origin}/company/${doc.company_id}/documents?doc=${doc.id}`;
+            try {
+              // navigator.clipboard can exist without writeText being callable
+              // (permissions, non-HTTPS) — optional chaining alone doesn't
+              // guard that, so this still needs a try/catch around the call.
+              navigator.clipboard.writeText(url).catch(() => {});
+            } catch { /* clipboard unavailable in this browser/context */ }
+            toast({ title: "Link copied", description: "Works for anyone already signed in to this company." });
           }}>
             <Share2 className="w-3.5 h-3.5 mr-1" /> Share
           </Button>

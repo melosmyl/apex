@@ -52,6 +52,17 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
   };
   useEffect(() => { load(); }, [companyId, sort]);
 
+  // Opens the document named by ?doc= on load — the target of the Share
+  // button's copied link. Access is still gated by the founder needing to be
+  // logged in as a member of this company; there is no public link yet.
+  useEffect(() => {
+    if (!items) return;
+    const docId = new URLSearchParams(window.location.search).get("doc");
+    if (!docId) return;
+    const match = items.find((d) => d.id === docId);
+    if (match) setSelected(match);
+  }, [items]);
+
   // Compute folder counts
   const folderCounts = useMemo(() => {
     if (!items) return {};
