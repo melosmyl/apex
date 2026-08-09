@@ -134,8 +134,15 @@ Deno.serve(async (req) => {
           decision_style: 'Balanced, synthesising, evidence-weighing',
           communication_style: 'Warm, clear, precise',
           strengths: ['Synthesis', 'Reading a founder\'s real situation quickly'],
-          default_provider: 'anthropic', default_model: 'claude-sonnet-5',
-          fallback_provider: 'openai', fallback_model: 'gpt-4o',
+          // gpt-4o is primary here, not the usual anthropic-first default.
+          // Confirmed deliberate, not an outage artefact: on 2026-08-09, after
+          // Anthropic billing was restored and re-verified working (flat
+          // schema: 3/4 success), claude-sonnet-5 still failed this exact
+          // full onboarding schema 4/4 with "Invalid response format" — a
+          // real schema-complexity limit (2 required nested array-of-object
+          // fields), not billing. Revisit if the schema is ever simplified.
+          default_provider: 'openai', default_model: 'gpt-4o',
+          fallback_provider: 'anthropic', fallback_model: 'claude-sonnet-5',
           temperature: 0.7, maximum_output_length: 3000,
         },
         user_id: user.id,
