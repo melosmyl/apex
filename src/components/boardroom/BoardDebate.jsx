@@ -43,7 +43,7 @@ const PHASE_MESSAGES = {
   resolution: "The Chair is preparing the resolution",
 };
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart, onResult }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -116,6 +116,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
       setResult(final);
       setPhase("result");
       setActiveName(null);
+      onResult?.(final);
     } catch (e) {
       setError(e.message || "The board could not convene.");
       setPhase("idle");

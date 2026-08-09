@@ -7,7 +7,7 @@ import { ArrowRight, ArrowLeft, Sparkles, Check } from "lucide-react";
 import OnboardingReview from "@/components/onboarding/OnboardingReview";
 import { generateOnboardingPlan } from "@/lib/onboarding";
 
-const QUESTIONS = [
+export const QUESTIONS = [
   { id: "name", type: "text", question: "What's the name of your company or idea?", placeholder: "e.g. Lumen & Co.", hint: "Don't worry — you can change this later.", required: true },
   { id: "description", type: "textarea", question: "In a sentence or two, what does it do?", placeholder: "We help…", hint: "Just the gist — your advisors will learn the rest.", required: true },
   { id: "stage", type: "choice", question: "Where are you right now?", options: [
