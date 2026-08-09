@@ -1,4 +1,5 @@
 import { base44 } from "@/api/base44Client";
+import { embedDecisionInBackground } from "@/lib/boardroom";
 
 export async function startVoiceSession({ companyId, topic, advisorIds, advisorNames, settings }) {
   const meeting = await base44.entities.BoardMeeting.create({
@@ -90,7 +91,7 @@ export async function saveMeetingResults({ companyId, sessionId, summary, adviso
     );
   }
 
-  await base44.entities.Decision.create({
+  const decision = await base44.entities.Decision.create({
     company_id: companyId,
     summary: summary.executive_summary,
     question: topic,
@@ -99,6 +100,7 @@ export async function saveMeetingResults({ companyId, sessionId, summary, adviso
     status: "decided",
     participants: advisorNames,
   });
+  embedDecisionInBackground(decision.id);
 
   return { tasks };
 }

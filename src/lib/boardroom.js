@@ -52,6 +52,14 @@ export async function runResolution(meetingId) {
   }
 }
 
+// Fire-and-forget: a decision without an embedding is simply invisible to
+// relevance search until the backfill picks it up, which must not block or
+// fail the flow that recorded it.
+export function embedDecisionInBackground(decisionId) {
+  if (!decisionId) return;
+  base44.functions.invoke("embedDecision", { decision_id: decisionId }).catch(() => {});
+}
+
 export async function runFounderFollowup(meetingId, founderMessage) {
   try {
     const res = await base44.functions.invoke("runFounderFollowup", {

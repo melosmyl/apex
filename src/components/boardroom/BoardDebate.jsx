@@ -9,7 +9,7 @@ import BoardTable from "@/components/boardroom/BoardTable";
 import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground } from "@/lib/boardroom";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -158,6 +158,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
       confidence_level: result?.board_resolution?.overall_confidence_score,
       status: "pending",
     });
+    embedDecisionInBackground(d.id);
     navigate(`/company/${companyId}/decisions?id=${d.id}`);
   };
 

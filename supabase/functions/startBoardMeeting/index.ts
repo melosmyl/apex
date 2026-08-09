@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { embedText } from '../_shared/embeddings.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,8 +13,12 @@ function buildContext(company, documents, decisions, meetings, projects, maxSize
   if (company.priorities?.length) ctx += `Strategic Priorities: ${company.priorities.join(', ')}\n`;
   if (company.metrics?.length) ctx += `Key Metrics: ${company.metrics.map(m => `${m.label}: ${m.value} (${m.trend})`).join(', ')}\n`;
   if (decisions?.length) {
-    ctx += `\nRecent Decisions:\n`;
-    decisions.slice(0, 5).forEach(d => { ctx += `- ${d.question}: ${d.final_recommendation || d.summary || 'N/A'}\n`; });
+    ctx += `\nPast decisions related to this question (most relevant first):\n`;
+    decisions.slice(0, 5).forEach(d => {
+      const when = d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'date unknown';
+      ctx += `- [${when}] ${d.question}: ${d.final_recommendation || d.summary || 'N/A'}\n`;
+    });
+    ctx += `You may refer to these directly if they bear on the question.\n`;
   }
   if (meetings?.length) {
     ctx += `\nPrevious Board Meetings:\n`;
@@ -29,6 +34,33 @@ function buildContext(company, documents, decisions, meetings, projects, maxSize
   }
   if (ctx.length > maxSize) ctx = ctx.slice(0, maxSize) + '... [truncated]';
   return ctx;
+}
+
+// Board memory: find past decisions related to the question being asked, rather
+// than merely the most recent ones. Falls back to recency when the question
+// cannot be embedded or nothing clears the similarity floor, so a board meeting
+// never fails because memory is unavailable.
+async function recallRelatedDecisions(db, companyId, question) {
+  let recencyFallback = [];
+  try {
+    const { data } = await db.from('decisions').select('*')
+      .eq('company_id', companyId).order('created_at', { ascending: false }).limit(10);
+    recencyFallback = data || [];
+  } catch { /* fall through with an empty list */ }
+
+  try {
+    const embedding = await embedText(question);
+    const { data: matches, error } = await db.rpc('match_decisions', {
+      p_company_id: companyId,
+      p_query_embedding: JSON.stringify(embedding),
+      p_match_count: 5,
+    });
+    if (error) throw new Error(error.message);
+    if (matches?.length) return { decisions: matches, retrieval: 'relevance' };
+  } catch (e) {
+    console.error('Relevance recall failed, falling back to recency:', e.message);
+  }
+  return { decisions: recencyFallback, retrieval: 'recency' };
 }
 
 async function callAdvisor(supabaseUrl, serviceKey, payload) {
@@ -72,13 +104,14 @@ Deno.serve(async (req) => {
     const { data: company } = await db.from('companies').select('*').eq('id', company_id).single();
     if (!company) return Response.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
 
-    const [{ data: documents }, { data: decisions }, { data: meetings }, { data: projects }, { data: advisors }] = await Promise.all([
+    const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled] = await Promise.all([
       db.from('documents').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(20),
-      db.from('decisions').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(10),
       db.from('board_meetings').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(5),
       db.from('projects').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(10),
       db.from('advisors').select('*').eq('company_id', company_id).limit(100),
+      recallRelatedDecisions(db, company_id, question),
     ]);
+    const decisions = recalled.decisions;
 
     const selectedAdvisors = (advisors || []).filter(a => advisor_ids.includes(a.id) && a.type !== 'human');
     if (selectedAdvisors.length < minAdv)
