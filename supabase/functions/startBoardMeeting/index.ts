@@ -6,12 +6,36 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// The founder never gave us these — onboarding is deliberately short now.
+// Rather than a form, the board recovers them in conversation, only when
+// they'd actually change the answer. See buildContext's gap block below.
+const PROFILE_GAPS = [
+  { key: 'industry', label: 'what industry they\'re in' },
+  { key: 'business_model', label: 'how the business makes money' },
+  { key: 'solo_founder', label: 'whether they\'re building alone or with a team' },
+  { key: 'team_size', label: 'how big the team is' },
+  { key: 'target_customer', label: 'who the target customer is' },
+  { key: 'primary_market', label: 'the primary market or geography' },
+  { key: 'available_capital', label: 'what capital is available' },
+  { key: 'available_time', label: 'how much time they can commit' },
+  { key: 'existing_assets', label: 'what they already have (prototype, customers, IP)' },
+  { key: 'immediate_goal', label: 'their most immediate goal' },
+  { key: 'confidence_gaps', label: 'where they lack confidence' },
+  { key: 'deadlines', label: 'any important deadlines' },
+];
+
 function buildContext(company, documents, decisions, meetings, projects, commitments, maxSize) {
   let ctx = `Company: ${company.name || 'N/A'}\nIndustry: ${company.industry || 'N/A'}\n`;
   ctx += `Description: ${company.description || company.tagline || 'N/A'}\n`;
   if (company.tagline) ctx += `Tagline: ${company.tagline}\n`;
   if (company.priorities?.length) ctx += `Strategic Priorities: ${company.priorities.join(', ')}\n`;
   if (company.metrics?.length) ctx += `Key Metrics: ${company.metrics.map(m => `${m.label}: ${m.value} (${m.trend})`).join(', ')}\n`;
+  const gaps = PROFILE_GAPS.filter(g => !company[g.key]);
+  if (gaps.length) {
+    ctx += `\nNot yet on file about this company (onboarding is short by design — the board fills these in over time):\n`;
+    gaps.forEach(g => { ctx += `- ${g.label} [profile_field: "${g.key}"]\n`; });
+    ctx += `If knowing one of these would materially change your answer, ask the founder directly in your response and report it in missing_information with the exact profile_field key. Don't force one in if it isn't actually relevant to this question — most won't be.\n`;
+  }
   if (decisions?.length) {
     ctx += `\nPast decisions related to this question (most relevant first):\n`;
     decisions.slice(0, 5).forEach(d => {
@@ -283,7 +307,17 @@ Deno.serve(async (req) => {
         key_arguments: { type: 'array', items: { type: 'string' } },
         assumptions: { type: 'array', items: { type: 'string' } },
         risks: { type: 'array', items: { type: 'string' } },
-        missing_information: { type: 'array', items: { type: 'string' } },
+        missing_information: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              detail: { type: 'string', description: 'The gap, phrased as a direct question to the founder' },
+              profile_field: { type: 'string', description: 'The exact profile_field key from the "Not yet on file" list above, only if this gap is one of those — omit entirely otherwise' },
+            },
+            required: ['detail'],
+          },
+        },
         suggested_actions: { type: 'array', items: { type: 'string' } },
         confidence_score: { type: 'number', description: '0-100' },
       },

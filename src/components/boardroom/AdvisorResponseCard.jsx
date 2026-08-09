@@ -1,9 +1,68 @@
-import React from "react";
+import React, { useState } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
 import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
+import { base44 } from "@/api/base44Client";
+
+// A missing_information item is either a plain string (older meetings, or a
+// gap that isn't one of the founder's profile fields) or {detail, profile_field}
+// — the board's own mechanism for recovering what the shortened onboarding
+// form no longer collects, answered right where the gap came up rather than
+// in a form. "Not sure yet" is a real, low-cost out: it just hides this one
+// prompt — the field stays open and can come up again in a later meeting
+// where it's actually relevant, nothing nags.
+function MissingInfoItem({ item, companyId }) {
+  const [mode, setMode] = useState("idle"); // idle | answering | saving | saved | dismissed
+  const [value, setValue] = useState("");
+
+  const detail = typeof item === "string" ? item : item.detail;
+  const profileField = typeof item === "object" && item ? item.profile_field : null;
+
+  const save = async () => {
+    if (!value.trim()) return;
+    setMode("saving");
+    try {
+      await base44.entities.Company.update(companyId, { [profileField]: value.trim() });
+      setMode("saved");
+    } catch {
+      setMode("answering");
+    }
+  };
+
+  if (mode === "saved") {
+    return <li className="text-sm flex gap-2"><span className="text-muted-foreground">—</span><span>{detail} <span className="text-emerald-700">— saved.</span></span></li>;
+  }
+  if (mode === "dismissed") {
+    return <li className="text-sm flex gap-2 text-muted-foreground/50"><span>—</span><span className="line-through">{detail}</span></li>;
+  }
+
+  return (
+    <li className="text-sm">
+      <div className="flex gap-2">
+        <span className="text-muted-foreground">—</span>
+        <div className="flex-1 min-w-0">
+          <p>{detail}</p>
+          {profileField && mode === "idle" && (
+            <div className="flex items-center gap-3 mt-1">
+              <button onClick={() => setMode("answering")} className="text-xs text-primary hover:text-primary/80">Answer</button>
+              <button onClick={() => setMode("dismissed")} className="text-xs text-muted-foreground hover:text-foreground">Not sure yet</button>
+            </div>
+          )}
+          {profileField && (mode === "answering" || mode === "saving") && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Your answer" autoFocus className="h-8 text-sm rounded-lg" onKeyDown={(e) => e.key === "Enter" && save()} disabled={mode === "saving"} />
+              <Button size="sm" variant="ghost" className="h-8 px-2.5 text-xs shrink-0" onClick={save} disabled={mode === "saving" || !value.trim()}>Save</Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
 
 export default function AdvisorResponseCard({ independent, challenge, accent, meetingId, companyId, meetingTitle }) {
   const { createPin } = usePin();
@@ -68,7 +127,7 @@ export default function AdvisorResponseCard({ independent, challenge, accent, me
         {independent.missing_information?.length > 0 && (
           <div>
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Missing Information</div>
-            <ul className="space-y-1">{independent.missing_information.map((a, i) => <li key={i} className="text-sm flex gap-2"><span className="text-muted-foreground">—</span>{a}</li>)}</ul>
+            <ul className="space-y-2">{independent.missing_information.map((item, i) => <MissingInfoItem key={i} item={item} companyId={companyId} />)}</ul>
           </div>
         )}
         {independent.suggested_actions?.length > 0 && (
