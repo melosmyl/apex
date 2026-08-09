@@ -5,6 +5,7 @@ import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
 import BoardMemoryNote from "@/components/boardroom/BoardMemoryNote";
+import BoardUncertaintyNote from "@/components/boardroom/BoardUncertaintyNote";
 import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
 
@@ -59,12 +60,6 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
           <List icon={AlertTriangle} title="Main Risks" items={resolution.main_risks} />
           <List icon={Lightbulb} title="Assumptions" items={resolution.assumptions} />
         </div>
-        {resolution.minority_opinion && (
-          <div className="bg-card border border-border/70 rounded-2xl p-5 mb-4">
-            <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Minority Opinion</div>
-            <p className="text-sm leading-relaxed italic text-muted-foreground">{resolution.minority_opinion}</p>
-          </div>
-        )}
         {resolution.missing_information?.length > 0 && (
           <List icon={AlertTriangle} title="Missing Information" items={resolution.missing_information} />
         )}
@@ -82,6 +77,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
       </div>
 
       <BoardMemoryNote memoryContext={result.memory_context} companyId={companyId} />
+      <BoardUncertaintyNote resolution={resolution} />
 
       <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 

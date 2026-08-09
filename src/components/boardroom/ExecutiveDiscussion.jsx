@@ -152,12 +152,6 @@ function DiscussionEvaluation({ evaluation }) {
             <ul className="space-y-1">{evaluation.disproven_arguments.map((a, i) => <li key={i} className="text-sm text-muted-foreground flex gap-2"><span>—</span>{a}</li>)}</ul>
           </div>
         )}
-        {evaluation.uncertain_assumptions?.length > 0 && (
-          <div>
-            <div className="text-xs font-medium mb-1.5">Uncertain Assumptions</div>
-            <ul className="space-y-1">{evaluation.uncertain_assumptions.map((a, i) => <li key={i} className="text-sm text-muted-foreground flex gap-2"><span>—</span>{a}</li>)}</ul>
-          </div>
-        )}
         {evaluation.opinions_changed?.length > 0 && (
           <div>
             <div className="text-xs font-medium mb-1.5">Opinions Changed</div>
