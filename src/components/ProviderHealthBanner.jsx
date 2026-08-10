@@ -1,19 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { supabase } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 
 // Surfaces provider_health_alerts (populated every 15 min by a Postgres cron
-// job, see 20260809180000_provider_health_alerts.sql) app-wide, on every
-// authenticated page. Born from a real incident: Anthropic ran out of
-// credits for hours and nothing surfaced it, because every advisor call has
-// a configured fallback — the product kept working, just silently on the
-// wrong model. Dismissing here only clears it locally for this session; the
-// underlying row reopens on the next scan if the condition is still true.
+// job, see 20260809180000_provider_health_alerts.sql) on every authenticated
+// page, admin only — these are operational signals for the owner, not
+// something a founder or free-meeting visitor should see. Born from a real
+// incident: Anthropic ran out of credits for hours and nothing surfaced it,
+// because every advisor call has a configured fallback — the product kept
+// working, just silently on the wrong model. Dismissing here only clears it
+// locally for this session; the underlying row reopens on the next scan if
+// the condition is still true.
 export default function ProviderHealthBanner() {
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState([]);
   const [dismissedIds, setDismissedIds] = useState(() => new Set());
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
+    if (!isAdmin) return;
     let cancelled = false;
     const load = async () => {
       const { data } = await supabase.from("provider_health_alerts").select("*").eq("acknowledged", false).order("last_seen", { ascending: false });
@@ -22,7 +28,7 @@ export default function ProviderHealthBanner() {
     load();
     const interval = setInterval(load, 60_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [isAdmin]);
 
   const acknowledge = async (alert) => {
     setDismissedIds((prev) => new Set(prev).add(alert.id));
