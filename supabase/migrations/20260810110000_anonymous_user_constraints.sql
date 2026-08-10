@@ -57,3 +57,15 @@ create policy "anonymous_users_no_documents"
 create policy "anonymous_users_no_tasks"
   on public.tasks as restrictive for insert to public
   with check (not public.is_anonymous_user());
+
+-- pins wasn't in the original blocked-tables list because it wasn't
+-- reachable from the anonymous flow's own code — usePin() crashed instead
+-- (fixed separately, PinContext.jsx). Restricting here anyway now that
+-- pin buttons render harmlessly instead of crashing the page.
+create policy "anonymous_users_no_pins"
+  on public.pins as restrictive for insert to public
+  with check (not public.is_anonymous_user());
+
+create policy "anonymous_users_no_decisions"
+  on public.decisions as restrictive for insert to public
+  with check (not public.is_anonymous_user());

@@ -1,4 +1,4 @@
-import { base44 } from "@/api/base44Client";
+import { base44, supabase } from "@/api/base44Client";
 import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
 import { buildAdvisorRecord, recommendAdvisorsHeuristic, getJourney } from "@/lib/companyJourney";
 
@@ -115,7 +115,12 @@ export async function createCompanyFromOnboarding(answers, plan) {
   // actual name, so resolve here or the task can never be executed or
   // completed by anyone. Falls back to the founder rather than leaving an
   // unresolvable role string, since that would be a permanently stuck task.
-  const tasks = (plan.suggested_tasks || []).map((t) => ({
+  //
+  // Skipped entirely for anonymous free-meeting visitors — RLS blocks task
+  // creation for them outright (see anonymous_users_no_tasks), and task
+  // creation isn't part of what the free meeting promises anyway.
+  const { data: { user } } = await supabase.auth.getUser();
+  const tasks = user?.is_anonymous ? [] : (plan.suggested_tasks || []).map((t) => ({
     company_id: company.id,
     title: t.title,
     assigned_to: resolveAssignee(t.assigned_to, createdAdvisors),

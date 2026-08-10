@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { base44, supabase } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Landmark, Sparkles, Users } from "lucide-react";
@@ -56,6 +56,11 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [liveTranscript, setLiveTranscript] = useState([]);
   const [resolutionStartedAt, setResolutionStartedAt] = useState(null);
   const [chairOpening, setChairOpening] = useState(loadedMeeting?.chair_opening || null);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setIsAnonymous(!!data?.user?.is_anonymous));
+  }, []);
 
   const aiAdvisors = advisors.filter((a) => a.type !== "human");
   const humanAdvisors = advisors.filter((a) => a.type === "human");
@@ -264,7 +269,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         <p className="font-display text-xl max-w-2xl">"{question}"</p>
         <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); }}>New question</Button>
       </div>
-      <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={recordDecision} onFollowup={handleFollowup} />
+      <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={isAnonymous ? undefined : recordDecision} onFollowup={isAnonymous ? undefined : handleFollowup} isAnonymous={isAnonymous} />
     </div>
   );
 }

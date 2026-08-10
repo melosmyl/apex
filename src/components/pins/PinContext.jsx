@@ -3,8 +3,14 @@ import PinDialog from "@/components/pins/PinDialog";
 
 const PinContext = createContext(null);
 
+// A safe no-op outside PinProvider (e.g. the anonymous free-meeting flow,
+// which reuses MeetingResult/AdvisorResponseCard/ExecutiveDiscussion — all
+// call usePin() — but sits outside CompanyLayout, where PinProvider
+// normally lives) rather than returning null and crashing on destructure.
+const NOOP_PIN_CONTEXT = { createPin: () => {} };
+
 export function usePin() {
-  return useContext(PinContext);
+  return useContext(PinContext) || NOOP_PIN_CONTEXT;
 }
 
 export function PinProvider({ companyId, children }) {

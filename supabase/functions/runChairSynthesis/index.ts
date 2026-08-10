@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
         missing_information: { type: 'array', items: { type: 'string' } },
         recommended_experiment: { type: 'string' },
         next_actions: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, assigned_to: { type: 'string' } } } },
-        overall_confidence_score: { type: 'number' },
+        overall_confidence_score: { type: 'number', description: 'A whole number from 0 to 100, never a 0-1 fraction' },
         discussion_evaluation: {
           type: 'object',
           properties: {
@@ -143,6 +143,13 @@ Deno.serve(async (req) => {
     if (!resolution) {
       await db.from('board_meetings').update({ status: 'failed' }).eq('id', meeting.id);
       return Response.json({ error: 'Chair synthesis failed. The board could not reach a resolution.' }, { status: 503, headers: corsHeaders });
+    }
+
+    // The schema asks for 0-100, but the model occasionally returns a 0-1
+    // fraction anyway — round(0.72) displays as "1%" if this isn't
+    // normalized before it's stored.
+    if (typeof resolution.overall_confidence_score === 'number' && resolution.overall_confidence_score > 0 && resolution.overall_confidence_score <= 1) {
+      resolution.overall_confidence_score = Math.round(resolution.overall_confidence_score * 100);
     }
 
     const nextActions = resolution.next_actions || [];

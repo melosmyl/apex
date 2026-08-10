@@ -66,7 +66,7 @@ function List({ icon: Icon, title, items }) {
   );
 }
 
-export default function MeetingResult({ result, advisors, companyId, onRecordDecision, onFollowup }) {
+export default function MeetingResult({ result, advisors, companyId, onRecordDecision, onFollowup, isAnonymous }) {
   const { createPin } = usePin();
   const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
   const resolution = result.board_resolution || {};
@@ -131,7 +131,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
 
       <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 
-      <FounderDecisionControls meetingId={result.meeting_id} nextActions={resolution.next_actions} companyId={companyId} />
+      <FounderDecisionControls meetingId={result.meeting_id} nextActions={resolution.next_actions} companyId={companyId} isAnonymous={isAnonymous} />
 
       <div>
         <h4 className="font-display text-lg mb-3">Advisor Perspectives</h4>

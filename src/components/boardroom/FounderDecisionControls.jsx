@@ -11,7 +11,7 @@ const OPTIONS = [
   { value: "undecided", label: "Undecided", icon: CircleDot },
 ];
 
-export default function FounderDecisionControls({ meetingId, nextActions = [], companyId }) {
+export default function FounderDecisionControls({ meetingId, nextActions = [], companyId, isAnonymous }) {
   const [decision, setDecision] = useState("pending");
   const [notes, setNotes] = useState("");
   const [selectedTasks, setSelectedTasks] = useState([]);
@@ -26,7 +26,10 @@ export default function FounderDecisionControls({ meetingId, nextActions = [], c
       await base44.entities.BoardMeeting.update(meetingId, {
         founder_decision: decision, founder_decision_notes: notes,
       });
-      if (selectedTasks.length) {
+      // Anonymous free-meeting sessions can't create tasks (RLS-enforced) —
+      // the checkboxes below are hidden for them too, so selectedTasks is
+      // always empty here, but skip explicitly rather than rely on that.
+      if (!isAnonymous && selectedTasks.length) {
         await base44.entities.Task.bulkCreate(
           selectedTasks.map(i => ({
             company_id: companyId, title: nextActions[i].title,
@@ -66,7 +69,7 @@ export default function FounderDecisionControls({ meetingId, nextActions = [], c
           placeholder="Add your thoughts, conditions, or your own final decision…" />
       </div>
 
-      {nextActions.length > 0 && (
+      {!isAnonymous && nextActions.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3"><ListChecks className="w-4 h-4 text-muted-foreground" /><h4 className="font-display text-base">Turn next actions into tasks</h4></div>
           <div className="space-y-2">
