@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { base44, supabase } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Landmark, Sparkles, Users } from "lucide-react";
+import { Landmark, Sparkles } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import BoardTable from "@/components/boardroom/BoardTable";
 import MeetingResult from "@/components/boardroom/MeetingResult";
@@ -222,7 +222,6 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   if (aiAdvisors.length < 3 && phase === "idle") {
     return (
       <EmptyState
-        icon={Users}
         title="Convene at least three advisors"
         description="A board debate needs differing perspectives. Invite at least three AI advisors to your executive team."
         action={<Button onClick={() => navigate(`/company/${companyId}/team`)} className="rounded-full px-6">Go to Executive Team</Button>}

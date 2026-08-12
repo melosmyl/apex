@@ -36,7 +36,7 @@ export default function BoardUncertaintyNote({ resolution }) {
       {hasConfidence && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] uppercase tracking-widest text-muted-foreground">Overall confidence</span>
+            <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Overall confidence</span>
             <span className={`text-sm font-medium ${tier.textClass}`}>{score}% · {tier.label}</span>
           </div>
           <div className="h-2 w-full rounded-full bg-border/60 overflow-hidden">
@@ -47,14 +47,14 @@ export default function BoardUncertaintyNote({ resolution }) {
 
       {minorityOpinion && (
         <div className="mb-4">
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Minority opinion</div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Minority opinion</div>
           <p className="text-sm leading-relaxed italic text-muted-foreground">{minorityOpinion}</p>
         </div>
       )}
 
       {uncertainAssumptions.length > 0 && (
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Assumptions that remain uncertain</div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Assumptions that remain uncertain</div>
           <ul className="space-y-1.5">
             {uncertainAssumptions.map((a, i) => (
               <li key={i} className="text-sm flex gap-2">

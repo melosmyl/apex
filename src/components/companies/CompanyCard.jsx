@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowUpRight, Users, Calendar, Scale } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 
 const STATUS_TIERS = [
@@ -45,22 +45,17 @@ function HealthRing({ score, tier }) {
       </svg>
       <div className="absolute text-center">
         <div className="font-display text-base leading-none">{score}</div>
-        <div className="text-[8px] uppercase tracking-wider text-muted-foreground mt-0.5">Health</div>
+        <div className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground mt-0.5">Health</div>
       </div>
     </div>
   );
 }
 
-function Stat({ icon: Icon, value, label }) {
+function Stat({ value, label }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="w-9 h-9 rounded-xl bg-secondary/70 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
-      </div>
-      <div>
-        <div className="font-display text-xl leading-none">{value}</div>
-        <div className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground mt-1">{label}</div>
-      </div>
+    <div>
+      <div className="font-display text-xl leading-none">{value}</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground mt-1.5">{label}</div>
     </div>
   );
 }
@@ -96,7 +91,7 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
           </div>
         </div>
         <div
-          className="px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.12em] font-medium shrink-0"
+          className="font-mono px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.12em] font-medium shrink-0"
           style={{ background: tier.chip, color: tier.chipText }}
         >
           {tier.label}
@@ -107,9 +102,9 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
 
       <div className="flex items-end justify-between gap-4 mb-5 pt-1">
         <div className="flex gap-5 flex-wrap">
-          <Stat icon={Users} value={stats.advisors || 0} label="Advisors" />
-          <Stat icon={Calendar} value={stats.meetings || 0} label="Meetings" />
-          <Stat icon={Scale} value={stats.decisions || 0} label="Decisions" />
+          <Stat value={stats.advisors || 0} label="Advisors" />
+          <Stat value={stats.meetings || 0} label="Meetings" />
+          <Stat value={stats.decisions || 0} label="Decisions" />
         </div>
         <HealthRing score={score} tier={tier} />
       </div>

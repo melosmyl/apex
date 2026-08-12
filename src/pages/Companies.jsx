@@ -2,12 +2,33 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Plus, Building2, RefreshCw, Shield } from "lucide-react";
+import { Plus, RefreshCw, Shield } from "lucide-react";
 import CompanyCard from "@/components/companies/CompanyCard";
 import GuidedOnboarding from "@/components/onboarding/GuidedOnboarding";
 import EmptyState from "@/components/EmptyState";
 import HealthWidget from "@/components/HealthWidget";
 import StatsWidget from "@/components/StatsWidget";
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins <= 1 ? "just now" : `${mins} minutes ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours === 1 ? "an hour ago" : `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "yesterday" : `${days} days ago`;
+}
+
+// True statements only — what moved, what's waiting, when the board last
+// met. No name, no time-of-day performance. If none of these are true,
+// render nothing rather than a greeting standing in for real content.
+function headline({ companies, decisionsWaiting, tasksCompletedOvernight, lastMeeting }) {
+  if (!companies?.length) return null;
+  if (decisionsWaiting > 0) return `${decisionsWaiting} decision${decisionsWaiting === 1 ? "" : "s"} waiting on you.`;
+  if (tasksCompletedOvernight > 0) return `${tasksCompletedOvernight} task${tasksCompletedOvernight === 1 ? "" : "s"} moved overnight.`;
+  if (lastMeeting?.created_date) return `Your board last met ${timeAgo(lastMeeting.created_date)}.`;
+  return null;
+}
 
 export default function Companies() {
   const [companies, setCompanies] = useState(null);
@@ -58,9 +79,6 @@ export default function Companies() {
       <div className="min-h-screen bg-background">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
           <div className="flex flex-col items-center justify-center text-center py-20 rise-in">
-            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-5">
-              <RefreshCw className="w-7 h-7 text-muted-foreground" strokeWidth={1.5} />
-            </div>
             <h3 className="text-xl font-display mb-2">Connection interrupted</h3>
             <p className="text-muted-foreground max-w-sm mb-6">We couldn't reach the server. Please check your connection and try again.</p>
             <Button onClick={load} className="rounded-full px-6"><RefreshCw className="w-4 h-4 mr-1.5" /> Retry</Button>
@@ -70,14 +88,23 @@ export default function Companies() {
     );
   }
 
+  const decisionsWaiting = decisions.filter((d) => d.status === "pending").length;
+  const overnightCutoff = Date.now() - 12 * 60 * 60 * 1000;
+  const tasksCompletedOvernight = tasks.filter(
+    (t) => t.status === "done" && t.updated_date && new Date(t.updated_date).getTime() >= overnightCutoff
+  ).length;
+  const headlineText = user ? headline({ companies, decisionsWaiting, tasksCompletedOvernight, lastMeeting: meetings[0] }) : null;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-12 fade-in">
           <div>
-            <div className="text-[2.5rem] sm:text-[3.25rem] sm:leading-[1.08] font-normal font-display mb-3 text-balance">
-              {user ? `${(() => {const h = new Date().getHours();return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";})()}, ${user.full_name?.split(" ")[0] || "there"}` : "\u00A0"}
-            </div>
+            {headlineText && (
+              <div className="text-[2.5rem] sm:text-[3.25rem] sm:leading-[1.08] font-normal font-display mb-3 text-balance">
+                {headlineText}
+              </div>
+            )}
             <p className="text-muted-foreground text-base sm:text-lg max-w-md leading-relaxed">Here's your executive briefing. <span className="font-display italic text-foreground/80">Never build alone.</span></p>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
@@ -98,7 +125,6 @@ export default function Companies() {
           </div> :
         companies.length === 0 ?
         <EmptyState
-          icon={Building2}
           title="Establish your first company"
           description="Create a workspace, assemble your AI executive team, and start making better decisions together."
           action={<Button onClick={() => setOnboarding(true)} variant="brand" className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :

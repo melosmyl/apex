@@ -55,17 +55,17 @@ export default function QuickAsk({ company, companyId, advisors, initialQuestion
         </div>
 
         <div className="bg-card border border-border/70 rounded-2xl p-6 mb-4 rise-in">
-          <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground mb-3">Answer</div>
+          <div className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground mb-3">Answer</div>
           <p className="leading-relaxed text-[0.95rem]">{result.answer}</p>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
-            <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground mb-2">Reasoning</div>
+            <div className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground mb-2">Reasoning</div>
             <p className="text-sm text-muted-foreground leading-relaxed">{result.reasoning}</p>
           </div>
           <div className="bg-card border border-brand/30 bg-brand-soft rounded-2xl p-5 rise-in">
-            <div className="text-xs uppercase tracking-[0.16em] text-brand font-medium mb-2">Next action</div>
+            <div className="font-mono text-xs uppercase tracking-[0.16em] text-brand font-medium mb-2">Next action</div>
             <p className="text-sm">{result.next_action}</p>
           </div>
         </div>

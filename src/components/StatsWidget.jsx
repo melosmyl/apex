@@ -1,5 +1,4 @@
 import React from "react";
-import { Scale, CheckCircle2, Calendar, TrendingUp, Gauge } from "lucide-react";
 
 function relativeTime(dateStr) {
   if (!dateStr) return "NONE YET";
@@ -12,18 +11,13 @@ function relativeTime(dateStr) {
   return `${days}D AGO`;
 }
 
-function StatCell({ icon: Icon, value, line1, line2, className = "" }) {
+function StatCell({ value, line1, line2, className = "" }) {
   return (
-    <div className={`bg-card p-6 flex items-center gap-4 transition-colors hover:bg-secondary/30 ${className}`}>
-      <div className="w-10 h-10 rounded-xl bg-brand-soft flex items-center justify-center shrink-0">
-        <Icon className="w-5 h-5 text-foreground/70" strokeWidth={1.75} />
-      </div>
-      <div className="min-w-0">
-        <div className="text-2xl sm:text-3xl font-display font-light leading-none truncate">{value}</div>
-        <div className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-2 leading-tight">
-          <div>{line1}</div>
-          <div>{line2}</div>
-        </div>
+    <div className={`bg-card p-6 transition-colors hover:bg-secondary/30 ${className}`}>
+      <div className="text-2xl sm:text-3xl font-display font-light leading-none truncate">{value}</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-2.5 leading-tight">
+        <div>{line1}</div>
+        <div>{line2}</div>
       </div>
     </div>
   );
@@ -59,11 +53,11 @@ export default function StatsWidget({ decisions = [], meetings = [], tasks = [] 
     <div className="mb-10 rise-in">
       <div className="rounded-3xl border border-border/60 shadow-soft overflow-hidden bg-card">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-px bg-border/50">
-          <StatCell icon={Scale} value={decisionsWaiting} line1="Decisions" line2="Waiting" />
-          <StatCell icon={CheckCircle2} value={tasksCompletedOvernight} line1="Tasks Completed" line2="Overnight" />
-          <StatCell icon={Calendar} value={meetingValue} line1="Last Board Meeting" line2={relativeTime(lastMeeting?.created_date)} />
-          <StatCell icon={TrendingUp} value={boardConfidence} line1="Board Confidence" line2="This Month" />
-          <StatCell icon={Gauge} value={productivity} line1="Productivity" line2="Overall" className="col-span-2 sm:col-span-1" />
+          <StatCell value={decisionsWaiting} line1="Decisions" line2="Waiting" />
+          <StatCell value={tasksCompletedOvernight} line1="Tasks Completed" line2="Overnight" />
+          <StatCell value={meetingValue} line1="Last Board Meeting" line2={relativeTime(lastMeeting?.created_date)} />
+          <StatCell value={boardConfidence} line1="Board Confidence" line2="This Month" />
+          <StatCell value={productivity} line1="Productivity" line2="Overall" className="col-span-2 sm:col-span-1" />
         </div>
       </div>
     </div>

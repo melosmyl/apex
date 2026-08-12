@@ -30,7 +30,7 @@ export default function BoardMemoryNote({ memoryContext, companyId }) {
 
       {decisions.length > 0 && (
         <div className="mb-4">
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Referencing</div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Referencing</div>
           <ul className="space-y-1.5">
             {decisions.map((d) => (
               <li key={d.id} className="text-sm flex gap-2">
@@ -46,7 +46,7 @@ export default function BoardMemoryNote({ memoryContext, companyId }) {
 
       {commitments.length > 0 && (
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Open commitments in view</div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Open commitments in view</div>
           <ul className="space-y-1.5">
             {commitments.map((c, i) => (
               <li key={i} className="text-sm flex gap-2">

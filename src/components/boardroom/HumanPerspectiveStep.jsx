@@ -88,7 +88,7 @@ export default function HumanPerspectiveStep({ humanAdvisors, question, onSubmit
     <div className="max-w-3xl rise-in">
       <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-8">
         <div className="text-center mb-6">
-          <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Human Perspectives</div>
+          <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Human Perspectives</div>
           <h2 className="font-display text-2xl font-light mb-1">What do your human advisors think?</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
             Your AI board has given their positions. Now capture your human advisors' input before the discussion — their perspectives will shape the debate.

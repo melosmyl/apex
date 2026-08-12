@@ -8,7 +8,7 @@ const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 function NameCard({ name, role, changed }) {
   return (
     <div className="flex items-baseline gap-2 mb-2 flex-wrap">
-      <span className="font-landing text-base sm:text-lg italic">{name}</span>
+      <span className="font-display text-base sm:text-lg italic">{name}</span>
       <span className="font-mono text-[10px] tracking-[0.15em] uppercase text-muted-foreground">{role}</span>
       {changed && (
         <span className="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground border border-border/70 rounded-full px-2 py-0.5">
@@ -36,7 +36,7 @@ function TranscriptMessage({ msg }) {
 function EmptyState() {
   return (
     <div className="border border-border/70 rounded-2xl px-6 py-16 text-center bg-card/40">
-      <p className="font-landing text-xl italic text-muted-foreground mb-2">The board is in session.</p>
+      <p className="font-display text-xl italic text-muted-foreground mb-2">The board is in session.</p>
       <p className="text-sm text-muted-foreground max-w-sm mx-auto">A real, unedited transcript goes here — nothing on this page is illustrative.</p>
     </div>
   );
@@ -66,7 +66,7 @@ export default function LandingTranscript({ token }) {
   return (
     <div>
       <p className="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground mb-3">A real board meeting, unedited</p>
-      <h3 className="font-landing text-2xl sm:text-3xl leading-snug mb-8 text-balance">"{meeting.question}"</h3>
+      <h3 className="font-display text-2xl sm:text-3xl leading-snug mb-8 text-balance">"{meeting.question}"</h3>
 
       <div className="space-y-0">
         {rounds.map((round) => (
@@ -88,9 +88,9 @@ export default function LandingTranscript({ token }) {
         <div className="mt-8 pt-8 border-t border-border/60">
           <div className="flex items-baseline justify-between gap-4 mb-3">
             <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">The chair's resolution</span>
-            <span className="font-landing text-lg">{conf}<span className="text-xs text-muted-foreground not-italic font-mono align-super">%</span></span>
+            <span className="font-display text-lg">{conf}<span className="text-xs text-muted-foreground not-italic font-mono align-super">%</span></span>
           </div>
-          <p className="font-landing text-xl sm:text-2xl italic leading-snug text-balance">{meeting.recommended_direction}</p>
+          <p className="font-display text-xl sm:text-2xl italic leading-snug text-balance">{meeting.recommended_direction}</p>
         </div>
       )}
     </div>

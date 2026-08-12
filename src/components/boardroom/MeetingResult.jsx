@@ -86,7 +86,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
           <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-primary" /><h3 className="font-display text-2xl">Board Resolution</h3></div>
           <div className="text-center shrink-0">
             <div className="font-display text-3xl">{conf}<span className="text-lg text-muted-foreground">%</span></div>
-            <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Confidence</div>
+            <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Confidence</div>
           </div>
         </div>
         <div className="mb-6">
@@ -95,12 +95,12 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         <PinnableText companyId={companyId} sourceType="board_resolution" sourceId={meetingId} sourceTitle={meetingTitle} sourceUrl={sourceUrl} meetingId={meetingId} onPin={createPin}>
           <p className="text-[15px] leading-relaxed mb-6">{resolution.executive_summary}</p>
           <div className="bg-accent/50 rounded-xl p-5 mb-6">
-            <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Direction</div>
+            <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Direction</div>
             <p className="font-display text-lg leading-snug">{resolution.recommended_direction}</p>
           </div>
         </PinnableText>
         {resolution.reasoning && (
-          <div className="mb-4"><div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Reasoning</div><p className="text-sm leading-relaxed">{resolution.reasoning}</p></div>
+          <div className="mb-4"><div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-1">Reasoning</div><p className="text-sm leading-relaxed">{resolution.reasoning}</p></div>
         )}
         <div className="grid sm:grid-cols-2 gap-4 mb-4">
           <List icon={Lightbulb} title="Areas of Agreement" items={resolution.areas_of_agreement} />
@@ -115,7 +115,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         )}
         {resolution.recommended_experiment && (
           <div className="bg-secondary/40 rounded-xl p-4 mb-4">
-            <div className="flex items-center gap-2 mb-1"><FlaskConical className="w-4 h-4 text-muted-foreground" /><span className="text-[11px] uppercase tracking-widest text-muted-foreground">Recommended Experiment</span></div>
+            <div className="flex items-center gap-2 mb-1"><FlaskConical className="w-4 h-4 text-muted-foreground" /><span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">Recommended Experiment</span></div>
             <p className="text-sm">{resolution.recommended_experiment}</p>
           </div>
         )}

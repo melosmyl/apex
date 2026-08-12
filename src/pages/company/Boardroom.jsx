@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useOutletContext, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -64,7 +64,6 @@ export default function Boardroom() {
       <div>
         <PageHeader eyebrow="The signature experience" title="The Boardroom" />
         <EmptyState
-          icon={Users}
           title="Assemble your executive team first"
           description="Add at least one AI advisor to start using the Boardroom."
           action={<Button onClick={() => navigate(`/company/${companyId}/team`)} className="rounded-full px-6">Go to Executive Team</Button>}

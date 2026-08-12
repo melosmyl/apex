@@ -49,7 +49,7 @@ export default function BoardroomHome({ onStartDebate, companyId }) {
       <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 rise-in">
         <div className="flex items-center gap-2.5 mb-4 text-muted-foreground">
           <Landmark className="w-5 h-5" strokeWidth={1.5} />
-          <span className="text-xs uppercase tracking-widest">Board Debate</span>
+          <span className="font-mono text-xs uppercase tracking-widest">Board Debate</span>
         </div>
         <Textarea
           value={question}
@@ -98,10 +98,8 @@ export default function BoardroomHome({ onStartDebate, companyId }) {
                 title="Coming soon"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
-                    <Icon className="w-4 h-4" strokeWidth={1.5} />
-                  </div>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Coming soon</span>
+                  <Icon className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Coming soon</span>
                 </div>
                 <h4 className="font-display text-sm mb-0.5">{m.label}</h4>
                 <p className="text-xs text-muted-foreground">{m.tagline}</p>

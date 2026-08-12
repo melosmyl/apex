@@ -58,7 +58,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       {/* Hero: What should I do next? */}
       <div className="rise-in">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Your next move</div>
+        <div className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Your next move</div>
         <h1 className="text-3xl sm:text-[2.5rem] sm:leading-[1.1] font-light font-display text-balance mb-2">
           {startHere ? plan.start_here_action : "Here's where things stand."}
         </h1>

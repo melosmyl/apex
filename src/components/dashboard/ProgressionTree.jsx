@@ -122,7 +122,7 @@ export default function ProgressionTree({ companyId, country }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-sm font-medium ${isDone ? "text-foreground" : "text-foreground/90"}`}>{node.label}</span>
                   {isHere && (
-                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-brand">
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-brand">
                       <MapPin className="w-3 h-3" strokeWidth={2} /> You are here
                     </span>
                   )}

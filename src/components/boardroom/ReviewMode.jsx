@@ -92,7 +92,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
               <div className="mt-4 bg-secondary/40 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Lightbulb className="w-4 h-4 text-brand" strokeWidth={1.5} />
-                  <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground font-medium">Recommended changes</span>
+                  <span className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground font-medium">Recommended changes</span>
                 </div>
                 <ul className="space-y-1.5">
                   {result.recommended_changes?.map((c, j) => (
@@ -171,7 +171,7 @@ function ReviewSection({ icon: Icon, title, items, tone }) {
     <div>
       <div className={`flex items-center gap-1.5 mb-2 ${toneClass}`}>
         <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span className="text-xs uppercase tracking-[0.14em] font-medium">{title}</span>
+        <span className="font-mono text-xs uppercase tracking-[0.14em] font-medium">{title}</span>
       </div>
       <ul className="space-y-1.5">
         {items?.map((item, i) => (

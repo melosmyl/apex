@@ -41,7 +41,7 @@ function SpeakButton({ text }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); speaking ? stop() : speak(text); }}
-      className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full transition-colors ${speaking ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+      className={`inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full transition-colors ${speaking ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
       title={speaking ? "Stop" : "Listen"}
     >
       {speaking ? <Square className="w-2.5 h-2.5" /> : <Volume2 className="w-2.5 h-2.5" />}
@@ -77,7 +77,7 @@ export function DiscussionMessage({ msg, accent }) {
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-display text-sm font-medium">You</span>
             <span className="text-xs text-muted-foreground">Founder</span>
-            <span className="inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Founder Reply</span>
+            <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Founder Reply</span>
           </div>
           <div className="bg-primary/5 rounded-xl p-3 border border-primary/10">
             <p className="text-sm leading-relaxed text-foreground/90">{msg.message}</p>
@@ -102,12 +102,12 @@ export function DiscussionMessage({ msg, accent }) {
               <CornerDownRight className="w-3 h-3" /> {msg.reply_to_advisor}
             </span>
           )}
-          <span className={`inline-flex items-center text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${typeMeta.className}`}>
+          <span className={`inline-flex items-center font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${typeMeta.className}`}>
             {typeMeta.label}
           </span>
           <SpeakButton text={msg.message} />
           {msg.changed_opinion && (
-            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
               <RefreshCw className="w-2.5 h-2.5" /> Changed
             </span>
           )}
@@ -138,7 +138,7 @@ export function DiscussionMessage({ msg, accent }) {
 function DiscussionEvaluation({ evaluation }) {
   return (
     <div className="bg-secondary/30 p-5 border-b border-border/50">
-      <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-3">Chair's Evaluation of the Discussion</div>
+      <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-3">Chair's Evaluation of the Discussion</div>
       <div className="grid sm:grid-cols-2 gap-4">
         {evaluation.strongest_arguments?.length > 0 && (
           <div>
@@ -269,7 +269,7 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
               return (
                 <div key={round}>
                   <div className="flex items-center gap-3 my-4">
-                    <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                    <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                       {round === 1 ? "Round 1 — Independent Positions" : roundMessages.some(m => m.message_type === 'founder_message') ? `Round ${round} — Founder Follow-up` : `Round ${round} — Discussion`}
                     </div>
                     <div className="flex-1 h-px bg-border/50" />

@@ -76,7 +76,7 @@ export default function LiveDiscussion({ transcript = [], advisors = [], phase, 
           return (
             <div key={round}>
               <div className="flex items-center gap-3 my-4">
-                <div className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                   {round === 1 ? "Round 1 — Independent Positions" : `Round ${round} — Discussion`}
                 </div>
                 <div className="flex-1 h-px bg-border/50" />

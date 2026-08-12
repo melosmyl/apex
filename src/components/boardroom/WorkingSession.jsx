@@ -100,7 +100,7 @@ export default function WorkingSession({ company, companyId, advisors }) {
         <div className="bg-brand-soft border border-brand/30 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <CheckSquare className="w-4 h-4 text-brand" strokeWidth={1.5} />
-            <span className="text-xs uppercase tracking-[0.16em] text-brand font-medium">Recommended actions</span>
+            <span className="font-mono text-xs uppercase tracking-[0.16em] text-brand font-medium">Recommended actions</span>
           </div>
           <ul className="space-y-2">
             {summary.recommended_actions?.map((a, i) => (
@@ -188,7 +188,7 @@ function SummarySection({ icon: Icon, title, items }) {
     <div className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
       <div className="flex items-center gap-2 mb-3">
         <Icon className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
-        <span className="text-xs uppercase tracking-[0.14em] font-medium text-muted-foreground">{title}</span>
+        <span className="font-mono text-xs uppercase tracking-[0.14em] font-medium text-muted-foreground">{title}</span>
       </div>
       <ul className="space-y-2">
         {items?.map((item, i) => (

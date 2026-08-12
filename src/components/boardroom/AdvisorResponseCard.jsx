@@ -105,34 +105,34 @@ export default function AdvisorResponseCard({ independent, challenge, accent, me
       <PinnableText companyId={companyId} sourceType="advisor_perspective" sourceId={meetingId} sourceTitle={meetingTitle || independent.advisor_name} sourceUrl={meetingId ? `/company/${companyId}/boardroom?meeting=${meetingId}` : undefined} meetingId={meetingId} advisorId={independent.advisor_id} onPin={createPin}>
       <div className="space-y-3">
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Position</div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Position</div>
           <p className="text-sm">{independent.position}</p>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Recommendation</div>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Recommendation</div>
           <p className="text-sm font-medium">{independent.recommendation}</p>
         </div>
         {independent.key_arguments?.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Key Arguments</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Key Arguments</div>
             <ul className="space-y-1">{independent.key_arguments.map((a, i) => <li key={i} className="text-sm flex gap-2"><span className="text-muted-foreground">—</span>{a}</li>)}</ul>
           </div>
         )}
         {independent.risks?.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Risks Identified</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Risks Identified</div>
             <ul className="space-y-1">{independent.risks.map((a, i) => <li key={i} className="text-sm flex gap-2"><span className="text-muted-foreground">—</span>{a}</li>)}</ul>
           </div>
         )}
         {independent.missing_information?.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Missing Information</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Missing Information</div>
             <ul className="space-y-2">{independent.missing_information.map((item, i) => <MissingInfoItem key={i} item={item} companyId={companyId} />)}</ul>
           </div>
         )}
         {independent.suggested_actions?.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Suggested Actions</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Suggested Actions</div>
             <ul className="space-y-1">{independent.suggested_actions.map((a, i) => <li key={i} className="text-sm flex gap-2"><span className="text-muted-foreground">—</span>{a}</li>)}</ul>
           </div>
         )}
