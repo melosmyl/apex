@@ -1,12 +1,4 @@
-// Momentum, time-saved, and milestone utilities for Stage 2.
-
-// Estimated minutes saved per activity — replaces manual human effort.
-const TIME_SAVED_PER_ACTIVITY = {
-  meeting: 120,   // convening + running a real board meeting
-  decision: 60,    // research + deliberation + writing a decision memo
-  task_done: 45,   // advisor executing a deliverable
-  document: 90,    // drafting a document from scratch
-};
+// Momentum and streak utilities.
 
 const MS_PER_DAY = 86400000;
 
@@ -85,32 +77,6 @@ export function countRecentActivity(meetings, decisions, tasks, docs, days = 7) 
   const cutoff = Date.now() - days * MS_PER_DAY;
   const dates = collectActivityDates(meetings, decisions, tasks, docs);
   return dates.filter((d) => new Date(d).getTime() >= cutoff).length;
-}
-
-/**
- * Compute total estimated time saved (in minutes) from company activity.
- */
-export function computeTimeSaved(meetings = [], decisions = [], tasks = [], docs = []) {
-  const doneTasks = tasks.filter((t) => t.status === "done");
-  return (
-    meetings.length * TIME_SAVED_PER_ACTIVITY.meeting +
-    decisions.length * TIME_SAVED_PER_ACTIVITY.decision +
-    doneTasks.length * TIME_SAVED_PER_ACTIVITY.task_done +
-    docs.length * TIME_SAVED_PER_ACTIVITY.document
-  );
-}
-
-/**
- * Format minutes into a human-readable duration.
- */
-export function formatTimeSaved(minutes) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours < 8) return mins ? `${hours}h ${mins}m` : `${hours}h`;
-  const days = Math.floor(hours / 8);
-  const remHours = hours % 8;
-  return remHours ? `${days}d ${remHours}h` : `${days}d`;
 }
 
 /**

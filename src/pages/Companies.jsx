@@ -62,6 +62,7 @@ export default function Companies() {
           advisors: companyAdvisors.length,
           advisorList: companyAdvisors,
           meetings: meetings.filter((m) => m.company_id === c.id).length,
+          completedMeetings: meetings.filter((m) => m.company_id === c.id && m.status === "complete").length,
           decisions: decisions.filter((d) => d.company_id === c.id).length
         };
       });
@@ -132,7 +133,7 @@ export default function Companies() {
 
         <div className="grid sm:grid-cols-1 lg:grid-cols-2 gap-6">
             {companies.map((c, i) =>
-          <div key={c.id} className="rise-in h-full" style={{ animationDelay: `${i * 60}ms` }}><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0 }} advisors={stats[c.id]?.advisorList || []} /></div>
+          <div key={c.id} className="rise-in h-full" style={{ animationDelay: `${i * 60}ms` }}><CompanyCard company={c} stats={stats[c.id] || { advisors: 0, meetings: 0, decisions: 0, completedMeetings: 0 }} advisors={stats[c.id]?.advisorList || []} /></div>
           )}
           </div>
         }

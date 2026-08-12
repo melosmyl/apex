@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PRODUCT_NAME } from "@/lib/branding";
+import { PRODUCT_NAME, IDENTITY_ACCENT_STYLE } from "@/lib/branding";
 import LandingTranscript from "@/components/landing/LandingTranscript";
 import roomImage from "@/assets/landing/room.jpg";
 import founderDeskImage from "@/assets/landing/founder-desk.jpg";
@@ -65,7 +65,7 @@ function Section({ children, className = "", dark = false }) {
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={IDENTITY_ACCENT_STYLE}>
       {/* 1. Hero — cream */}
       <Section className="pt-16 sm:pt-24 pb-16 sm:pb-24">
         <div className="max-w-5xl mx-auto text-center rise-in">

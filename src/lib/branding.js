@@ -11,3 +11,16 @@ export const PRODUCT_DOMAIN = "nobodytoldsandra.com";
 // 2026-08-12) — this placeholder exists so renaming her later is a one-line
 // change here, not a find-and-replace across the codebase.
 export const ASSISTANT_NAME = "The Assistant";
+
+// The landing and auth pages carry a deliberately separate identity accent
+// (deep indigo) from the rest of the product (amber, --brand in index.css).
+// Applied as a scoped CSS custom-property override on those pages' root
+// element rather than a second global token, so `bg-brand`/`text-brand`/
+// Button's variant="brand" resolve to indigo only within that subtree —
+// the app interior stays amber-only without per-component changes there.
+export const IDENTITY_ACCENT_STYLE = {
+  "--brand": "234 58% 38%",
+  "--brand-foreground": "40 20% 98%",
+  "--brand-soft": "234 45% 93%",
+  "--ring": "234 55% 45%",
+};

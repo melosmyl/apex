@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { PinProvider } from "@/components/pins/PinContext";
 import {
   LayoutDashboard, Users, Landmark, FolderKanban, CheckSquare, BookOpen,
-  FileText, Search, Scale, CalendarClock, Settings, ChevronLeft, Menu, X, Pin } from
+  FileText, Search, Scale, CalendarClock, Settings, ChevronLeft, Menu, Pin } from
 "lucide-react";
 
 const NAV = [
@@ -21,6 +21,12 @@ const NAV = [
 { to: "meetings", label: "Meetings", icon: CalendarClock },
 { to: "settings", label: "Settings", icon: Settings }];
 
+// A single dark anchor is the highest-return fix for the app reading flat —
+// near-black, independent of the app's own (otherwise-unused) light/dark
+// theme, so it doesn't touch anything else. Text colour is inherited and
+// dimmed via opacity rather than the muted-foreground token, since that
+// token is tuned for light surfaces and would be unreadable here.
+const SIDEBAR_DARK = { background: "hsl(220 8% 7%)", color: "hsl(40 10% 92%)" };
 
 export default function CompanyLayout() {
   const { companyId } = useParams();
@@ -36,9 +42,9 @@ export default function CompanyLayout() {
   useEffect(() => {setOpen(false);}, [location.pathname]);
 
   const SidebarInner =
-  <div className="flex flex-col h-full">
-      <div className="px-6 py-6 border-b border-border/60">
-        <button onClick={() => navigate("/")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm mb-4 transition-colors">
+  <div className="flex flex-col h-full" style={SIDEBAR_DARK}>
+      <div className="px-6 py-6 border-b border-white/10">
+        <button onClick={() => navigate("/")} className="flex items-center gap-2 opacity-60 hover:opacity-100 text-sm mb-4 transition-opacity">
           <ChevronLeft className="w-4 h-4" /> My Companies
         </button>
         <div className="flex items-center gap-3">
@@ -47,7 +53,7 @@ export default function CompanyLayout() {
           </div>
           <div className="min-w-0">
             <div className="font-display text-base leading-tight truncate">{company?.name || "…"}</div>
-            <div className="text-xs text-muted-foreground truncate">{company?.industry}</div>
+            <div className="text-xs opacity-60 truncate">{company?.industry}</div>
           </div>
         </div>
       </div>
@@ -58,23 +64,23 @@ export default function CompanyLayout() {
         to={`/company/${companyId}/${item.to}`}
         className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-        isActive ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`
+        isActive ? "bg-brand text-brand-foreground font-medium" : "opacity-70 hover:opacity-100 hover:bg-white/5"}`
 
         }>
-        
+
             <item.icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
             {item.label}
           </NavLink>
       )}
       </nav>
-      <div className="px-6 py-4 border-t border-border/60">
+      <div className="px-6 py-4 border-t border-white/10">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-muted-foreground font-display italic">Never build alone.</span>
-          <Link to="/pricing" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
+          <span className="text-xs opacity-60 font-display italic">Never build alone.</span>
+          <Link to="/pricing" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Pricing</Link>
         </div>
         <div className="flex items-center gap-3">
-          <Link to="/privacy" className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors">Privacy</Link>
-          <Link to="/terms" className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors">Terms</Link>
+          <Link to="/privacy" className="text-[11px] opacity-45 hover:opacity-80 transition-opacity">Privacy</Link>
+          <Link to="/terms" className="text-[11px] opacity-45 hover:opacity-80 transition-opacity">Terms</Link>
         </div>
       </div>
     </div>;
@@ -82,14 +88,14 @@ export default function CompanyLayout() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <aside className="hidden lg:flex w-72 shrink-0 border-r border-border/60 bg-card/50 backdrop-blur sticky top-0 h-screen">
+      <aside className="hidden lg:flex w-72 shrink-0 sticky top-0 h-screen">
         {SidebarInner}
       </aside>
 
       {open &&
       <div className="lg:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-foreground/20 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <aside className="relative w-72 bg-card h-full shadow-xl">{SidebarInner}</aside>
+          <aside className="relative w-72 h-full shadow-xl">{SidebarInner}</aside>
         </div>
       }
 

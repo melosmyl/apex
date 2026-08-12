@@ -5,8 +5,9 @@
 
 @layer base {
   :root {
-    /* Paper-white & precise — architectural, not cream */
-    --background: 40 14% 96%;
+    /* Three real surface values: background sits a clear step below card,
+       so layering reads from value contrast, not just hairline borders. */
+    --background: 36 16% 87%;
     --foreground: 220 8% 10%;
     --card: 0 0% 100%;
     --card-foreground: 220 8% 10%;
@@ -14,23 +15,26 @@
     --popover-foreground: 220 8% 10%;
     --primary: 220 8% 10%;
     --primary-foreground: 40 20% 97%;
-    --secondary: 40 12% 93%;
+    --secondary: 38 14% 92%;
     --secondary-foreground: 220 8% 14%;
-    --muted: 40 10% 93%;
-    --muted-foreground: 60 4% 46%;
-    --accent: 40 12% 91%;
+    --muted: 38 12% 92%;
+    --muted-foreground: 60 4% 40%;
+    --accent: 38 16% 94%;
     --accent-foreground: 220 8% 14%;
     --destructive: 6 60% 45%;
     --destructive-foreground: 40 20% 97%;
-    --border: 42 16% 86%;
-    --input: 42 16% 86%;
-    --ring: 234 55% 45%;
+    --border: 40 16% 74%;
+    --input: 40 16% 74%;
+    --ring: 43 70% 40%;
 
-    /* Deep indigo — the one accent, used sparingly. Contrast-checked against
-       both brand-foreground and the page background: ~9.4:1 either way. */
-    --brand: 234 58% 38%;
+    /* Signal amber — the one accent app-wide. The landing/auth/free-meeting
+       pages override this locally to a deep indigo (IDENTITY_ACCENT_STYLE
+       in src/lib/branding.js) — that identity is deliberately separate from
+       the product interior, which stays amber-only: nothing else may draw
+       the eye as importance or interactivity. */
+    --brand: 43 75% 40%;
     --brand-foreground: 40 20% 98%;
-    --brand-soft: 234 45% 93%;
+    --brand-soft: 43 55% 90%;
 
     /* Hairline-first — shadows are a last resort, not the default */
     --shadow-soft: 0 1px 2px rgba(20,20,15,0.04);
@@ -56,7 +60,7 @@
     --sidebar-accent: 40 12% 90%;
     --sidebar-accent-foreground: 220 8% 14%;
     --sidebar-border: 42 16% 85%;
-    --sidebar-ring: 234 55% 45%;
+    --sidebar-ring: 43 70% 40%;
   }
 
   .dark {
@@ -79,13 +83,10 @@
     --destructive-foreground: 40 10% 92%;
     --border: 220 6% 17%;
     --input: 220 6% 17%;
-    --ring: 234 55% 68%;
-    /* Lighter/brighter than the light-mode brand — contrast-checked at
-       ~5.9:1 against near-black brand-foreground and ~6.1:1 as text
-       directly on the dark background. */
-    --brand: 234 58% 70%;
+    --ring: 43 65% 50%;
+    --brand: 43 70% 52%;
     --brand-foreground: 220 8% 9%;
-    --brand-soft: 234 35% 22%;
+    --brand-soft: 43 30% 20%;
 
     --shadow-soft: 0 1px 2px rgba(0,0,0,0.3);
     --shadow-card: 0 2px 6px rgba(0,0,0,0.35);
@@ -100,7 +101,7 @@
     --sidebar-accent: 220 6% 14%;
     --sidebar-accent-foreground: 40 10% 92%;
     --sidebar-border: 220 6% 16%;
-    --sidebar-ring: 234 55% 68%;
+    --sidebar-ring: 43 65% 50%;
   }
 }
 

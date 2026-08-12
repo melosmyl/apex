@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { supabase, base44 } from "@/api/base44Client";
+import { IDENTITY_ACCENT_STYLE } from "@/lib/branding";
 import { generateOnboardingPlan, createCompanyFromOnboarding } from "@/lib/onboarding";
 import { QUESTIONS as PROFILE_QUESTIONS } from "@/components/onboarding/GuidedOnboarding";
 import BoardDebate from "@/components/boardroom/BoardDebate";
@@ -113,7 +114,7 @@ export default function FreeMeeting() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={IDENTITY_ACCENT_STYLE}>
       <div className="max-w-2xl mx-auto px-5 sm:px-8 py-12">
         {phase === "intro" && (
           <div className="text-center rise-in">

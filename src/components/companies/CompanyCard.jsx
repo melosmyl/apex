@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 
-const STATUS_TIERS = [
-  { min: 80, label: "Excellent", ring: "hsl(150 45% 38%)", chip: "hsl(150 40% 92%)", chipText: "hsl(150 40% 28%)" },
-  { min: 60, label: "Strong", ring: "hsl(150 35% 42%)", chip: "hsl(150 30% 92%)", chipText: "hsl(150 30% 30%)" },
-  { min: 40, label: "Stable", ring: "hsl(var(--brand))", chip: "hsl(var(--brand-soft))", chipText: "hsl(38 50% 32%)" },
-  { min: 0, label: "Early days", ring: "hsl(30 8% 50%)", chip: "hsl(38 15% 92%)", chipText: "hsl(30 8% 40%)" },
-];
+// Health only renders once there's real activity behind it — otherwise
+// it's a number with nothing behind it, exactly the "unearned praise"
+// this product's whole positioning argues against. Three completed board
+// meetings is the bar; below it, the card says so honestly instead of
+// showing a score.
+const HEALTH_GATE_MEETINGS = 3;
 
 const AVATAR_GRADIENTS = [
   "linear-gradient(135deg, hsl(40 65% 55%), hsl(28 60% 48%))",
@@ -23,17 +23,13 @@ function healthScore(stats) {
   return Math.min(100, Math.round(40 + (stats.advisors || 0) * 8 + (stats.meetings || 0) * 6 + (stats.decisions || 0) * 6));
 }
 
-function tierFor(score) {
-  return STATUS_TIERS.find((t) => score >= t.min);
-}
-
 function hashString(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
   return Math.abs(h);
 }
 
-function HealthRing({ score, tier }) {
+function HealthRing({ score }) {
   const r = 28;
   const c = 2 * Math.PI * r;
   const offset = c - (score / 100) * c;
@@ -41,7 +37,7 @@ function HealthRing({ score, tier }) {
     <div className="relative w-[68px] h-[68px] flex items-center justify-center shrink-0">
       <svg className="w-[68px] h-[68px] -rotate-90" viewBox="0 0 72 72">
         <circle cx="36" cy="36" r={r} fill="none" stroke="hsl(var(--secondary))" strokeWidth="5" />
-        <circle cx="36" cy="36" r={r} fill="none" stroke={tier.ring} strokeWidth="5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset} className="transition-all duration-700 ease-out" />
+        <circle cx="36" cy="36" r={r} fill="none" stroke="hsl(var(--brand))" strokeWidth="5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={offset} className="transition-all duration-700 ease-out" />
       </svg>
       <div className="absolute text-center">
         <div className="font-display text-base leading-none">{score}</div>
@@ -63,7 +59,8 @@ function Stat({ value, label }) {
 export default function CompanyCard({ company, stats, advisors = [] }) {
   const navigate = useNavigate();
   const score = healthScore(stats);
-  const tier = tierFor(score);
+  const completedMeetings = stats.completedMeetings || 0;
+  const healthEarned = completedMeetings >= HEALTH_GATE_MEETINGS;
   const team = advisors.slice(0, 5);
   const extra = Math.max(0, advisors.length - 5);
   const initials = company.name?.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "•";
@@ -90,12 +87,6 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
             {company.industry && <p className="text-sm text-muted-foreground mt-0.5 truncate">{company.industry}</p>}
           </div>
         </div>
-        <div
-          className="font-mono px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.12em] font-medium shrink-0"
-          style={{ background: tier.chip, color: tier.chipText }}
-        >
-          {tier.label}
-        </div>
       </div>
 
       {company.tagline && <p className="text-sm text-muted-foreground mb-5 line-clamp-2 leading-relaxed">{company.tagline}</p>}
@@ -106,7 +97,13 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
           <Stat value={stats.meetings || 0} label="Meetings" />
           <Stat value={stats.decisions || 0} label="Decisions" />
         </div>
-        <HealthRing score={score} tier={tier} />
+        {healthEarned ? (
+          <HealthRing score={score} />
+        ) : (
+          <p className="text-xs text-muted-foreground text-right max-w-[110px] leading-snug shrink-0">
+            Health appears after {HEALTH_GATE_MEETINGS} board meetings
+          </p>
+        )}
       </div>
 
       {team.length > 0 && (

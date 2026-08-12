@@ -3,12 +3,10 @@ import { useOutletContext, useNavigate, useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowRight, Target, CheckSquare, Landmark, FileText, Scale,
+  ArrowRight, CheckSquare, Landmark, FileText, Scale,
   TrendingUp, CircleDot
 } from "lucide-react";
-import { computeTimeSaved } from "@/lib/momentum";
 import OpenCommitmentsWidget from "@/components/dashboard/OpenCommitmentsWidget";
-import TimeSavedWidget from "@/components/dashboard/TimeSavedWidget";
 import ProgressionTree from "@/components/dashboard/ProgressionTree";
 
 export default function Dashboard() {
@@ -29,12 +27,8 @@ export default function Dashboard() {
     })();
   }, [companyId]);
 
-  // Stage 2: compute momentum and time-saved from all activity
   const allMeetings = data?.meetings || [];
-  const allDecisions = data?.decisions || [];
   const allTasks = data?.tasks || [];
-  const allDocs = data?.docs || [];
-  const timeSavedMin = computeTimeSaved(allMeetings, allDecisions, allTasks, allDocs);
 
   const go = (p) => navigate(`/company/${companyId}/${p}`);
 
@@ -72,34 +66,32 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Current priorities — max 5, each with an action */}
+      {/* Current priorities — the one loud card on this screen. More
+          padding, larger type, amber numerals: this is where the eye
+          should land. Everything else on the page is deliberately quieter. */}
       {priorities.length > 0 && (
-        <div className="bg-card border border-border/70 rounded-2xl p-6 rise-in">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2.5">
-              <Target className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.75} />
-              <h3 className="font-display text-lg">Current priorities</h3>
-            </div>
-          </div>
-          <ul className="space-y-3">
+        <div className="bg-card border border-border/70 rounded-3xl p-8 sm:p-10 rise-in">
+          <h3 className="font-display text-2xl sm:text-3xl mb-6">Current priorities</h3>
+          <ul className="space-y-5 sm:space-y-6">
             {priorities.map((p, i) => (
-              <li key={i} className="flex items-center gap-3 group">
-                <span className="font-display text-sm text-muted-foreground/60 w-6">{String(i + 1).padStart(2, "0")}</span>
-                <span className="text-sm flex-1">{p}</span>
-                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              <li key={i} className="flex items-center gap-4 sm:gap-5 group">
+                <span className="font-display text-3xl sm:text-4xl text-brand w-10 sm:w-12 shrink-0">{String(i + 1).padStart(2, "0")}</span>
+                <span className="text-base sm:text-lg flex-1">{p}</span>
+                <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {/* Continue where you left off + Recent progress */}
-      <div className="grid lg:grid-cols-2 gap-5">
+      {/* Continue where you left off + Recent progress — quiet and tight,
+          recessed a step below the loud card rather than competing with it. */}
+      <div className="grid lg:grid-cols-2 gap-4">
         {/* Continue */}
-        <div className="bg-card border border-border/70 rounded-2xl p-6 rise-in">
-          <div className="flex items-center gap-2.5 mb-4">
-            <CircleDot className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.75} />
-            <h3 className="font-display text-lg">Continue where you left off</h3>
+        <div className="bg-secondary/50 rounded-xl p-5 rise-in">
+          <div className="flex items-center gap-2 mb-3">
+            <CircleDot className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
+            <h3 className="font-display text-base">Continue where you left off</h3>
           </div>
           {!data ? (
             <p className="text-sm text-muted-foreground py-2">Loading…</p>
@@ -109,7 +101,7 @@ export default function Dashboard() {
               <Button onClick={() => go("boardroom")} variant="outline" className="rounded-full text-sm">Convene a board meeting</Button>
             </div>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2.5">
               {openTasks.slice(0, 3).map((t) => (
                 <li key={t.id}>
                   <button onClick={() => go("tasks")} className="flex items-start gap-3 text-left w-full group">
@@ -137,17 +129,17 @@ export default function Dashboard() {
         </div>
 
         {/* Recent progress */}
-        <div className="bg-card border border-border/70 rounded-2xl p-6 rise-in">
-          <div className="flex items-center gap-2.5 mb-4">
-            <TrendingUp className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={1.75} />
-            <h3 className="font-display text-lg">Recent progress</h3>
+        <div className="bg-secondary/50 rounded-xl p-5 rise-in">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
+            <h3 className="font-display text-base">Recent progress</h3>
           </div>
           {!data ? (
             <p className="text-sm text-muted-foreground py-2">Loading…</p>
           ) : recentProgress.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">No progress recorded yet. Your first meeting will appear here.</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2.5">
               {recentProgress.map((item, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <CheckSquare className="w-3.5 h-3.5 text-muted-foreground/50 mt-0.5 shrink-0" strokeWidth={1.5} />
@@ -160,14 +152,6 @@ export default function Dashboard() {
             </ul>
           )}
         </div>
-      </div>
-
-      {/* Time Saved — Momentum moved to the Assistant's welcome-back
-          interjection (src/lib/assistant.js loadGapRecoveryState), which
-          reuses computeStreak unchanged and carries the same
-          never-penalize-absence rule forward. */}
-      <div className="sm:max-w-sm">
-        <TimeSavedWidget minutes={timeSavedMin} />
       </div>
 
       <OpenCommitmentsWidget tasks={allTasks} meetings={allMeetings} companyId={companyId} />
