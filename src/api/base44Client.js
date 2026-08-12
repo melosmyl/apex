@@ -22,6 +22,8 @@ const TABLES = {
   AIUsageLog: 'ai_usage_logs',
   DeliverableGenerationLog: 'deliverable_generation_logs',
   SystemLimits: 'system_limits',
+  Note: 'notes',
+  AssistantEvent: 'assistant_events',
 };
 
 function parseSort(sort) {

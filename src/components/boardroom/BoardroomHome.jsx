@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Landmark, ArrowRight, ChevronDown, ChevronUp, Zap, MessagesSquare, FileText, ClipboardCheck, Radio } from "lucide-react";
 import { MEETING_MODES } from "@/lib/meetingModes";
+import { useAssistant } from "@/lib/AssistantContext";
 
 const PROMPTS = [
   "Should we manufacture our products in Portugal or Vietnam?",
@@ -17,10 +18,21 @@ const PROMPTS = [
 const OTHER_MODES = MEETING_MODES.filter((m) => m.key !== "board_debate");
 const ICONS = { Zap, MessagesSquare, FileText, ClipboardCheck, Radio };
 
-export default function BoardroomHome({ onStartDebate }) {
+export default function BoardroomHome({ onStartDebate, companyId }) {
   const [question, setQuestion] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [showOtherModes, setShowOtherModes] = useState(false);
+
+  // Resurfacing's real trigger point: this is where a founder actually
+  // composes their question in the normal flow (BoardDebate's own idle
+  // textarea only sees typing on the rarer "New question" follow-up path).
+  // Debounced, never a timer — see BoardDebate.jsx for the matching effect.
+  const { checkNoteRelevance, interjection } = useAssistant();
+  useEffect(() => {
+    if (interjection || question.trim().length < 15) return;
+    const t = setTimeout(() => checkNoteRelevance(companyId, question), 800);
+    return () => clearTimeout(t);
+  }, [question, companyId, interjection, checkNoteRelevance]);
 
   const submit = () => {
     if (!question.trim()) return;

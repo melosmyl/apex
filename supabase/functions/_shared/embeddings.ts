@@ -37,3 +37,11 @@ export function decisionEmbeddingText(decision: {
     decision.summary,
   ].filter(Boolean).join('\n\n');
 }
+
+// The text a note is remembered by. Tags are included once tagging has run
+// (Phase B) so a note's later semantic match also benefits from the
+// classifier's own words, not just the founder's raw phrasing.
+export function noteEmbeddingText(note: { raw_text?: string; tags?: string[] }): string {
+  return [note.raw_text, note.tags?.length ? note.tags.join(', ') : null]
+    .filter(Boolean).join('\n\n');
+}

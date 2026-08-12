@@ -6,8 +6,7 @@ import {
   ArrowRight, Target, CheckSquare, Landmark, FileText, Scale,
   TrendingUp, CircleDot
 } from "lucide-react";
-import { computeStreak, countRecentActivity, computeTimeSaved } from "@/lib/momentum";
-import MomentumWidget from "@/components/dashboard/MomentumWidget";
+import { computeTimeSaved } from "@/lib/momentum";
 import OpenCommitmentsWidget from "@/components/dashboard/OpenCommitmentsWidget";
 import MilestoneTracker from "@/components/dashboard/MilestoneTracker";
 import BuildStateWidget from "@/components/dashboard/BuildStateWidget";
@@ -38,8 +37,6 @@ export default function Dashboard() {
   const allTasks = data?.tasks || [];
   const allDocs = data?.docs || [];
   const allAdvisors = data?.advisors || [];
-  const streak = computeStreak(allMeetings, allDecisions, allTasks, allDocs);
-  const recentCount = countRecentActivity(allMeetings, allDecisions, allTasks, allDocs, 7);
   const timeSavedMin = computeTimeSaved(allMeetings, allDecisions, allTasks, allDocs);
 
   const go = (p) => navigate(`/company/${companyId}/${p}`);
@@ -168,9 +165,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Momentum + Time Saved */}
-      <div className="grid sm:grid-cols-2 gap-5">
-        <MomentumWidget streak={streak} recentCount={recentCount} />
+      {/* Time Saved — Momentum moved to the Assistant's welcome-back
+          interjection (src/lib/assistant.js loadGapRecoveryState), which
+          reuses computeStreak unchanged and carries the same
+          never-penalize-absence rule forward. */}
+      <div className="sm:max-w-sm">
         <TimeSavedWidget minutes={timeSavedMin} />
       </div>
 

@@ -11,6 +11,7 @@ import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
 import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
 import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground } from "@/lib/boardroom";
+import { useAssistant } from "@/lib/AssistantContext";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -43,7 +44,7 @@ const PHASE_MESSAGES = {
   resolution: "The Chair is preparing the resolution",
 };
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart, onResult }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart, onResult, routeFromNoteId }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -61,6 +62,28 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setIsAnonymous(!!data?.user?.is_anonymous));
   }, []);
+
+  // Suppresses the Assistant widget entirely while a meeting is running —
+  // the boardroom is the product's centre of gravity, nothing may split
+  // attention while one is active. Mirrors this component's own state
+  // outward rather than changing its state machine.
+  const { setMeetingRunning, checkNoteRelevance, interjection } = useAssistant();
+  useEffect(() => {
+    setMeetingRunning(["preparing", "discussion", "resolution", "human_input"].includes(phase));
+    return () => setMeetingRunning(false);
+  }, [phase, setMeetingRunning]);
+
+  // Resurfacing's one trigger point (Phase D): the founder composing a
+  // question, debounced — never a timer, never on load. Only while genuinely
+  // idle (not mid-meeting), only past a minimum length, and skipped once
+  // this session already has an interjection (the budget is enforced
+  // server-side too, but no reason to keep spending an embedding call on
+  // every pause once it's spent for the day).
+  useEffect(() => {
+    if (phase !== "idle" || interjection || question.trim().length < 15) return;
+    const t = setTimeout(() => checkNoteRelevance(companyId, question), 800);
+    return () => clearTimeout(t);
+  }, [question, phase, companyId, interjection, checkNoteRelevance]);
 
   const aiAdvisors = advisors.filter((a) => a.type !== "human");
   const humanAdvisors = advisors.filter((a) => a.type === "human");
@@ -137,6 +160,11 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
       setPendingMeetingId(phase1.meeting_id);
       setLiveTranscript(toRoundOneMessages(phase1.independent_responses));
       setChairOpening(phase1.chair_opening || null);
+      // The Assistant routed this question in from a captured note — the
+      // note only learns its meeting_id now that a real meeting exists.
+      if (routeFromNoteId) {
+        base44.entities.Note.update(routeFromNoteId, { routed_meeting_id: phase1.meeting_id, status: "routed" }).catch(() => {});
+      }
       // If human advisors are selected, show the human perspective step
       if (selectedHumanAdvisors.length > 0) {
         setPhase("human_input");

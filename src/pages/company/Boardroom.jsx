@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate, useOutletContext } from "react-router-dom";
+import { useParams, useNavigate, useOutletContext, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,27 @@ export default function Boardroom() {
   const { companyId } = useParams();
   const { company } = useOutletContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const [advisors, setAdvisors] = useState(null);
   const [mode, setMode] = useState(null);
   const [question, setQuestion] = useState("");
   const [autoStart, setAutoStart] = useState(false);
   const [loadedMeeting, setLoadedMeeting] = useState(null);
+  const [routeFromNoteId, setRouteFromNoteId] = useState(null);
+
+  // The Assistant routes a strategic-sized note here via navigate(..., {
+  // state }) rather than a URL param — the note's raw text can be long and
+  // there's no reason to expose it in the URL. presetNoteId lets BoardDebate
+  // report back once a real meeting exists, so the note can be marked routed.
+  useEffect(() => {
+    const preset = location.state?.presetQuestion;
+    if (!preset) return;
+    setQuestion(preset);
+    setRouteFromNoteId(location.state?.presetNoteId || null);
+    setAutoStart(true);
+    setMode("board_debate");
+    window.history.replaceState({}, "");
+  }, [location.state]);
 
   useEffect(() => {
     base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then((advs) => {
@@ -68,6 +84,7 @@ export default function Boardroom() {
     setLoadedMeeting(null);
     setQuestion("");
     setAutoStart(false);
+    setRouteFromNoteId(null);
   };
 
   return (
@@ -94,10 +111,11 @@ export default function Boardroom() {
             initialQuestion={question}
             loadedMeeting={loadedMeeting}
             autoStart={autoStart}
+            routeFromNoteId={routeFromNoteId}
           />
         </div>
       ) : (
-        <BoardroomHome onStartDebate={startDebate} />
+        <BoardroomHome onStartDebate={startDebate} companyId={companyId} />
       )}
     </div>
   );

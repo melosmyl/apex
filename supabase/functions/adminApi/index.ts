@@ -72,6 +72,16 @@ Deno.serve(async (req) => {
         if (error) throw error;
         return Response.json({ models }, { headers: corsHeaders });
       }
+      case 'get_cannibalization_metrics': {
+        // "If assistant usage rises while board meetings fall, she is
+        // cannibalising the product" — the from-day-one instrumentation
+        // requirement (Phase F). Raw per-user-per-week rows; Admin.jsx
+        // aggregates for display.
+        const { data: rows, error } = await db.from('assistant_cannibalization_weekly')
+          .select('*').order('week', { ascending: false }).limit(500);
+        if (error) throw error;
+        return Response.json({ rows: rows || [] }, { headers: corsHeaders });
+      }
       default:
         return Response.json({ error: 'Unknown action' }, { status: 400, headers: corsHeaders });
     }

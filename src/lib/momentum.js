@@ -10,6 +10,15 @@ const TIME_SAVED_PER_ACTIVITY = {
 
 const MS_PER_DAY = 86400000;
 
+// Absence is never a penalty: past a short grace period, both the (now
+// removed) MomentumWidget and the Assistant's welcome-back interjection
+// (src/lib/assistant.js) stop implying "you should have been here" and
+// switch to welcoming the founder back — still showing the streak they
+// already earned rather than a reset "0". Lives here, not in a component
+// file, since it's a pure threshold both a UI widget and a headless check
+// need to agree on.
+export const AWAY_AFTER_DAYS = 2;
+
 /**
  * Collect all activity timestamps from company data, sorted descending.
  */

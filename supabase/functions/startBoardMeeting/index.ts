@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { embedText } from '../_shared/embeddings.ts';
+import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,7 +63,7 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
       const overdue = c.days_open >= OVERDUE_AFTER_DAYS ? ' [OVERDUE]' : '';
       ctx += `- "${c.title}" — agreed ${c.days_open} day${c.days_open === 1 ? '' : 's'} ago after the meeting on "${c.meeting_question}", still not done${overdue}\n`;
     });
-    ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not. This meeting's own opening already covers outstanding commitments as a status check; you do not need to force one in here if it does not fit.\n`;
+    ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not.\n`;
   }
   if (documents?.length) {
     ctx += `\nRelevant Documents:\n`;
@@ -70,32 +71,6 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
   }
   if (ctx.length > maxSize) ctx = ctx.slice(0, maxSize) + '... [truncated]';
   return ctx;
-}
-
-// A commitment is a task the founder explicitly took on after a board meeting.
-// Advisors get the full list with an age on each, rather than a hard cutoff, so
-// they can judge for themselves when something is worth raising.
-const OVERDUE_AFTER_DAYS = 14;
-
-async function loadOpenCommitments(db, companyId) {
-  const { data, error } = await db.from('tasks')
-    .select('title, status, created_at, board_meetings!inner(question)')
-    .eq('company_id', companyId)
-    .not('source_meeting_id', 'is', null)
-    .neq('status', 'done')
-    .order('created_at', { ascending: true })
-    .limit(20);
-  if (error) {
-    console.error('Could not load open commitments:', error.message);
-    return [];
-  }
-  const now = Date.now();
-  return (data || []).map(t => ({
-    title: t.title,
-    status: t.status,
-    days_open: Math.max(0, Math.floor((now - new Date(t.created_at).getTime()) / 86400000)),
-    meeting_question: t.board_meetings?.question || 'a previous meeting',
-  }));
 }
 
 // Board memory: find past decisions related to the question being asked, rather
@@ -138,14 +113,24 @@ async function loadRecentlyCompletedTasks(db, companyId, sinceIso) {
   return data || [];
 }
 
+// Deterministic, non-LLM fallback — used only if the model's own phrasing
+// fails to verify below. Always names the work, whether or not the model's
+// wording checks out; this is the retention mechanic, so it must never
+// silently disappear the way an unverified overdue-chase used to.
+function templatedCompletedRecap(completedTasks) {
+  const titles = completedTasks.map((t) => `"${t.title}"`).join(', ');
+  return `Since we last met, the board saw progress on: ${titles}.`;
+}
+
 // The Chair opens with what has changed since the last meeting: work
-// finished, how the founder responded to the last resolution, and — this is
-// the one place accountability follow-up is reliable — outstanding
-// commitments. Unlike the per-advisor context (competing against whatever the
-// founder actually asked this time), this is the Chair's own dedicated
-// moment, so a mandatory, direct ask about overdue items has somewhere to
-// live instead of losing out to the day's actual question.
-async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, meetingId, newQuestion, previousMeeting, commitments }) {
+// finished, and how the founder responded to the last resolution. This used
+// to also chase overdue commitments directly — that's moved to the
+// Assistant (Phase E, prepareAccountabilityChases), which can raise it
+// proactively between meetings rather than only when a new one starts, and
+// avoids two voices nagging about the same thing. This opening now stays
+// pure recap and acknowledgment — the continuity differentiator made
+// visible ("the board remembers"), never a chase.
+async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, meetingId, newQuestion, previousMeeting }) {
   if (!previousMeeting) return null; // first meeting ever — nothing to open with
   const completedTasks = await loadRecentlyCompletedTasks(db, companyId, previousMeeting.created_at);
 
@@ -158,33 +143,16 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, co
   if (completedTasks.length) {
     prompt += `\nCompleted since then:\n`;
     completedTasks.forEach(t => { prompt += `- ${t.title}\n`; });
+    prompt += `\nThis is mandatory, not optional: your opening_statement text must literally contain each completed item's exact title in quotes — this is the board demonstrating it remembers and noticed, not a vague "good progress." A generic "you've been busy" is NOT acceptable — name every item above.\n`;
   } else {
-    prompt += `\nNothing has been marked done since then.\n`;
+    prompt += `\nNothing has been marked done since then — a short, honest "quiet since we last met" is fine. Do not invent progress that didn't happen.\n`;
   }
-  const overdue = (commitments || []).filter(c => c.days_open >= OVERDUE_AFTER_DAYS);
-  const notYetOverdue = (commitments || []).filter(c => c.days_open < OVERDUE_AFTER_DAYS);
-  if (overdue.length) {
-    prompt += `\nStill outstanding and overdue:\n`;
-    overdue.forEach(c => { prompt += `- "${c.title}" — ${c.days_open} days, from the meeting on "${c.meeting_question}"\n`; });
-    prompt += `\nThis is mandatory, not optional: your opening_statement text must literally contain each overdue item's exact title in quotes, immediately followed by a direct question about it. Curious, not accusatory — "What happened with '${overdue[0].title}' — did priorities shift, or did it just not get done?" is the right shape. A vague "I'd like to follow up on outstanding items" is NOT acceptable — name it.\n`;
-    prompt += `List every overdue title you named in overdue_items_named — it must exactly match commitments_raised.length === the number of overdue items above.\n`;
-  }
-  if (notYetOverdue.length) {
-    prompt += `\nAlso still open, not yet overdue (mention only if it fits naturally, no need to chase):\n`;
-    notYetOverdue.forEach(c => { prompt += `- "${c.title}" — ${c.days_open} days\n`; });
-  }
-  if (!completedTasks.length && !overdue.length && !notYetOverdue.length) {
-    prompt += `\nThere is nothing notable to report since last time — a short, honest "quiet since we last met" is fine.\n`;
-  }
-  prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question.`;
+  prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question. Never chase, never ask about outstanding or overdue items — that is handled elsewhere now; this is acknowledgment only.`;
 
   const schema = {
     type: 'object',
-    properties: {
-      opening_statement: { type: 'string' },
-      overdue_items_named: { type: 'array', items: { type: 'string' }, description: 'Exact titles of every overdue commitment named in opening_statement — must match the overdue list exactly, empty array if none were overdue.' },
-    },
-    required: ['opening_statement', 'overdue_items_named'],
+    properties: { opening_statement: { type: 'string' } },
+    required: ['opening_statement'],
   };
 
   try {
@@ -199,22 +167,25 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, co
       }),
     });
     const data = await res.json();
-    if (!res.ok || !data.response) return null;
-    // If the model claims it named the overdue items but didn't actually
+    const stated = res.ok ? (data.response?.opening_statement || null) : null;
+
+    // If the model claims it named the completed items but didn't actually
     // include their titles verbatim, don't ship a statement that only
-    // pretends to be specific — better to surface nothing than a vague one.
-    const stated = data.response.opening_statement || null;
-    if (overdue.length && stated) {
-      const namedAll = overdue.every(c => stated.includes(c.title));
+    // pretends to be specific — fall back to a deterministic recap built
+    // directly from the known titles rather than losing the acknowledgment
+    // entirely (unlike the old overdue-chase, which could safely discard to
+    // null since chasing was optional — recap is the retention mechanic).
+    if (completedTasks.length) {
+      const namedAll = !!stated && completedTasks.every(t => stated.includes(t.title));
       if (!namedAll) {
-        console.error('Chair opening dropped: claimed to name overdue items but did not include their exact titles.');
-        return null;
+        console.error('Chair opening fell back to templated recap: model did not name every completed item verbatim.');
+        return templatedCompletedRecap(completedTasks);
       }
     }
     return stated;
   } catch (e) {
-    console.error('Chair opening failed (non-fatal):', e.message);
-    return null;
+    console.error('Chair opening failed, falling back to templated recap if there is work to name:', e.message);
+    return completedTasks.length ? templatedCompletedRecap(completedTasks) : null;
   }
 }
 
@@ -343,7 +314,7 @@ Deno.serve(async (req) => {
       )),
       buildChairOpening({
         supabaseUrl, serviceKey, db, chairAdvisor, company, companyId: company_id, userId: user.id,
-        meetingId: meeting.id, newQuestion: question, previousMeeting, commitments,
+        meetingId: meeting.id, newQuestion: question, previousMeeting,
       }),
     ]);
 

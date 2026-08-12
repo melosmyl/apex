@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import PageHeader from "@/components/PageHeader";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
-import { Shield, Save, Activity, Settings, FlaskConical, Loader2, AlertCircle } from "lucide-react";
+import { Shield, Save, Activity, Settings, FlaskConical, Loader2, AlertCircle, Sparkles } from "lucide-react";
 
 const PROVIDERS = [
   { value: "openai", label: "OpenAI" },
@@ -26,20 +26,23 @@ export default function Admin() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [error, setError] = useState(null);
+  const [cannibalization, setCannibalization] = useState(null);
 
   const load = async () => {
     setError(null);
     try {
       const me = await base44.auth.me();
       if (me.role !== "admin") { setError("Admin access required."); return; }
-      const [advRes, logRes, limRes] = await Promise.all([
+      const [advRes, logRes, limRes, cannRes] = await Promise.all([
         base44.functions.invoke("adminApi", { action: "list_advisors" }),
         base44.functions.invoke("adminApi", { action: "list_usage" }),
         base44.functions.invoke("adminApi", { action: "get_limits" }),
+        base44.functions.invoke("adminApi", { action: "get_cannibalization_metrics" }),
       ]);
       setAdvisors(advRes.data.advisors || []);
       setLogs(logRes.data.logs || []);
       setLimits(limRes.data.limits);
+      setCannibalization(cannRes.data.rows || []);
     } catch (e) {
       setError(e?.response?.data?.error || e.message);
     }
@@ -231,6 +234,29 @@ export default function Admin() {
                 {saving === "limits" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save limits
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* The Assistant — cannibalization check */}
+      {cannibalization?.length > 0 && (
+        <div className="mb-10">
+          <div className="flex items-center gap-2 mb-1"><Sparkles className="w-5 h-5 text-primary" /><h3 className="font-display text-xl">The Assistant — board meetings vs. assistant messages</h3></div>
+          <p className="text-xs text-muted-foreground mb-4">If assistant messages rise while board meetings fall for the same user/week, she's cannibalising the product, not supporting it.</p>
+          <div className="bg-card border border-border/70 rounded-2xl divide-y divide-border/50">
+            {cannibalization.slice(0, 30).map((r, i) => {
+              const cannibalizing = r.assistant_messages > r.board_meetings * 3 && r.board_meetings === 0 && r.assistant_messages > 0;
+              return (
+                <div key={i} className="flex items-center gap-3 px-4 py-2.5 text-xs">
+                  <span className="text-muted-foreground w-24 shrink-0">{new Date(r.week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                  <span className="font-mono text-muted-foreground truncate w-32 shrink-0">{r.user_id.slice(0, 8)}</span>
+                  <span>{r.board_meetings} board meeting{r.board_meetings === 1 ? "" : "s"}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span>{r.assistant_messages} assistant message{r.assistant_messages === 1 ? "" : "s"}</span>
+                  {cannibalizing && <Badge variant="destructive" className="text-[10px] ml-auto">Check this one</Badge>}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
