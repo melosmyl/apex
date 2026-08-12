@@ -4,6 +4,7 @@
 // generate-deliverable backend function.
 
 import ExcelJS from 'npm:exceljs@4.4.0';
+import { PRODUCT_NAME } from './branding.ts';
 
 // Canonical assumption rows on the Assumptions sheet.
 // Formulas in every other sheet reference these cell addresses so that
@@ -689,7 +690,7 @@ function buildSourcesNotes(ws, spec) {
 // ─── Main entry ─────────────────────────────────────────────────
 export async function buildFinancialModelWorkbook(spec) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Apex Advisory';
+  wb.creator = PRODUCT_NAME;
   wb.created = new Date();
   wb.properties = { title: spec.modelTitle || 'Financial Model', company: spec.company?.name || '' };
 

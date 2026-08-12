@@ -7,6 +7,7 @@
 // function's only job is to produce a genuinely personalised plan when it can.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { PRODUCT_NAME } from '../_shared/branding.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -87,7 +88,7 @@ function buildPrompt(answers: Record<string, unknown>) {
     .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`)
     .join('\n');
 
-  return `You are an expert startup coach helping a founder set up their AI executive board on Apex.
+  return `You are an expert startup coach helping a founder set up their AI executive board on ${PRODUCT_NAME}.
 
 Here is what the founder has shared — it may be brief, since onboarding is deliberately short. Work with what's here rather than assuming more detail than was given:
 ${answersText}

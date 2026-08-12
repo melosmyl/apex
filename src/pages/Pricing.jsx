@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Check, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 const TIERS = [
   {
@@ -45,7 +46,7 @@ const TIERS = [
     tagline: "For larger organisations.",
     features: ["Private models", "Security & compliance", "Custom advisors", "Integrations", "Dedicated support"],
     cta: "Contact sales",
-    href: "mailto:melody.m.p.j@icloud.com?subject=Advisory — Enterprise Plan",
+    href: `mailto:melody.m.p.j@icloud.com?subject=${PRODUCT_NAME} — Enterprise Plan`,
     highlight: false,
   },
 ];

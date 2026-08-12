@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -190,6 +191,11 @@ export default function FreeMeeting() {
             {resultReady && <ConversionCapture meetingId={meetingIdForConversion} companyId={company.id} />}
           </div>
         )}
+
+        <div className="flex items-center justify-center gap-4 mt-16 pt-6 border-t border-border/50">
+          <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
+          <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
+        </div>
       </div>
     </div>
   );

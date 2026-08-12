@@ -67,9 +67,15 @@ export default function CompanyLayout() {
           </NavLink>
       )}
       </nav>
-      <div className="px-6 py-4 border-t border-border/60 flex items-center justify-between">
-        <span className="text-xs text-muted-foreground font-display italic">Never build alone.</span>
-        <Link to="/pricing" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
+      <div className="px-6 py-4 border-t border-border/60">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-muted-foreground font-display italic">Never build alone.</span>
+          <Link to="/pricing" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link to="/privacy" className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors">Privacy</Link>
+          <Link to="/terms" className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors">Terms</Link>
+        </div>
       </div>
     </div>;
 
