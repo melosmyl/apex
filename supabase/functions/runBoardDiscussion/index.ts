@@ -12,7 +12,23 @@ const DISCUSSION_PRINCIPLES = `DISCUSSION PRINCIPLES:
 - Challenge every assumption. Ask: "What evidence supports this?" "What would make you completely change your opinion?" "Have we considered the opportunity cost?" "What is the strongest argument against your position?"
 - If someone challenges you, do NOT automatically change your opinion. Defend it, clarify it, strengthen it — or admit you were wrong. Changing your mind is intelligent, not weak.
 - Do NOT be agreeable. If everyone agrees too quickly, the discussion was not deep enough. Healthy disagreement is encouraged.
-- Do NOT generate filler. Every message must add value: introduce evidence, challenge reasoning, clarify assumptions, offer alternatives, identify blind spots, or resolve disagreements.`;
+- Do NOT generate filler. Every message must add value: introduce evidence, challenge reasoning, clarify assumptions, offer alternatives, identify blind spots, or resolve disagreements.
+
+SPECIFICITY — this is a hard requirement:
+- Every recommendation must name something the founder could actually do this week. Who to call. What to write. Which number to look up. Which customer to ask.
+- "Validate demand", "consider your positioning", "think about pricing" are not recommendations. They are categories of recommendation. Name the specific action inside the category.
+- If you genuinely cannot name a concrete next action, say so and explain what information would make one possible. That is a useful contribution. A vague recommendation is not.
+- Prefer the smallest real action over the most impressive-sounding one. "Call the six people who enquired last month and ask what stopped them" beats "conduct customer discovery research."
+
+QUESTION QUALITY:
+- Sometimes the most useful thing a board can do is tell the founder they are asking the wrong question. If the question hides a more important unresolved decision, say so directly and name the better question.
+- Do not do this to avoid answering. Only when the original question genuinely cannot be answered well until something upstream is resolved.
+- If you reframe the question, still address the original as best you can — the founder asked it for a reason.
+
+HONEST UNCERTAINTY:
+- "I don't know, and here is what would tell us" is a legitimate and valuable position. Take it when it is true.
+- Do not manufacture a recommendation to appear useful. If the honest answer is that there is not enough information, say that, name the specific missing information, and say how the founder could get it.
+- A low confidence score is not a substitute for saying this plainly. If you would not act on your own recommendation, say so.`;
 
 function formatTranscript(transcript, currentAdvisorId) {
   const byRound = {};
@@ -55,7 +71,7 @@ function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRou
     context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. If you are now in agreement with another advisor, say so explicitly.\n`;
   } else {
     context += `YOUR TASK: Contribute to the discussion. You may:\n`;
-    context += `- Question another advisor's reasoning or ask for evidence\n- Challenge an assumption or identify a weakness\n- Defend your position against criticism\n- Change your opinion if persuaded (explain why)\n- Support another advisor's argument\n- Identify a risk nobody has mentioned\n- Introduce new information or evidence\n\n`;
+    context += `- Question another advisor's reasoning or ask for evidence\n- Challenge an assumption or identify a weakness\n- Defend your position against criticism\n- Change your opinion if persuaded (explain why)\n- Support another advisor's argument\n- Identify a risk nobody has mentioned\n- Introduce new information or evidence\n- Say the question itself is wrong, and name the question that should be asked instead\n\n`;
     context += `Be direct, specific, and substantive. If replying to a specific advisor, name them. Do not repeat what others have already said. Every message must add value.\n`;
   }
   return context;
@@ -128,6 +144,7 @@ Deno.serve(async (req) => {
         new_position: { type: 'string', description: 'If you changed your opinion, state your new position. Leave empty if unchanged.' },
         new_risks: { type: 'array', items: { type: 'string' }, description: 'Any new risks or blind spots you have identified that have not been mentioned yet' },
         confidence_score: { type: 'number', description: 'Your current confidence in your recommendation, 0-100' },
+        answerable: { type: 'boolean', description: 'false if the question genuinely cannot be answered well without missing information — see HONEST UNCERTAINTY. true otherwise (the default).' },
       },
       required: ['message', 'message_type', 'confidence_score'],
     };
@@ -155,6 +172,7 @@ Deno.serve(async (req) => {
           reply_to_advisor: resp.reply_to_advisor || null, changed_opinion: resp.changed_opinion || false,
           new_position: resp.new_position || null, new_risks: resp.new_risks || [],
           confidence_score: resp.confidence_score || 0,
+          answerable: resp.answerable !== false,
           provider_used: r.data.provider_used, model_used: r.data.model_used,
         };
       }).filter(Boolean);

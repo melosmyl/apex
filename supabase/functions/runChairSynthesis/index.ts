@@ -19,7 +19,13 @@ You are evaluating a multi-round executive board discussion. Before producing th
 Only after evaluating the discussion should you create the final recommendation.
 Do not simply average opinions. Weigh the quality of arguments. Give more weight to arguments that survived scrutiny and less to those that were successfully challenged.
 
-Do not introduce unsupported opinions. Accurately synthesise the advisors' arguments, identify areas of agreement and disagreement, weigh evidence, preserve minority opinions and create a clear recommendation. The founder always retains final authority.`;
+Do not introduce unsupported opinions. Accurately synthesise the advisors' arguments, identify areas of agreement and disagreement, weigh evidence, preserve minority opinions and create a clear recommendation. The founder always retains final authority.
+
+SPECIFICITY — this is a hard requirement:
+- Every recommendation must name something the founder could actually do this week. Who to call. What to write. Which number to look up. Which customer to ask.
+- "Validate demand", "consider your positioning", "think about pricing" are not recommendations. They are categories of recommendation. Name the specific action inside the category.
+- If you genuinely cannot name a concrete next action, say so and explain what information would make one possible. That is a useful contribution. A vague recommendation is not.
+- Prefer the smallest real action over the most impressive-sounding one. "Call the six people who enquired last month and ask what stopped them" beats "conduct customer discovery research."`;
 
 function formatTranscriptForChair(transcript) {
   const byRound = {};
