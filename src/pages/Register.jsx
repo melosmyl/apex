@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
+import { Mail, Lock, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -77,7 +77,6 @@ export default function Register() {
   if (showOtp) {
     return (
       <AuthLayout
-        icon={Mail}
         title="Verify your email"
         subtitle={`We sent a code to ${email}`}
       >
@@ -105,7 +104,8 @@ export default function Register() {
           </InputOTP>
         </div>
         <Button
-          className="w-full h-12 font-medium"
+          variant="brand"
+          className="w-full h-12 rounded-full font-medium"
           onClick={handleVerify}
           disabled={loading || otpCode.length < 6}
         >
@@ -130,9 +130,7 @@ export default function Register() {
 
   return (
     <AuthLayout
-      icon={UserPlus}
-      title="Create your account"
-      subtitle="Sign up to get started"
+      title="Your first real disagreement."
       footer={
         <>
           Already have an account?{" "}
@@ -144,7 +142,7 @@ export default function Register() {
     >
       <Button
         variant="outline"
-        className="w-full h-12 text-sm font-medium mb-6"
+        className="w-full h-12 rounded-full text-sm font-medium mb-6"
         onClick={handleGoogle}
       >
         <GoogleIcon className="w-5 h-5 mr-2" />
@@ -216,7 +214,7 @@ export default function Register() {
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+        <Button type="submit" variant="brand" className="w-full h-12 rounded-full font-medium" disabled={loading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

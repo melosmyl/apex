@@ -20,6 +20,7 @@ import Admin from '@/pages/Admin';
 import SharedDocumentView from '@/pages/share/SharedDocumentView';
 import SharedMeetingView from '@/pages/share/SharedMeetingView';
 import FreeMeeting from '@/pages/FreeMeeting';
+import Landing from '@/pages/Landing';
 
 import Companies from '@/pages/Companies';
 import CompanyLayout from '@/components/CompanyLayout';
@@ -70,8 +71,10 @@ const AuthenticatedApp = () => {
       <Route path="/share/document/:token" element={<SharedDocumentView />} />
       <Route path="/share/meeting/:token" element={<SharedMeetingView />} />
       <Route path="/board" element={<FreeMeeting />} />
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+      <Route element={<ProtectedRoute unauthenticatedElement={<Landing />} />}>
         <Route path="/" element={<Companies />} />
+      </Route>
+      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/admin" element={<Admin />} />
         <Route path="/company/:companyId" element={<CompanyLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />

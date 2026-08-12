@@ -27,7 +27,6 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout
-      icon={Mail}
       title="Reset password"
       subtitle="We'll send you a link to reset it"
       footer={
@@ -59,7 +58,7 @@ export default function ForgotPassword() {
               />
             </div>
           </div>
-          <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+          <Button type="submit" variant="brand" className="w-full h-12 rounded-full font-medium" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

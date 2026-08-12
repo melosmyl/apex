@@ -79,7 +79,8 @@ module.exports = {
   			heading: ['var(--font-heading)'],
   			body: ['var(--font-body)'],
   			display: ['var(--font-display)'],
-  			mono: ['var(--font-mono)']
+  			mono: ['var(--font-mono)'],
+  			landing: ['var(--font-landing)']
   		},
   		letterSpacing: {
   			'tightest': '-0.03em',

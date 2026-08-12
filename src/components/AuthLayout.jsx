@@ -1,21 +1,23 @@
 import React from "react";
+import { Link } from "react-router-dom";
+import { PRODUCT_NAME } from "@/lib/branding";
 
-export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
+export default function AuthLayout({ title, subtitle, footer, children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary mb-4">
-            <Icon className="w-7 h-7 text-primary-foreground" aria-hidden="true" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-          {subtitle && <p className="text-muted-foreground mt-2">{subtitle}</p>}
+    <div className="min-h-screen flex items-center justify-center bg-background px-5 sm:px-8 py-16">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-10 sm:mb-12">
+          <Link to="/" className="font-mono text-[11px] tracking-[0.25em] uppercase text-muted-foreground hover:text-foreground transition-colors">
+            {PRODUCT_NAME}
+          </Link>
+          <h1 className="font-landing text-3xl sm:text-4xl leading-tight mt-5 text-balance">{title}</h1>
+          {subtitle && <p className="text-muted-foreground mt-3 text-[15px] text-balance">{subtitle}</p>}
         </div>
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
+        <div className="bg-card rounded-2xl border border-border/70 shadow-card p-7 sm:p-8">
           {children}
         </div>
         {footer && (
-          <p className="text-center text-sm text-muted-foreground mt-6">{footer}</p>
+          <p className="text-center text-sm text-muted-foreground mt-8">{footer}</p>
         )}
       </div>
     </div>
