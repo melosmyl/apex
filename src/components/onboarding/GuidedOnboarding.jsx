@@ -20,7 +20,18 @@ export const QUESTIONS = [
     { value: "market_expansion", label: "Market expansion" },
     { value: "turnaround", label: "Turnaround" }
   ], required: true },
-  { id: "current_challenges", type: "textarea", question: "What's keeping you up at night?", placeholder: "The thing you most need help with right now.", hint: "Your board will ask for more detail as it gets to know you.", required: true }
+  { id: "current_challenges", type: "textarea", question: "What's keeping you up at night?", placeholder: "The thing you most need help with right now.", hint: "Your board will ask for more detail as it gets to know you.", required: true },
+  { id: "country", type: "choice", question: "Which country are you registering in?", options: [
+    { value: "United Kingdom", label: "United Kingdom" },
+    { value: "Ireland", label: "Ireland" },
+    { value: "United States", label: "United States" },
+    { value: "Canada", label: "Canada" },
+    { value: "Australia", label: "Australia" },
+    { value: "Sweden", label: "Sweden" },
+    { value: "Germany", label: "Germany" },
+    { value: "France", label: "France" },
+    { value: "Other", label: "Somewhere else" }
+  ], hint: "This changes what your board can actually show you — official steps differ by country.", required: true }
 ];
 
 const PHASE_MESSAGES = [
@@ -125,7 +136,7 @@ export default function GuidedOnboarding({ open, onClose }) {
                 Let's build your board.
               </h1>
               <p className="text-muted-foreground text-base sm:text-lg leading-relaxed max-w-md mx-auto mb-8">
-                Four quick questions. We'll assemble the right advisors and map your first steps — the rest, your board will ask you directly.
+                Five quick questions. We'll assemble the right advisors and map your first steps — the rest, your board will ask you directly.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button onClick={beginQuestions} variant="brand" className="rounded-full px-8 h-12 text-[0.95rem]">

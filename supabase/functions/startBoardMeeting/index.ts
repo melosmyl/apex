@@ -23,9 +23,27 @@ const PROFILE_GAPS = [
   { key: 'immediate_goal', label: 'their most immediate goal' },
   { key: 'confidence_gaps', label: 'where they lack confidence' },
   { key: 'deadlines', label: 'any important deadlines' },
+  { key: 'country', label: 'which country they\'re registering the business in' },
 ];
 
-function buildContext(company, documents, decisions, meetings, projects, commitments, maxSize) {
+// The founder's Progression Tree, summarised for the board — completed
+// items plus the next few not-yet ones, by order_index. Reuses the same
+// "mention if relevant, don't force it in" instruction pattern as the
+// commitments block above, since most questions won't touch it.
+async function loadProgressionSummary(db, companyId) {
+  const { data: tree } = await db.from('progression_trees').select('id').eq('company_id', companyId).maybeSingle();
+  if (!tree) return null;
+  const { data: nodes } = await db.from('progression_nodes').select('id, label').eq('tree_id', tree.id).order('order_index');
+  if (!nodes?.length) return null;
+  const { data: completions } = await db.from('progression_node_completions').select('node_id').eq('company_id', companyId);
+  const doneIds = new Set((completions || []).map(c => c.node_id));
+  return {
+    completed: nodes.filter(n => doneIds.has(n.id)).map(n => n.label),
+    next: nodes.filter(n => !doneIds.has(n.id)).slice(0, 3).map(n => n.label),
+  };
+}
+
+function buildContext(company, documents, decisions, meetings, projects, commitments, progression, maxSize) {
   let ctx = `Company: ${company.name || 'N/A'}\nIndustry: ${company.industry || 'N/A'}\n`;
   ctx += `Description: ${company.description || company.tagline || 'N/A'}\n`;
   if (company.tagline) ctx += `Tagline: ${company.tagline}\n`;
@@ -36,6 +54,12 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
     ctx += `\nNot yet on file about this company (onboarding is short by design — the board fills these in over time):\n`;
     gaps.forEach(g => { ctx += `- ${g.label} [profile_field: "${g.key}"]\n`; });
     ctx += `If knowing one of these would materially change your answer, ask the founder directly in your response and report it in missing_information with the exact profile_field key. Don't force one in if it isn't actually relevant to this question — most won't be.\n`;
+  }
+  if (progression?.completed?.length || progression?.next?.length) {
+    ctx += `\nProgress on the founder's path (their Progression Tree):\n`;
+    if (progression.completed.length) ctx += `Already unlocked: ${progression.completed.join(', ')}\n`;
+    if (progression.next.length) ctx += `Next up: ${progression.next.join(', ')}\n`;
+    ctx += `Reference it explicitly if directly relevant to this question — e.g. this question depends on something not yet unlocked, or the answer should build on something they just achieved. Don't force it in if it isn't relevant — most questions won't touch it.\n`;
   }
   if (decisions?.length) {
     ctx += `\nPast decisions related to this question (most relevant first):\n`;
@@ -230,13 +254,14 @@ Deno.serve(async (req) => {
     const { data: company } = await db.from('companies').select('*').eq('id', company_id).single();
     if (!company) return Response.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
 
-    const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments] = await Promise.all([
+    const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
       db.from('documents').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(20),
       db.from('board_meetings').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(5),
       db.from('projects').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(10),
       db.from('advisors').select('*').eq('company_id', company_id).limit(100),
       recallRelatedDecisions(db, company_id, question),
       loadOpenCommitments(db, company_id),
+      loadProgressionSummary(db, company_id),
     ]);
     const decisions = recalled.decisions;
 
@@ -244,7 +269,7 @@ Deno.serve(async (req) => {
     if (selectedAdvisors.length < minAdv)
       return Response.json({ error: 'Not enough AI advisors selected' }, { status: 400, headers: corsHeaders });
 
-    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, limits.max_context_size || 8000);
+    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
 
     // What the board is drawing on, recorded so the founder can see it later.
     const memoryContext = {

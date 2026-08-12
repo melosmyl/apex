@@ -8,26 +8,24 @@ import {
 } from "lucide-react";
 import { computeTimeSaved } from "@/lib/momentum";
 import OpenCommitmentsWidget from "@/components/dashboard/OpenCommitmentsWidget";
-import MilestoneTracker from "@/components/dashboard/MilestoneTracker";
-import BuildStateWidget from "@/components/dashboard/BuildStateWidget";
 import TimeSavedWidget from "@/components/dashboard/TimeSavedWidget";
+import ProgressionTree from "@/components/dashboard/ProgressionTree";
 
 export default function Dashboard() {
-  const { company, setCompany } = useOutletContext();
+  const { company } = useOutletContext();
   const { companyId } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const [decisions, tasks, docs, meetings, advisors] = await Promise.all([
+      const [decisions, tasks, docs, meetings] = await Promise.all([
         base44.entities.Decision.filter({ company_id: companyId }, "-created_date", 5),
         base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200),
         base44.entities.Document.filter({ company_id: companyId }, "-created_date", 200),
         base44.entities.BoardMeeting.filter({ company_id: companyId }, "-created_date", 200),
-        base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100),
       ]);
-      setData({ decisions, tasks, docs, meetings, advisors });
+      setData({ decisions, tasks, docs, meetings });
     })();
   }, [companyId]);
 
@@ -36,7 +34,6 @@ export default function Dashboard() {
   const allDecisions = data?.decisions || [];
   const allTasks = data?.tasks || [];
   const allDocs = data?.docs || [];
-  const allAdvisors = data?.advisors || [];
   const timeSavedMin = computeTimeSaved(allMeetings, allDecisions, allTasks, allDocs);
 
   const go = (p) => navigate(`/company/${companyId}/${p}`);
@@ -175,11 +172,10 @@ export default function Dashboard() {
 
       <OpenCommitmentsWidget tasks={allTasks} meetings={allMeetings} companyId={companyId} />
 
-      {/* Where you're going (self-reported) vs what's actually happened (computed) */}
-      <div className="grid lg:grid-cols-2 gap-5">
-        <MilestoneTracker company={company} companyId={companyId} onUpdate={setCompany} />
-        <BuildStateWidget advisors={allAdvisors} meetings={allMeetings} decisions={allDecisions} docs={allDocs} tasks={allTasks} />
-      </div>
+      {/* The Progression Tree — replaces MilestoneTracker (self-reported)
+          and BuildStateWidget (computed, but only 5 fixed facts) as of the
+          Phase G cutover: one system, derived-or-conversational, not three. */}
+      <ProgressionTree companyId={companyId} country={company?.country} />
 
       {/* Quick access row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

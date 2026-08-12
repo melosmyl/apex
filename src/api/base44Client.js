@@ -24,6 +24,9 @@ const TABLES = {
   SystemLimits: 'system_limits',
   Note: 'notes',
   AssistantEvent: 'assistant_events',
+  ProgressionTree: 'progression_trees',
+  ProgressionNode: 'progression_nodes',
+  ProgressionNodeCompletion: 'progression_node_completions',
 };
 
 function parseSort(sort) {

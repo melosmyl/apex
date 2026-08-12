@@ -73,6 +73,7 @@ export async function createCompanyFromOnboarding(answers, plan) {
     tagline: plan.executive_briefing ? plan.executive_briefing.split(".")[0] + "." : "",
     business_model: answers.business_model,
     stage: answers.stage,
+    country: answers.country,
     recommended_journey: plan.recommended_journey || answers.stage,
     solo_founder: answers.solo_founder,
     team_size: answers.team_size,
@@ -130,6 +131,10 @@ export async function createCompanyFromOnboarding(answers, plan) {
   if (tasks.length) {
     await base44.entities.Task.bulkCreate(tasks);
   }
+
+  // Fire-and-forget, same pattern as embedNoteInBackground — never blocks
+  // the founder reaching their dashboard.
+  base44.functions.invoke("generateProgressionTree", { company_id: company.id }).catch(() => {});
 
   return { company, advisors: createdAdvisors };
 }

@@ -50,7 +50,7 @@ export async function containsAdvice(supabaseUrl, serviceKey, { text, user_id, c
 // direct response to what the founder just typed, exempt by design). Checked
 // server-side, before any LLM call, so a budget that's already spent for
 // the day never costs anything to re-discover.
-const INTERJECTION_EVENT_TYPES = ['interjection_shown', 'accountability_chase_shown', 'welcome_back_shown'];
+const INTERJECTION_EVENT_TYPES = ['interjection_shown', 'accountability_chase_shown', 'welcome_back_shown', 'tree_unlock_shown'];
 
 export async function interjectionBudgetSpent(db, userId) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

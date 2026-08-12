@@ -19,7 +19,7 @@ const POLL_INTERVAL_MS = 1500;
 // as a sibling of <Outlet/>, not nested inside the /company/:companyId
 // route, so useParams() here would never see companyId — useMatch reads
 // the current URL directly regardless of tree position.
-export default function AssistantWidget({ meetingRunning, interjection, dismissInterjection }) {
+export default function AssistantWidget({ meetingRunning, interjection, dismissInterjection, pendingNodeAnswer, clearPendingNodeAnswer, onNodeAnswered }) {
   const match = useMatch("/company/:companyId/*");
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -43,6 +43,13 @@ export default function AssistantWidget({ meetingRunning, interjection, dismissI
   useEffect(() => {
     if (interjection) setOpen(true);
   }, [interjection]);
+
+  // Same auto-open rule as interjection above — the founder just clicked
+  // "I've done this" on a tree node, so opening is a direct response to
+  // their own action, not a proactive interruption.
+  useEffect(() => {
+    if (pendingNodeAnswer) setOpen(true);
+  }, [pendingNodeAnswer]);
 
   const stopPolling = () => { clearTimeout(pollRef.current); pollRef.current = null; };
 
@@ -86,7 +93,7 @@ export default function AssistantWidget({ meetingRunning, interjection, dismissI
 
   const dismissRouting = () => setRoutingNote(null);
 
-  const close = () => { setOpen(false); stopPolling(); setRoutingNote(null); };
+  const close = () => { setOpen(false); stopPolling(); setRoutingNote(null); clearPendingNodeAnswer?.(); };
 
   if (!match || meetingRunning) return null;
   const companyId = match.params.companyId;
@@ -101,11 +108,14 @@ export default function AssistantWidget({ meetingRunning, interjection, dismissI
               <X className="w-4 h-4" />
             </button>
           </div>
-          <CaptureInput companyId={companyId} onCaptured={onCaptured} />
+          {pendingNodeAnswer && (
+            <p className="text-sm text-muted-foreground mb-2">Have you done this — {pendingNodeAnswer.label.toLowerCase()}? Tell me what happened.</p>
+          )}
+          <CaptureInput companyId={companyId} onCaptured={onCaptured} pendingNodeAnswer={pendingNodeAnswer} onNodeAnswered={onNodeAnswered} />
           {routingNote && (
             <RoutingPrompt promptText={routingNote.board_prompt_text} onAccept={acceptRouting} onDismiss={dismissRouting} />
           )}
-          {!routingNote && interjection && (
+          {!routingNote && !pendingNodeAnswer && interjection && (
             <InterjectionBanner text={interjection.text} onDismiss={dismissInterjection} />
           )}
         </div>

@@ -62,6 +62,31 @@ Deno.serve(async (req) => {
       return Response.json({ type: 'chase', text: chase.chase_text }, { headers: corsHeaders });
     }
 
+    // Tree unlock (Phase E) — "you're one step from X." Scoped to
+    // count-threshold facts only, board_assembled at 2-of-3 advisors is the
+    // only one so far: "one step away" has no natural meaning for a boolean
+    // fact or an assistant_asked node. Shown once ever per node (not
+    // per-day) — repeating "one more advisor" daily once they've seen it
+    // would read as nagging, not motivating.
+    const { data: boardNode } = await db.from('progression_nodes')
+      .select('id').eq('company_id', company_id).eq('spine_key', 'board_assembled').maybeSingle();
+
+    if (boardNode) {
+      const { data: alreadyShown } = await db.from('assistant_events')
+        .select('id').eq('progression_node_id', boardNode.id).eq('event_type', 'tree_unlock_shown').limit(1);
+      const { data: alreadyDone } = await db.from('progression_node_completions').select('id').eq('node_id', boardNode.id).maybeSingle();
+
+      if (!alreadyShown?.length && !alreadyDone) {
+        const { data: advisors } = await db.from('advisors').select('id, type').eq('company_id', company_id);
+        const aiCount = (advisors || []).filter((a) => a.type !== 'human').length;
+
+        if (aiCount === 2) {
+          await db.from('assistant_events').insert({ user_id: user.id, company_id, event_type: 'tree_unlock_shown', progression_node_id: boardNode.id });
+          return Response.json({ type: 'tree_unlock', text: "You're one advisor away from a full board that can actually debate with you." }, { headers: corsHeaders });
+        }
+      }
+    }
+
     return Response.json({ type: null }, { headers: corsHeaders });
   } catch (error) {
     console.error('getSessionInterjection error:', error);

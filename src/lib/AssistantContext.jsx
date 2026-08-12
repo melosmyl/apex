@@ -8,7 +8,7 @@ const AssistantContext = createContext(null);
 // Safe no-op outside AssistantProvider, same reasoning as usePin()'s
 // NOOP_PIN_CONTEXT — anything that calls this before the provider mounts
 // (or in a tree that never mounts it) shouldn't crash on destructure.
-const NOOP_ASSISTANT_CONTEXT = { meetingRunning: false, setMeetingRunning: () => {}, checkNoteRelevance: async () => {}, checkSession: async () => {} };
+const NOOP_ASSISTANT_CONTEXT = { meetingRunning: false, setMeetingRunning: () => {}, checkNoteRelevance: async () => {}, checkSession: async () => {}, askAboutNode: () => {}, nodeAnswerCount: 0 };
 
 export function useAssistant() {
   return useContext(AssistantContext) || NOOP_ASSISTANT_CONTEXT;
@@ -22,6 +22,8 @@ export function useAssistant() {
 export function AssistantProvider({ children }) {
   const [meetingRunning, setMeetingRunning] = useState(false);
   const [interjection, setInterjection] = useState(null);
+  const [pendingNodeAnswer, setPendingNodeAnswer] = useState(null);
+  const [nodeAnswerCount, setNodeAnswerCount] = useState(0);
   const sessionCheckedFor = useRef(null);
 
   // Called only from BoardDebate's idle-phase question textarea, debounced
@@ -51,10 +53,26 @@ export function AssistantProvider({ children }) {
 
   const dismissInterjection = useCallback(() => setInterjection(null), []);
 
+  // The "I've done this" hand-off for assistant_asked progression nodes
+  // (Phase E) — opens the widget pre-seeded with the node's question rather
+  // than collecting the answer as a disguised checkbox.
+  const askAboutNode = useCallback((node) => setPendingNodeAnswer(node), []);
+  const clearPendingNodeAnswer = useCallback(() => setPendingNodeAnswer(null), []);
+  // Bumped after a successful answer so ProgressionTree (which has no other
+  // way to know a background answer just landed) knows to refetch completions.
+  const onNodeAnswered = useCallback(() => { setPendingNodeAnswer(null); setNodeAnswerCount((c) => c + 1); }, []);
+
   return (
-    <AssistantContext.Provider value={{ meetingRunning, setMeetingRunning, interjection, checkNoteRelevance, checkSession, dismissInterjection }}>
+    <AssistantContext.Provider value={{ meetingRunning, setMeetingRunning, interjection, checkNoteRelevance, checkSession, dismissInterjection, askAboutNode, nodeAnswerCount }}>
       {children}
-      <AssistantWidget meetingRunning={meetingRunning} interjection={interjection} dismissInterjection={dismissInterjection} />
+      <AssistantWidget
+        meetingRunning={meetingRunning}
+        interjection={interjection}
+        dismissInterjection={dismissInterjection}
+        pendingNodeAnswer={pendingNodeAnswer}
+        clearPendingNodeAnswer={clearPendingNodeAnswer}
+        onNodeAnswered={onNodeAnswered}
+      />
     </AssistantContext.Provider>
   );
 }

@@ -60,6 +60,18 @@ export async function loadGapRecoveryState(companyId) {
   return { isAway: streak.daysSinceLastActivity !== null && streak.daysSinceLastActivity >= AWAY_AFTER_DAYS, streak };
 }
 
+// The "I've done this" hand-off for assistant_asked progression nodes —
+// deliberately a dedicated edge function rather than AdvisorResponseCard's
+// dynamic profile_field write path, since that path has no server-side
+// allowlist. The server runs its own affirm/deny check before recording
+// anything, so a reply like "not yet" never completes the node.
+export async function recordProgressionAnswer(companyId, nodeId, answerText) {
+  const { data } = await base44.functions.invoke("recordProgressionAnswer", {
+    company_id: companyId, node_id: nodeId, answer_text: answerText,
+  });
+  return data;
+}
+
 // Checked once per company page landed on (see AssistantContext) — priority
 // welcome-back > accountability chase > note resurfacing is enforced
 // server-side (getSessionInterjection decides which one, if any, given the
