@@ -222,9 +222,13 @@
     --metal-top: hsl(40 18% 97%);
     --metal-mid: hsl(40 11% 87%);
     --metal-bottom: hsl(40 9% 53%);
-    --metal-border: hsl(40 14% 30%);
+    /* Firm enough to define the button's own edges against a plain cream
+       background with no backing stage behind it — the original 1px at
+       L30 read as a hairline once the hero's dark stage (that used to do
+       the real contrast work) was removed. */
+    --metal-border: hsl(40 14% 20%);
     background-image: linear-gradient(180deg, var(--metal-top) 0%, var(--metal-mid) 32%, var(--metal-bottom) 100%);
-    border: 1px solid var(--metal-border);
+    border: 2px solid var(--metal-border);
     color: hsl(220 8% 10%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.95),

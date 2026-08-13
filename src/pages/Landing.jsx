@@ -4,9 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PRODUCT_NAME } from "@/lib/branding";
 import LandingTranscript from "@/components/landing/LandingTranscript";
-import roomImage from "@/assets/landing/room.jpg";
+import officeImage from "@/assets/landing/office.jpg";
 import floorPapersImage from "@/assets/landing/floor-papers.jpg";
-import boardroomImage from "@/assets/landing/boardroom.jpg";
 import tornPageImage from "@/assets/landing/torn-page-dark.jpg";
 
 // Swap in the real board meeting's share token here — see /share/meeting/:token.
@@ -80,24 +79,22 @@ export default function Landing() {
             <br className="hidden sm:block" />
             Not one confident answer. Five people who disagree.
           </p>
-          {/* A dark stage behind the button, not a bare border on cream —
-              confirmed side by side against the plain-bordered version,
-              this reads as genuinely lit rather than merely outlined.
-              Deliberately the same dark ground as the closing section
-              (DARK_SECTION) so the page anchors dark at both ends instead
-              of introducing a third, one-off dark patch. */}
-          <div className="inline-block bg-[hsl(220_8%_7%)] rounded-2xl p-3.5">
-            <Button asChild variant="primary" size="lg" className="px-8 h-12 text-base">
-              <Link to="/board">Sit in on one <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
-            </Button>
-          </div>
+          {/* No dark stage behind the button — the metal border itself
+              (see .btn-metal in index.css) is firm enough to define the
+              button's edges against cream on its own. */}
+          <Button asChild variant="primary" size="lg" className="px-8 h-12 text-base">
+            <Link to="/board">Sit in on one <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
+          </Button>
         </div>
       </Section>
 
-      {/* 2. The room — full-bleed photograph, atmosphere before argument */}
+      {/* 2. The room — full-bleed photograph, atmosphere before argument.
+          Desaturated hard in the file itself (near-greyscale, lamps keep a
+          little warmth) rather than via a CSS filter, since a flat
+          `grayscale` class would kill the lamp glow along with the rest. */}
       <div className="w-full">
         <img
-          src={roomImage}
+          src={officeImage}
           alt=""
           role="presentation"
           loading="lazy"
@@ -183,29 +180,7 @@ export default function Landing() {
         </div>
       </Section>
 
-      {/* 7. The cost — dark. The unaffordable version: an empty, expensive
-          boardroom, illustrating the price line only. Never implies these
-          chairs are our advisors — no labels, no faces. Desaturated hard;
-          cropped from the top to leave out most of the glossy render-floor
-          that gives away it's a render. */}
-      <Section dark className="pt-16 sm:pt-20 pb-10 sm:pb-14">
-        <div className="max-w-4xl mx-auto">
-          <div className="h-[30vh] sm:h-[44vh] overflow-hidden rounded-sm">
-            <img
-              src={boardroomImage}
-              alt=""
-              role="presentation"
-              loading="lazy"
-              className="w-full h-full object-cover object-top grayscale-[80%]"
-            />
-          </div>
-          <p className="font-display text-2xl sm:text-3xl italic text-center mt-8 sm:mt-10 opacity-90 text-balance">
-            Real boards cost £50,000 a year.
-          </p>
-        </div>
-      </Section>
-
-      {/* 8. Close — dark, the page's true dark anchor. The paper is an
+      {/* 7. Close — dark, the page's true dark anchor. The paper is an
           object on the ground, not a background — cropped tight so it
           fills the frame, not stretched full-bleed (which would lose the
           torn edge and cast shadow the whole effect depends on). */}
