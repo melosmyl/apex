@@ -48,7 +48,13 @@ export default function CompanyLayout() {
           <ChevronLeft className="w-4 h-4" /> My Companies
         </button>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl text-primary-foreground flex items-center justify-center font-display text-lg overflow-hidden bg-[#247420]">
+          {/* Same inverted-tile treatment as CompanyCard.jsx, swapped for
+              this dark surface: white fill, near-black text. No more
+              hardcoded green. */}
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center font-display text-lg overflow-hidden"
+            style={{ background: "hsl(40 20% 97%)", color: "hsl(220 8% 10%)" }}
+          >
             {company?.logo_url ? <img src={company.logo_url} alt="" className="w-full h-full object-cover" /> : company?.name?.[0] || "•"}
           </div>
           <div className="min-w-0">

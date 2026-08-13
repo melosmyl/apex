@@ -1,26 +1,29 @@
 import React from "react";
-import { ADVISOR_LIBRARY, initialsOf } from "@/lib/advisorLibrary";
-import LineArtPortrait from "@/components/LineArtPortrait";
+import { initialsOf } from "@/lib/advisorLibrary";
 
 const SIZES = { xs: "w-6 h-6 text-[10px]", sm: "w-9 h-9 text-xs", md: "w-12 h-12 text-sm", lg: "w-16 h-16 text-lg", xl: "w-24 h-24 text-2xl" };
 
-export default function AdvisorAvatar({ name, accent = "#7a5c3e", photo_url, size = "md", className = "" }) {
-  const libraryAdvisor = ADVISOR_LIBRARY.find((a) => a.name === name);
-  const ringShadow = libraryAdvisor
-    ? `0 0 0 2px #4a90d9, 0 1px 3px rgba(0,0,0,0.08)`
-    : photo_url
-      ? `0 0 0 1px rgba(0,0,0,0.06)`
-      : `0 1px 2px rgba(0,0,0,0.08)`;
-  const bg = libraryAdvisor ? "#fff" : photo_url ? undefined : `linear-gradient(145deg, ${accent}, ${accent}cc)`;
+// No illustrated faces, no per-advisor accent colour — a small, sharp-
+// cornered, near-black tile with mono initials, same shape language as the
+// button/company-tile system. `empty` renders an unfilled seat (a dashed
+// outline, no initials) rather than a missing face.
+export default function AdvisorAvatar({ name, photo_url, size = "md", empty = false, className = "" }) {
+  if (empty) {
+    return (
+      <div
+        className={`${SIZES[size]} ${className} rounded-lg border border-dashed border-border shrink-0`}
+        aria-hidden="true"
+      />
+    );
+  }
+
   return (
     <div
-      className={`${SIZES[size]} ${className} rounded-full flex items-center justify-center font-display font-medium text-white shrink-0 overflow-hidden`}
-      style={{ background: bg, boxShadow: ringShadow }}
+      className={`${SIZES[size]} ${className} rounded-lg flex items-center justify-center font-mono font-medium shrink-0 overflow-hidden`}
+      style={{ background: "hsl(220 8% 10%)", color: "hsl(40 20% 97%)" }}
       title={name}
     >
-      {libraryAdvisor ? (
-        <LineArtPortrait variant={libraryAdvisor.key} />
-      ) : photo_url ? (
+      {photo_url ? (
         <img src={photo_url} alt={name} className="w-full h-full object-cover" />
       ) : (
         initialsOf(name)

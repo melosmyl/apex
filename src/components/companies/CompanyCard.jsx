@@ -10,23 +10,13 @@ import AdvisorAvatar from "@/components/AdvisorAvatar";
 // showing a score.
 const HEALTH_GATE_MEETINGS = 3;
 
-const AVATAR_GRADIENTS = [
-  "linear-gradient(135deg, hsl(40 65% 55%), hsl(28 60% 48%))",
-  "linear-gradient(135deg, hsl(150 40% 42%), hsl(160 38% 32%))",
-  "linear-gradient(135deg, hsl(200 55% 50%), hsl(215 50% 42%))",
-  "linear-gradient(135deg, hsl(340 55% 52%), hsl(350 50% 45%))",
-  "linear-gradient(135deg, hsl(280 45% 50%), hsl(270 40% 42%))",
-  "linear-gradient(135deg, hsl(60 55% 50%), hsl(48 60% 45%))",
-];
+// Matches the hard cap enforced in ExecutiveTeam.jsx — the row always
+// shows this many seats, filled or not, rather than a variable-length
+// list with a "+N more" overflow that can never actually trigger.
+const MAX_ADVISOR_SEATS = 6;
 
 function healthScore(stats) {
   return Math.min(100, Math.round(40 + (stats.advisors || 0) * 8 + (stats.meetings || 0) * 6 + (stats.decisions || 0) * 6));
-}
-
-function hashString(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
-  return Math.abs(h);
 }
 
 function HealthRing({ score }) {
@@ -61,26 +51,24 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
   const score = healthScore(stats);
   const completedMeetings = stats.completedMeetings || 0;
   const healthEarned = completedMeetings >= HEALTH_GATE_MEETINGS;
-  const team = advisors.slice(0, 5);
-  const extra = Math.max(0, advisors.length - 5);
+  const seats = Array.from({ length: MAX_ADVISOR_SEATS }, (_, i) => advisors[i] || null);
   const initials = company.name?.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "•";
-  const gradient = AVATAR_GRADIENTS[hashString(company.id || company.name) % AVATAR_GRADIENTS.length];
 
   return (
     <button
       onClick={() => navigate(`/company/${company.id}`)}
       className="group w-full text-left bg-card border border-border/60 rounded-3xl p-6 sm:p-7 hover:shadow-elevated hover:border-border hover:-translate-y-1 transition-all duration-300 ease-out relative overflow-hidden"
     >
-      {/* Top accent bar — appears on hover */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-brand opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
       <div className="flex items-start justify-between gap-4 mb-5">
         <div className="flex items-center gap-4 min-w-0">
+          {/* Inverts with the surface rather than carrying its own colour —
+              near-black on this card's light surface; the sidebar version
+              (CompanyLayout.jsx) is the same pair swapped, white on dark. */}
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-soft group-hover:scale-105 transition-transform duration-300"
-            style={{ background: gradient }}
+            className="w-14 h-14 rounded-lg flex items-center justify-center shrink-0 shadow-soft group-hover:scale-105 transition-transform duration-300"
+            style={{ background: "hsl(220 8% 10%)", color: "hsl(40 20% 97%)" }}
           >
-            <span className="font-display text-lg font-medium text-white">{initials}</span>
+            <span className="font-display text-lg font-medium">{initials}</span>
           </div>
           <div className="min-w-0">
             <h3 className="font-display text-2xl leading-tight truncate">{company.name}</h3>
@@ -106,24 +94,24 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
         )}
       </div>
 
-      {team.length > 0 && (
-        <div className="flex items-center justify-between gap-3 pt-4 border-t border-border/50">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex -space-x-2">
-              {team.map((a, i) => (
-                <div key={a.id || i} className="ring-2 ring-card rounded-full group-hover:-translate-x-0.5 transition-transform" style={{ transitionDelay: `${i * 30}ms` }}>
-                  <AdvisorAvatar name={a.name} accent={a.accent} size="sm" />
-                </div>
-              ))}
-            </div>
-            {extra > 0 && <span className="text-xs text-muted-foreground ml-1">+{extra} more</span>}
+      <div className="flex items-center justify-between gap-3 pt-4 border-t border-border/50">
+          {/* Six seats, always — filled with real advisors, empty tiles for
+              the rest, rather than a variable-length list with a "+N more"
+              that could never actually trigger once 6 is a hard cap. */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            {seats.map((a, i) =>
+              a ? (
+                <AdvisorAvatar key={a.id || i} name={a.name} size="sm" />
+              ) : (
+                <AdvisorAvatar key={`empty-${i}`} empty size="sm" />
+              )
+            )}
           </div>
           <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
             Enter
             <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </div>
         </div>
-      )}
     </button>
   );
 }

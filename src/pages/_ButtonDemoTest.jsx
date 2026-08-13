@@ -1,6 +1,16 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, LayoutDashboard, Users, Landmark, FolderKanban, CheckSquare } from "lucide-react";
+import CompanyCard from "@/components/companies/CompanyCard";
+import AdvisorAvatar from "@/components/AdvisorAvatar";
+
+const MOCK_COMPANY = { id: "mock-1", name: "Petit Manoir", industry: "Hospitality", tagline: "A small hotel that argues with itself before it argues with guests." };
+const MOCK_ADVISORS = [
+  { id: "a1", name: "Marcus Webb", role: "CFO" },
+  { id: "a2", name: "Priya Shah", role: "Head of Growth" },
+  { id: "a3", name: "Elena Voss", role: "Chief of Staff" },
+];
+const MOCK_STATS = { advisors: 3, meetings: 4, decisions: 2, completedMeetings: 4 };
 
 // Scratch route for reviewing the metal button component — not linked from
 // nav, deleted once approved.
@@ -52,6 +62,34 @@ export default function ButtonDemoTest() {
         <p className="text-sm text-muted-foreground max-w-xl">
           Every state below is real CSS — Hover and Pressed are forced via a <code>data-force-state</code> attribute matched by the same rule as the actual :hover/:active pseudo-classes, not a simulated approximation.
         </p>
+      </div>
+
+      <div>
+        <h2 className="font-display text-xl mb-4">Company tile — inverted, no green, no illustrated faces</h2>
+        <p className="text-sm text-muted-foreground mb-4 max-w-xl">
+          Real CompanyCard component with mock data — no authenticated session available to view the real hub. Two advisor seats filled, one empty tile.
+        </p>
+        <div className="max-w-md mb-6">
+          <CompanyCard company={MOCK_COMPANY} stats={MOCK_STATS} advisors={MOCK_ADVISORS} />
+        </div>
+        <div className="grid grid-cols-2 gap-6 max-w-lg">
+          <div className="bg-card border border-border/70 rounded-2xl p-6">
+            <div className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-3">Sidebar tile — dark surface</div>
+            <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: "hsl(220 8% 7%)" }}>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center font-display text-lg overflow-hidden" style={{ background: "hsl(40 20% 97%)", color: "hsl(220 8% 10%)" }}>P</div>
+              <div className="text-sm" style={{ color: "hsl(40 10% 92%)" }}>Petit Manoir</div>
+            </div>
+          </div>
+          <div className="bg-card border border-border/70 rounded-2xl p-6">
+            <div className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-3">Advisor seats — filled vs. empty</div>
+            <div className="flex items-center gap-1.5">
+              <AdvisorAvatar name="Marcus Webb" size="sm" />
+              <AdvisorAvatar name="Priya Shah" size="sm" />
+              <AdvisorAvatar empty size="sm" />
+              <AdvisorAvatar empty size="sm" />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
