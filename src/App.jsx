@@ -22,6 +22,7 @@ import SharedMeetingView from '@/pages/share/SharedMeetingView';
 import FreeMeeting from '@/pages/FreeMeeting';
 import Landing from '@/pages/Landing';
 import ButtonDemoTest from '@/pages/_ButtonDemoTest';
+import BoardroomDemoTest from '@/pages/_BoardroomDemoTest';
 
 import Companies from '@/pages/Companies';
 import CompanyLayout from '@/components/CompanyLayout';
@@ -73,6 +74,7 @@ const AuthenticatedApp = () => {
       <Route path="/share/meeting/:token" element={<SharedMeetingView />} />
       <Route path="/board" element={<FreeMeeting />} />
       <Route path="/_test/buttons" element={<ButtonDemoTest />} />
+      <Route path="/_test/boardroom" element={<BoardroomDemoTest />} />
       <Route element={<ProtectedRoute unauthenticatedElement={<Landing />} />}>
         <Route path="/" element={<Companies />} />
       </Route>

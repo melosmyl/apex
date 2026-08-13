@@ -17,15 +17,15 @@ export const BOARDROOM_IMAGE_SIZE = { width: 1672, height: 941 };
 // Order here doubles as fill priority for advisor→seat assignment (see
 // CHAIR_SEAT_ORDER below): centre/head seats fill before the outer ones.
 export const CHAIRS = [
-  { id: "far-2", cx: 828, cy: 495, w: 78, h: 64, rx: 14 },
-  { id: "far-1", cx: 702, cy: 490, w: 88, h: 64, rx: 14 },
-  { id: "far-3", cx: 955, cy: 490, w: 92, h: 64, rx: 14 },
-  { id: "left-1", cx: 600, cy: 548, w: 104, h: 104, rx: 16 },
-  { id: "right-1", cx: 1130, cy: 538, w: 104, h: 104, rx: 16 },
-  { id: "left-2", cx: 495, cy: 538, w: 118, h: 114, rx: 18 },
-  { id: "right-2", cx: 1235, cy: 528, w: 118, h: 114, rx: 18 },
-  { id: "left-3", cx: 395, cy: 528, w: 128, h: 124, rx: 18 },
-  { id: "right-3", cx: 1340, cy: 523, w: 128, h: 124, rx: 18 },
+  { id: "far-2", cx: 830, cy: 498, w: 80, h: 40, rx: 16 },
+  { id: "far-1", cx: 703, cy: 494, w: 95, h: 40, rx: 16 },
+  { id: "far-3", cx: 955, cy: 494, w: 85, h: 40, rx: 16 },
+  { id: "left-1", cx: 365, cy: 520, w: 95, h: 75, rx: 18 },
+  { id: "right-1", cx: 1310, cy: 520, w: 95, h: 75, rx: 18 },
+  { id: "left-2", cx: 278, cy: 528, w: 90, h: 78, rx: 18 },
+  { id: "right-2", cx: 1397, cy: 528, w: 90, h: 78, rx: 18 },
+  { id: "left-3", cx: 175, cy: 540, w: 105, h: 90, rx: 20 },
+  { id: "right-3", cx: 1502, cy: 540, w: 105, h: 90, rx: 20 },
 ];
 
 // Advisor→seat assignment fills in this order — centre-out, alternating
@@ -36,15 +36,15 @@ export const CHAIR_SEAT_ORDER = CHAIRS.map((c) => c.id);
 // Name-tag anchor per chair — just outside the backrest, on the side that
 // has clear dark wall/floor behind it rather than overlapping the table.
 const TAG_ANCHOR = {
-  "far-1": { x: 702, y: 452, align: "middle" },
-  "far-2": { x: 828, y: 457, align: "middle" },
-  "far-3": { x: 955, y: 452, align: "middle" },
-  "left-1": { x: 600, y: 486, align: "middle" },
-  "left-2": { x: 495, y: 471, align: "middle" },
-  "left-3": { x: 395, y: 456, align: "middle" },
-  "right-1": { x: 1130, y: 476, align: "middle" },
-  "right-2": { x: 1235, y: 461, align: "middle" },
-  "right-3": { x: 1340, y: 451, align: "middle" },
+  "far-1": { x: 703, y: 456, align: "middle" },
+  "far-2": { x: 830, y: 460, align: "middle" },
+  "far-3": { x: 955, y: 456, align: "middle" },
+  "left-1": { x: 365, y: 464, align: "middle" },
+  "left-2": { x: 278, y: 471, align: "middle" },
+  "left-3": { x: 175, y: 477, align: "middle" },
+  "right-1": { x: 1310, y: 464, align: "middle" },
+  "right-2": { x: 1397, y: 471, align: "middle" },
+  "right-3": { x: 1502, y: 477, align: "middle" },
 };
 
 const CROSSFADE_MS = 550;
@@ -110,10 +110,11 @@ export default function BoardroomBanner({
           return (
             <rect
               key={c.id}
-              x={c.cx - c.w * 0.7}
-              y={c.cy - c.h * 0.7}
-              width={c.w * 1.4}
-              height={c.h * 1.4}
+              x={c.cx - c.w * 0.575}
+              y={c.cy - c.h * 0.575}
+              width={c.w * 1.15}
+              height={c.h * 1.15}
+              rx={c.rx}
               fill={`url(#chair-glow-${c.id})`}
               // Below sm: the room stays a static, unlit photograph — narrow
               // viewports can't reliably show a lit chair at legible size,
