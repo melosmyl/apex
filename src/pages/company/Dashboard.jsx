@@ -60,7 +60,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground max-w-2xl leading-relaxed">{plan?.executive_briefing || company?.tagline}</p>
         )}
         {startHere && (
-          <Button onClick={() => go("boardroom")} variant="brand" className="rounded-full px-7 mt-5">
+          <Button onClick={() => go("boardroom")} variant="primary" className="px-7 mt-5">
             <Landmark className="w-4 h-4 mr-2" /> Start your first board meeting
           </Button>
         )}
@@ -98,7 +98,7 @@ export default function Dashboard() {
           ) : openTasks.length === 0 && (data.meetings?.length || 0) === 0 ? (
             <div className="text-sm text-muted-foreground">
               <p className="mb-3">You're all caught up. Your next move:</p>
-              <Button onClick={() => go("boardroom")} variant="outline" className="rounded-full text-sm">Convene a board meeting</Button>
+              <Button onClick={() => go("boardroom")} variant="secondaryOutline" className="text-sm">Convene a board meeting</Button>
             </div>
           ) : (
             <ul className="space-y-2.5">

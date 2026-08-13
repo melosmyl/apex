@@ -43,9 +43,9 @@ export default function VoiceMeetingSummary({ result, advisors, companyId, onSav
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="rounded-full" onClick={onClose}>Close</Button>
+          <Button variant="secondaryOutline" size="sm" onClick={onClose}>Close</Button>
           {!saved && (
-            <Button onClick={handleSave} disabled={saving} className="rounded-full">
+            <Button onClick={handleSave} disabled={saving} variant="primary">
               {saving ? "Saving…" : "Save to records"}
             </Button>
           )}

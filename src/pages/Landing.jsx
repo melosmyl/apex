@@ -2,10 +2,12 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PRODUCT_NAME, IDENTITY_ACCENT_STYLE } from "@/lib/branding";
+import { PRODUCT_NAME } from "@/lib/branding";
 import LandingTranscript from "@/components/landing/LandingTranscript";
 import roomImage from "@/assets/landing/room.jpg";
-import founderDeskImage from "@/assets/landing/founder-desk.jpg";
+import floorPapersImage from "@/assets/landing/floor-papers.jpg";
+import boardroomImage from "@/assets/landing/boardroom.jpg";
+import tornPageImage from "@/assets/landing/torn-page-dark.jpg";
 
 // Swap in the real board meeting's share token here — see /share/meeting/:token.
 // Until it's set, section 4 shows an honest "in session" placeholder rather
@@ -65,7 +67,7 @@ function Section({ children, className = "", dark = false }) {
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background" style={IDENTITY_ACCENT_STYLE}>
+    <div className="min-h-screen bg-background">
       {/* 1. Hero — cream */}
       <Section className="pt-16 sm:pt-24 pb-16 sm:pb-24">
         <div className="max-w-5xl mx-auto text-center rise-in">
@@ -78,13 +80,21 @@ export default function Landing() {
             <br className="hidden sm:block" />
             Not one confident answer. Five people who disagree.
           </p>
-          <Button asChild variant="brand" size="lg" className="rounded-full px-8 h-12 text-base font-mono tracking-wide uppercase">
-            <Link to="/board">Sit in on one <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
-          </Button>
+          {/* A dark stage behind the button, not a bare border on cream —
+              confirmed side by side against the plain-bordered version,
+              this reads as genuinely lit rather than merely outlined.
+              Deliberately the same dark ground as the closing section
+              (DARK_SECTION) so the page anchors dark at both ends instead
+              of introducing a third, one-off dark patch. */}
+          <div className="inline-block bg-[hsl(220_8%_7%)] rounded-2xl p-3.5">
+            <Button asChild variant="primary" size="lg" className="px-8 h-12 text-base">
+              <Link to="/board">Sit in on one <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
+            </Button>
+          </div>
         </div>
       </Section>
 
-      {/* 2. The room — full-bleed photograph, the page's only photographic dark moment */}
+      {/* 2. The room — full-bleed photograph, atmosphere before argument */}
       <div className="w-full">
         <img
           src={roomImage}
@@ -144,15 +154,16 @@ export default function Landing() {
         </div>
       </Section>
 
-      {/* 6. Founder note — cream */}
+      {/* 6. Founder note — cream. Image beside the note, not behind it —
+          atmosphere, not a hero. Fully desaturated per the imagery brief. */}
       <Section className="py-16 sm:py-20">
-        <div className="max-w-2xl mx-auto grid sm:grid-cols-[minmax(0,220px)_1fr] gap-8 sm:gap-10 items-center">
+        <div className="max-w-2xl mx-auto grid sm:grid-cols-[minmax(0,280px)_1fr] gap-8 sm:gap-10 items-center">
           <img
-            src={founderDeskImage}
+            src={floorPapersImage}
             alt=""
             role="presentation"
             loading="lazy"
-            className="w-full max-w-[220px] mx-auto sm:max-w-none aspect-[3/4] object-cover rounded-2xl shadow-card"
+            className="w-full aspect-[4/3] object-cover rounded-sm shadow-card grayscale"
           />
           <div>
             <Kicker>Why I built this</Kicker>
@@ -172,23 +183,59 @@ export default function Landing() {
         </div>
       </Section>
 
-      {/* 7. Close — dark, ends the page on the same beat it opened a moment on */}
-      <Section dark className="py-20 sm:py-28">
-        <div className="max-w-xl mx-auto text-center">
-          <h2 className="font-display text-4xl sm:text-5xl leading-tight mb-6 text-balance">
-            Take a seat.
-          </h2>
-          <p className="text-lg sm:text-xl leading-relaxed opacity-85 mb-10 text-balance">
-            Real boards cost £50,000 a year.{" "}
-            <br className="hidden sm:block" />
-            Yours starts free, tonight.
+      {/* 7. The cost — dark. The unaffordable version: an empty, expensive
+          boardroom, illustrating the price line only. Never implies these
+          chairs are our advisors — no labels, no faces. Desaturated hard;
+          cropped from the top to leave out most of the glossy render-floor
+          that gives away it's a render. */}
+      <Section dark className="pt-16 sm:pt-20 pb-10 sm:pb-14">
+        <div className="max-w-4xl mx-auto">
+          <div className="h-[30vh] sm:h-[44vh] overflow-hidden rounded-sm">
+            <img
+              src={boardroomImage}
+              alt=""
+              role="presentation"
+              loading="lazy"
+              className="w-full h-full object-cover object-top grayscale-[80%]"
+            />
+          </div>
+          <p className="font-display text-2xl sm:text-3xl italic text-center mt-8 sm:mt-10 opacity-90 text-balance">
+            Real boards cost £50,000 a year.
           </p>
-          <Button asChild variant="brand" size="lg" className="rounded-full px-8 h-12 text-base font-mono tracking-wide uppercase">
-            <Link to="/board">Take a seat <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
-          </Button>
+        </div>
+      </Section>
+
+      {/* 8. Close — dark, the page's true dark anchor. The paper is an
+          object on the ground, not a background — cropped tight so it
+          fills the frame, not stretched full-bleed (which would lose the
+          torn edge and cast shadow the whole effect depends on). */}
+      <Section dark className="pt-6 sm:pt-8 pb-16 sm:pb-24">
+        <div className="max-w-md sm:max-w-xl mx-auto">
+          <div className="relative">
+            <img
+              src={tornPageImage}
+              alt=""
+              role="presentation"
+              loading="lazy"
+              className="w-full aspect-[5/3] object-cover object-[51%_50%] rounded-sm shadow-elevated"
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 sm:px-12">
+              <h2 className="font-display text-3xl sm:text-5xl leading-[1.05] text-[hsl(220_8%_10%)] mb-3 sm:mb-5 text-balance">
+                Take a seat.
+              </h2>
+              <p className="text-sm sm:text-lg leading-snug text-[hsl(220_8%_22%)] mb-5 sm:mb-8 text-balance">
+                Real boards cost £50,000 a year.
+                <br />
+                Yours starts free, tonight.
+              </p>
+              <Button asChild variant="primary" size="lg" className="px-6 sm:px-8 h-10 sm:h-12 text-xs sm:text-base">
+                <Link to="/board">Take a seat <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <footer className="flex items-center justify-center gap-4 mt-16 pt-8 border-t border-white/10">
+        <footer className="flex items-center justify-center gap-4 mt-14 sm:mt-16">
           <Link to="/privacy" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Privacy</Link>
           <Link to="/terms" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Terms</Link>
         </footer>

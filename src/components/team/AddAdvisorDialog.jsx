@@ -41,7 +41,7 @@ export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = []
                 ) : atCap ? (
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">Coming soon</span>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={() => add(a)} disabled={adding === a.key}>
+                  <Button size="sm" variant="secondaryOutline" onClick={() => add(a)} disabled={adding === a.key}>
                     {adding === a.key ? "…" : "Invite"}
                   </Button>
                 )}

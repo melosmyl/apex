@@ -72,7 +72,7 @@ export default function BoardroomHome({ onStartDebate, companyId }) {
             </button>
           ))}
         </div>
-        <Button onClick={submit} disabled={!question.trim()} className="w-full mt-5 rounded-full h-11">
+        <Button onClick={submit} disabled={!question.trim()} variant="primary" className="w-full mt-5 h-11">
           Ask the board <ArrowRight className="w-4 h-4 ml-1.5" />
         </Button>
       </div>
@@ -119,10 +119,10 @@ export default function BoardroomHome({ onStartDebate, companyId }) {
             several rounds, then the Chair produces a resolution. It typically takes a few minutes.
           </p>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setConfirming(false)} className="rounded-full">
+            <Button variant="secondaryOutline" onClick={() => setConfirming(false)}>
               Cancel
             </Button>
-            <Button onClick={confirmStart} className="rounded-full">
+            <Button onClick={confirmStart} variant="primary">
               Start the debate <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </DialogFooter>

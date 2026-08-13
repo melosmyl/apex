@@ -12,10 +12,10 @@ export default function RoutingPrompt({ promptText, onAccept, onDismiss }) {
     <div className="mt-3 pt-3 border-t border-border/60 rise-in">
       <p className="text-sm mb-3">{promptText}</p>
       <div className="flex gap-2">
-        <Button size="sm" className="rounded-full flex-1" onClick={onAccept}>
+        <Button size="sm" variant="primary" className="flex-1" onClick={onAccept}>
           <Landmark className="w-3.5 h-3.5 mr-1.5" /> Open board meeting
         </Button>
-        <Button size="sm" variant="ghost" className="rounded-full" onClick={onDismiss}>
+        <Button size="sm" variant="ghost" onClick={onDismiss}>
           Not now
         </Button>
       </div>

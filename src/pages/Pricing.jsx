@@ -90,7 +90,7 @@ export default function Pricing() {
                 ))}
               </ul>
               <a href={t.href} className="block">
-                <Button variant={t.highlight ? "default" : "outline"} className="w-full rounded-full">{t.cta}</Button>
+                <Button variant={t.highlight ? "primary" : "secondaryOutline"} className="w-full">{t.cta}</Button>
               </a>
             </div>
           ))}

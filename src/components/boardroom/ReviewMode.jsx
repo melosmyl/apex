@@ -62,7 +62,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
             <h2 className="font-display text-xl">Review: {docTitle}</h2>
             <p className="text-xs text-muted-foreground mt-1">{selectedAdvisors.length} advisor{selectedAdvisors.length > 1 ? "s" : ""} reviewed this</p>
           </div>
-          <Button variant="outline" className="rounded-full" onClick={() => { setReviews([]); }}>
+          <Button variant="secondaryOutline" onClick={() => { setReviews([]); }}>
             <RotateCcw className="w-4 h-4 mr-1.5" /> New review
           </Button>
         </div>
@@ -158,7 +158,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
 
       {error && <p className="text-sm text-destructive mb-4">{error}</p>}
 
-      <Button onClick={run} disabled={(!docContent?.trim() && !pasteContent?.trim()) || selectedAdvisors.length === 0 || loading} variant="brand" className="rounded-full px-8">
+      <Button onClick={run} disabled={(!docContent?.trim() && !pasteContent?.trim()) || selectedAdvisors.length === 0 || loading} variant="primary" className="px-8">
         {loading ? "Reviewing…" : "Start review"} {!loading && <ArrowRight className="w-4 h-4 ml-1.5" />}
       </Button>
     </div>

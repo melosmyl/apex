@@ -63,13 +63,13 @@ export default function Research() {
     <div>
       <PageHeader eyebrow="On-demand intelligence" title="Research Hub"
         description="Request research your board can reference in future meetings.">
-        <Button onClick={() => setUploadOpen(true)} variant="outline" className="rounded-full px-5"><Upload className="w-4 h-4 mr-1.5" /> Upload</Button>
+        <Button onClick={() => setUploadOpen(true)} variant="secondaryOutline" className="px-5"><Upload className="w-4 h-4 mr-1.5" /> Upload</Button>
       </PageHeader>
 
       <div className="bg-card border border-border/70 rounded-2xl p-6 mb-8 rise-in">
         <div className="flex flex-col sm:flex-row gap-3">
           <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What should we research?" className="rounded-full" disabled={busy} onKeyDown={(e)=>e.key==="Enter"&&run()} />
-          <Button onClick={() => run()} disabled={busy || !topic.trim()} className="rounded-full px-6">
+          <Button onClick={() => run()} disabled={busy || !topic.trim()} variant="primary" className="px-6">
             {busy ? <><Sparkles className="w-4 h-4 mr-2 animate-pulse" /> Researching…</> : <><Search className="w-4 h-4 mr-2" /> Research</>}
           </Button>
         </div>

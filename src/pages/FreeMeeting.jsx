@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { supabase, base44 } from "@/api/base44Client";
-import { IDENTITY_ACCENT_STYLE } from "@/lib/branding";
 import { generateOnboardingPlan, createCompanyFromOnboarding } from "@/lib/onboarding";
 import { QUESTIONS as PROFILE_QUESTIONS } from "@/components/onboarding/GuidedOnboarding";
 import BoardDebate from "@/components/boardroom/BoardDebate";
@@ -49,7 +48,7 @@ function ConversionCapture({ meetingId, companyId }) {
       <p className="text-sm text-muted-foreground mb-4">This transcript is already yours to keep and share, no account needed. Enter your email and these same advisors remember this conversation and carry it forward — a real board, not a one-off.</p>
       <div className="flex flex-col sm:flex-row gap-2">
         <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="flex-1" onKeyDown={(e) => e.key === "Enter" && submit()} />
-        <Button onClick={submit} disabled={state === "sending" || !email.trim()} className="rounded-full px-6 shrink-0">
+        <Button onClick={submit} disabled={state === "sending" || !email.trim()} variant="primary" className="px-6 shrink-0">
           {state === "sending" ? "Sending…" : "Keep this board"}
         </Button>
       </div>
@@ -114,7 +113,7 @@ export default function FreeMeeting() {
   };
 
   return (
-    <div className="min-h-screen bg-background" style={IDENTITY_ACCENT_STYLE}>
+    <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-5 sm:px-8 py-12">
         {phase === "intro" && (
           <div className="text-center rise-in">
@@ -125,7 +124,7 @@ export default function FreeMeeting() {
             <p className="text-muted-foreground text-base sm:text-lg leading-relaxed mb-8 max-w-md mx-auto">
               No account, no card. Bring something you're actually stuck on — five advisors will debate it for real, and you keep the result either way.
             </p>
-            <Button onClick={() => setPhase("form")} variant="brand" className="rounded-full px-8 h-12">Begin <ArrowRight className="w-4 h-4 ml-1.5" /></Button>
+            <Button onClick={() => setPhase("form")} variant="primary" className="px-8 h-12">Begin <ArrowRight className="w-4 h-4 ml-1.5" /></Button>
           </div>
         )}
 
@@ -160,7 +159,7 @@ export default function FreeMeeting() {
 
             <TurnstileWidget onToken={setTurnstileToken} />
 
-            <Button onClick={begin} disabled={!canSubmit} variant="brand" className="rounded-full px-8 h-12 w-full sm:w-auto">
+            <Button onClick={begin} disabled={!canSubmit} variant="primary" className="px-8 h-12 w-full sm:w-auto">
               Convene the board <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </div>
@@ -182,7 +181,7 @@ export default function FreeMeeting() {
         {phase === "error" && (
           <div className="text-center py-24">
             <p className="text-lg text-muted-foreground max-w-md mx-auto mb-4">{errorMessage}</p>
-            <Button variant="outline" className="rounded-full" onClick={() => setPhase("form")}>Try again</Button>
+            <Button variant="secondaryOutline" onClick={() => setPhase("form")}>Try again</Button>
           </div>
         )}
 

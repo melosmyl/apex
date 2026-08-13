@@ -85,7 +85,7 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full shrink-0"
+            className="h-8 w-8 shrink-0"
             onClick={handleDownload}
             disabled={downloading}
             title={`Download ${primaryFormat?.toUpperCase()}`}
@@ -148,8 +148,8 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
 
       {hasFile ? (
         <Button
-          variant="outline"
-          className="w-full rounded-full mt-3 group-hover:border-brand/40"
+          variant="secondaryOutline"
+          className="w-full mt-3 group-hover:border-brand/40"
           onClick={handleDownload}
           disabled={downloading}
         >

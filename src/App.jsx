@@ -21,6 +21,7 @@ import SharedDocumentView from '@/pages/share/SharedDocumentView';
 import SharedMeetingView from '@/pages/share/SharedMeetingView';
 import FreeMeeting from '@/pages/FreeMeeting';
 import Landing from '@/pages/Landing';
+import ButtonDemoTest from '@/pages/_ButtonDemoTest';
 
 import Companies from '@/pages/Companies';
 import CompanyLayout from '@/components/CompanyLayout';
@@ -71,11 +72,19 @@ const AuthenticatedApp = () => {
       <Route path="/share/document/:token" element={<SharedDocumentView />} />
       <Route path="/share/meeting/:token" element={<SharedMeetingView />} />
       <Route path="/board" element={<FreeMeeting />} />
+      <Route path="/_test/buttons" element={<ButtonDemoTest />} />
       <Route element={<ProtectedRoute unauthenticatedElement={<Landing />} />}>
         <Route path="/" element={<Companies />} />
       </Route>
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
         <Route path="/admin" element={<Admin />} />
+        {/* The explicit hub — never auto-redirects, even for a single-
+            company account. "/" is the smart entry point used right after
+            login (skips straight into your one company); this is what
+            "My Companies" in the sidebar points to instead, so a
+            single-company founder can still reach the hub to start a
+            second company. */}
+        <Route path="/companies" element={<Companies skipRedirect />} />
         <Route path="/company/:companyId" element={<CompanyLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />

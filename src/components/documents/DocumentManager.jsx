@@ -136,7 +136,7 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
   return (
     <div>
       <PageHeader eyebrow={eyebrow} title={title} description={description}>
-        <Button onClick={() => setCreateOpen(true)} className="rounded-full px-5"><Plus className="w-4 h-4 mr-1.5" /> Add Document</Button>
+        <Button onClick={() => setCreateOpen(true)} variant="primary" className="px-5"><Plus className="w-4 h-4 mr-1.5" /> Add Document</Button>
       </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6">
@@ -164,7 +164,7 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
               <select value={sort} onChange={(e) => setSort(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
                 {SORT_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
               </select>
-              <Button variant={showFilters ? "default" : "outline"} size="icon" onClick={() => setShowFilters(v => !v)} className="rounded-md">
+              <Button variant={showFilters ? "primary" : "secondaryOutline"} size="icon" onClick={() => setShowFilters(v => !v)}>
                 <SlidersHorizontal className="w-4 h-4" />
               </Button>
               <div className="flex items-center gap-1 bg-secondary/60 rounded-md p-0.5">
@@ -221,7 +221,7 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
               icon={FileText}
               title={hasFilters || selectedFolder ? "No documents match" : "Nothing here yet"}
               description={hasFilters || selectedFolder ? "Try adjusting your filters or search." : emptyText}
-              action={!hasFilters && !selectedFolder ? <Button onClick={() => setCreateOpen(true)} className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Add Document</Button> : null}
+              action={!hasFilters && !selectedFolder ? <Button onClick={() => setCreateOpen(true)} variant="primary" className="px-6"><Plus className="w-4 h-4 mr-1.5" /> Add Document</Button> : null}
             />
           ) : view === "grid" ? (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">

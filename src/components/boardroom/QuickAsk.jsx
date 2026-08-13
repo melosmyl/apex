@@ -45,7 +45,7 @@ export default function QuickAsk({ company, companyId, advisors, initialQuestion
               <div className="text-xs text-muted-foreground">{selectedAdvisor?.role}</div>
             </div>
           </div>
-          <Button variant="outline" className="rounded-full" onClick={() => { setResult(null); setQuestion(""); }}>
+          <Button variant="secondaryOutline" onClick={() => { setResult(null); setQuestion(""); }}>
             <RotateCcw className="w-4 h-4 mr-1.5" /> New question
           </Button>
         </div>
@@ -110,7 +110,7 @@ export default function QuickAsk({ company, companyId, advisors, initialQuestion
 
       {error && <p className="text-sm text-destructive mb-4">{error}</p>}
 
-      <Button onClick={run} disabled={!question.trim() || !selectedAdvisor || loading} variant="brand" className="rounded-full px-8">
+      <Button onClick={run} disabled={!question.trim() || !selectedAdvisor || loading} variant="primary" className="px-8">
         {loading ? "Getting answer…" : "Get answer"} {!loading && <ArrowRight className="w-4 h-4 ml-1.5" />}
       </Button>
     </div>

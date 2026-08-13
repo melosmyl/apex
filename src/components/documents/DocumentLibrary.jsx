@@ -45,10 +45,10 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
   return (
     <div>
       <PageHeader eyebrow={eyebrow} title={title} description={description}>
-        <Button onClick={() => setOpen(true)} className="rounded-full px-5"><Plus className="w-4 h-4 mr-1.5" /> Add</Button>
+        <Button onClick={() => setOpen(true)} variant="primary" className="px-5"><Plus className="w-4 h-4 mr-1.5" /> Add</Button>
       </PageHeader>
       {items === null ? <div className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />
-        : items.length === 0 ? <EmptyState icon={FileText} title="Nothing here yet" description={emptyText} action={<Button onClick={() => setOpen(true)} className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> Add</Button>} />
+        : items.length === 0 ? <EmptyState icon={FileText} title="Nothing here yet" description={emptyText} action={<Button onClick={() => setOpen(true)} variant="primary" className="px-6"><Plus className="w-4 h-4 mr-1.5" /> Add</Button>} />
         : (
         <div className="grid sm:grid-cols-2 gap-4">
           {items.map((d) => (

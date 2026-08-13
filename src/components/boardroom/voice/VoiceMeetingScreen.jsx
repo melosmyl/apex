@@ -59,7 +59,7 @@ export default function VoiceMeetingScreen({
           Your browser doesn't support voice recognition. Try Chrome, Edge, or Safari.
           You can still use the other Boardroom modes.
         </p>
-        <Button variant="outline" onClick={onEnd} className="rounded-full">Back to modes</Button>
+        <Button variant="secondaryOutline" onClick={onEnd}>Back to modes</Button>
       </div>
     );
   }

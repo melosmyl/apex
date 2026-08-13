@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Landmark, Sparkles } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
-import BoardTable from "@/components/boardroom/BoardTable";
+import BoardroomBanner from "@/components/boardroom/BoardroomBanner";
+import AdvisorSelectionRow from "@/components/boardroom/AdvisorSelectionRow";
 import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
 import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs } from "@/lib/boardroom";
 import { useAssistant } from "@/lib/AssistantContext";
 
 const POLL_INTERVAL_MS = 3000;
@@ -58,6 +59,9 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [resolutionStartedAt, setResolutionStartedAt] = useState(null);
   const [chairOpening, setChairOpening] = useState(loadedMeeting?.chair_opening || null);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  // Fixed once a meeting starts — an advisor keeps the same chair for the
+  // whole discussion rather than jumping seats between turns.
+  const [seatAssignment, setSeatAssignment] = useState({});
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setIsAnonymous(!!data?.user?.is_anonymous));
@@ -155,6 +159,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     if (!question.trim()) return;
     if (selectedAiAdvisors.length < 3) { setError("Select at least 3 AI advisors."); return; }
     setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setResolutionStartedAt(null); setChairOpening(null);
+    setSeatAssignment(assignChairs(selectedAiAdvisors));
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id) });
       setPendingMeetingId(phase1.meeting_id);
@@ -219,12 +224,32 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
 
   const selectedCount = selectedIds?.length || 0;
 
+  // Who currently has the floor: cycling through participants while
+  // positions are being formed, then the real speaking order as the
+  // transcript grows during discussion. Resolution has no seated speaker
+  // (the Chair is synthesizing, not one of the debating advisors), so no
+  // chair lights during that phase.
+  const activeSpeakerName =
+    phase === "preparing" ? activeName :
+    phase === "discussion" && liveTranscript.length ? liveTranscript[liveTranscript.length - 1].advisor_name :
+    null;
+  const activeChairId = activeSpeakerName ? seatAssignment[activeSpeakerName] : null;
+
+  // Fixed for the meeting, not just the active speaker — every seated
+  // advisor's tag stays mounted with unchanging text the whole time, so
+  // handover is a pure opacity crossfade with nothing to swap mid-fade.
+  const chairLabels = {};
+  for (const [name, chairId] of Object.entries(seatAssignment)) {
+    const advisor = advisors.find((a) => a.name === name);
+    if (advisor) chairLabels[chairId] = { name: advisor.name, role: advisor.role };
+  }
+
   if (aiAdvisors.length < 3 && phase === "idle") {
     return (
       <EmptyState
         title="Convene at least three advisors"
         description="A board debate needs differing perspectives. Invite at least three AI advisors to your executive team."
-        action={<Button onClick={() => navigate(`/company/${companyId}/team`)} className="rounded-full px-6">Go to Executive Team</Button>}
+        action={<Button onClick={() => navigate(`/company/${companyId}/team`)} variant="primary" className="px-6">Go to Executive Team</Button>}
       />
     );
   }
@@ -244,8 +269,13 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   if (phase !== "result") {
     return (
       <div className="max-w-3xl">
+        <BoardroomBanner
+          activeChairId={activeChairId}
+          chairLabels={chairLabels}
+          className="h-[200px] sm:h-[280px] rounded-2xl mb-6 rise-in"
+        />
         <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
-          <BoardTable advisors={advisors} activeName={activeName} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
+          <AdvisorSelectionRow advisors={advisors} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
           <p className="text-center text-xs text-muted-foreground mt-4">
             {selectedCount} attending · {selectedAiAdvisors.length} AI{selectedHumanAdvisors.length > 0 && `, ${selectedHumanAdvisors.length} human`}
             {selectedAiAdvisors.length < 3 && " · At least 3 AI advisors required"}
@@ -262,7 +292,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
                     <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
                   ))}
                 </div>
-                <Button onClick={start} disabled={!question.trim() || selectedAiAdvisors.length < 3} className="w-full mt-4 rounded-full h-11">
+                <Button onClick={start} disabled={!question.trim() || selectedAiAdvisors.length < 3} variant="primary" className="w-full mt-4 h-11">
                   <Landmark className="w-4 h-4 mr-2" /> Start Board Debate
                 </Button>
               </>
@@ -294,7 +324,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     <div>
       <div className="flex items-center justify-between mb-6">
         <p className="font-display text-xl max-w-2xl">"{question}"</p>
-        <Button variant="outline" className="rounded-full shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); }}>New question</Button>
+        <Button variant="secondaryOutline" className="shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); setSeatAssignment({}); }}>New question</Button>
       </div>
       <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={isAnonymous ? undefined : recordDecision} onFollowup={isAnonymous ? undefined : handleFollowup} isAnonymous={isAnonymous} />
     </div>

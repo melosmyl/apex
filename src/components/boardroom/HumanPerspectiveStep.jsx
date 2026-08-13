@@ -109,7 +109,7 @@ export default function HumanPerspectiveStep({ humanAdvisors, question, onSubmit
           <button onClick={onSkip} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Skip human input
           </button>
-          <Button onClick={submit} disabled={filledCount === 0} className="rounded-full px-6">
+          <Button onClick={submit} disabled={filledCount === 0} variant="primary" className="px-6">
             Continue to discussion <ArrowRight className="w-4 h-4 ml-1.5" />
           </Button>
         </div>

@@ -21,13 +21,13 @@ const FORMAT_ICONS = {
   csv: FileSpreadsheet,
 };
 
-export default function DocumentDownloadButton({ doc, variant = "default", size = "default", className = "" }) {
+export default function DocumentDownloadButton({ doc, variant = "primary", size = "default", className = "" }) {
   const [downloadingFormat, setDownloadingFormat] = useState(null);
   const options = getDownloadOptions(doc);
 
   if (options.length === 0) {
     return (
-      <Button variant="outline" size={size} className={`rounded-full ${className}`} disabled>
+      <Button variant="secondaryOutline" size={size} className={className} disabled>
         <FileX className="w-4 h-4 mr-1.5" /> No File Generated
       </Button>
     );
@@ -43,7 +43,7 @@ export default function DocumentDownloadButton({ doc, variant = "default", size 
       <Button
         variant={variant}
         size={size}
-        className={`rounded-full ${className}`}
+        className={className}
         disabled={isDownloading}
         onClick={() =>
           downloadDocumentFile(doc.id, opt.format, {
@@ -66,7 +66,7 @@ export default function DocumentDownloadButton({ doc, variant = "default", size 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} className={`rounded-full ${className}`} disabled={!!downloadingFormat}>
+        <Button variant={variant} size={size} className={className} disabled={!!downloadingFormat}>
           {downloadingFormat ? (
             <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
           ) : (

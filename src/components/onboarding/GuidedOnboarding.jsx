@@ -139,10 +139,10 @@ export default function GuidedOnboarding({ open, onClose }) {
                 Five quick questions. We'll assemble the right advisors and map your first steps — the rest, your board will ask you directly.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button onClick={beginQuestions} variant="brand" className="rounded-full px-8 h-12 text-[0.95rem]">
+                <Button onClick={beginQuestions} variant="primary" className="px-8 h-12 text-[0.95rem]">
                   Begin <ArrowRight className="w-4 h-4 ml-1.5" />
                 </Button>
-                <Button onClick={onClose} variant="ghost" className="rounded-full px-6">Maybe later</Button>
+                <Button onClick={onClose} variant="ghost" className="px-6">Maybe later</Button>
               </div>
               <p className="text-xs text-muted-foreground/70 mt-8">Takes about a minute. One question at a time.</p>
             </div>
@@ -202,10 +202,10 @@ export default function GuidedOnboarding({ open, onClose }) {
               )}
 
               <div className="flex items-center justify-between mt-8">
-                <Button onClick={back} variant="ghost" className="rounded-full px-5">
+                <Button onClick={back} variant="ghost" className="px-5">
                   <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
                 </Button>
-                <Button onClick={next} disabled={!canProceed()} variant="brand" className="rounded-full px-8">
+                <Button onClick={next} disabled={!canProceed()} variant="primary" className="px-8">
                   {stepIndex === visibleQuestions.length - 1 ? "See my board" : "Continue"} <ArrowRight className="w-4 h-4 ml-1.5" />
                 </Button>
               </div>

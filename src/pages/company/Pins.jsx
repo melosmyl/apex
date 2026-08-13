@@ -227,7 +227,7 @@ Cite pin titles when referencing specific points. Do not invent conclusions not 
             <button onClick={() => setView("grid")} className={`p-1.5 rounded ${view === "grid" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><LayoutGrid className="w-4 h-4" /></button>
             <button onClick={() => setView("list")} className={`p-1.5 rounded ${view === "list" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><List className="w-4 h-4" /></button>
           </div>
-          <Button variant="outline" onClick={generateAISummary} disabled={aiSummarizing || !filtered.length} className="rounded-full">
+          <Button variant="secondaryOutline" onClick={generateAISummary} disabled={aiSummarizing || !filtered.length}>
             {aiSummarizing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1.5" />}
             AI Summary
           </Button>

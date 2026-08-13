@@ -219,7 +219,7 @@ export default function ProjectPlannerDialog({ project, companyId, open, onOpenC
             disabled={!conversation || sending}
             className="flex-1"
           />
-          <Button onClick={send} disabled={!input.trim() || !conversation || sending} size="icon" className="rounded-full shrink-0">
+          <Button onClick={send} disabled={!input.trim() || !conversation || sending} size="icon" variant="primary" className="shrink-0">
             <Send className="w-4 h-4" />
           </Button>
         </div>

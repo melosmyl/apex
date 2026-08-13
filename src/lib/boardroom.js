@@ -1,4 +1,18 @@
 import { base44 } from "@/api/base44Client";
+import { CHAIR_SEAT_ORDER } from "@/components/boardroom/BoardroomBanner";
+
+// Fixed for the duration of a meeting — called once when a meeting starts
+// so an advisor never jumps seats mid-discussion. Fills centre-out
+// (CHAIR_SEAT_ORDER already carries that priority) so 3 advisors sit at
+// the head of the table and 6 fan evenly down both sides.
+export function assignChairs(advisors = []) {
+  const assignment = {};
+  advisors.forEach((a, i) => {
+    if (i >= CHAIR_SEAT_ORDER.length) return; // more advisors than usable chairs shouldn't happen (cap is 6 of 9)
+    assignment[a.name] = CHAIR_SEAT_ORDER[i];
+  });
+  return assignment;
+}
 
 // Every attending advisor is called in every discussion round, so an advisor
 // absent from a round is one whose call failed and was dropped server-side.

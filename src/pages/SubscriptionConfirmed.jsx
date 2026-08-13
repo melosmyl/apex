@@ -17,9 +17,9 @@ export default function SubscriptionConfirmed() {
           Your new advisor is being activated. Return to your executive team — they'll be ready shortly.
         </p>
         {companyId ? (
-          <Button asChild className="rounded-full px-6"><Link to={`/company/${companyId}/team`}>Back to your team</Link></Button>
+          <Button asChild variant="primary" className="px-6"><Link to={`/company/${companyId}/team`}>Back to your team</Link></Button>
         ) : (
-          <Button asChild className="rounded-full px-6"><Link to="/">Go home</Link></Button>
+          <Button asChild variant="primary" className="px-6"><Link to="/">Go home</Link></Button>
         )}
       </div>
     </div>

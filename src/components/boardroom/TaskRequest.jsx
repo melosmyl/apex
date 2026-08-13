@@ -45,7 +45,7 @@ export default function TaskRequest({ company, companyId, advisors }) {
               <div className="text-xs text-muted-foreground">{selectedAdvisor?.role}</div>
             </div>
           </div>
-          <Button variant="outline" className="rounded-full" onClick={() => { setResult(null); setSavedDoc(null); setTaskTitle(""); setTaskDescription(""); }}>
+          <Button variant="secondaryOutline" onClick={() => { setResult(null); setSavedDoc(null); setTaskTitle(""); setTaskDescription(""); }}>
             <RotateCcw className="w-4 h-4 mr-1.5" /> New request
           </Button>
         </div>
@@ -54,7 +54,7 @@ export default function TaskRequest({ company, companyId, advisors }) {
           <div className="bg-brand-soft border border-brand/30 rounded-2xl p-4 mb-5 flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-brand shrink-0" />
             <span className="text-sm flex-1">Deliverable saved to Documents.</span>
-            <Button variant="ghost" className="rounded-full text-sm" onClick={() => navigate(`/company/${companyId}/documents`)}>
+            <Button variant="ghost" className="text-sm" onClick={() => navigate(`/company/${companyId}/documents`)}>
               <Link2 className="w-3.5 h-3.5 mr-1" /> Open
             </Button>
           </div>
@@ -119,7 +119,7 @@ export default function TaskRequest({ company, companyId, advisors }) {
 
       {error && <p className="text-sm text-destructive mb-4">{error}</p>}
 
-      <Button onClick={run} disabled={!taskTitle.trim() || !selectedAdvisor || loading} variant="brand" className="rounded-full px-8">
+      <Button onClick={run} disabled={!taskTitle.trim() || !selectedAdvisor || loading} variant="primary" className="px-8">
         {loading ? "Producing deliverable…" : "Request deliverable"} {!loading && <ArrowRight className="w-4 h-4 ml-1.5" />}
       </Button>
     </div>

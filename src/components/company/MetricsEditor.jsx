@@ -42,7 +42,7 @@ export default function MetricsEditor({ metrics = [], onChange }) {
             <SelectItem value="flat">Flat</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" onClick={add}><Plus className="w-4 h-4" /></Button>
+        <Button variant="secondaryOutline" onClick={add}><Plus className="w-4 h-4" /></Button>
       </div>
     </div>
   );

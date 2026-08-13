@@ -55,7 +55,13 @@ module.exports = {
   			brand: {
   				DEFAULT: 'hsl(var(--brand))',
   				foreground: 'hsl(var(--brand-foreground))',
-  				soft: 'hsl(var(--brand-soft))'
+  				soft: 'hsl(var(--brand-soft))',
+  				text: 'hsl(var(--brand-text))'
+  			},
+  			live: {
+  				DEFAULT: 'hsl(var(--live))',
+  				foreground: 'hsl(var(--live-foreground))',
+  				soft: 'hsl(var(--live-soft))'
   			},
   			chart: {
   				'1': 'hsl(var(--chart-1))',

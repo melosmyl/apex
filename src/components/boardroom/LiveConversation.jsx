@@ -176,7 +176,8 @@ export default function LiveConversation({ company, companyId, advisors }) {
         <Button
           onClick={handleStart}
           disabled={!topic.trim() || selectedAdvisors.length < 1}
-          className="w-full rounded-full h-12"
+          variant="primary"
+          className="w-full h-12"
         >
           <Radio className="w-4 h-4 mr-2" /> Start voice meeting
         </Button>

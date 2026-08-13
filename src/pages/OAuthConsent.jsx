@@ -218,7 +218,7 @@ export default function OAuthConsent() {
 
       <div className="flex gap-3">
         <Button
-          variant="outline"
+          variant="secondaryOutline"
           className="flex-1 h-12 font-medium"
           disabled={submitting}
           onClick={() => respond("deny")}

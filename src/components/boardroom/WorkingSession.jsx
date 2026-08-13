@@ -81,7 +81,7 @@ export default function WorkingSession({ company, companyId, advisors }) {
             <h2 className="font-display text-xl">Session summary</h2>
             <p className="text-xs text-muted-foreground mt-1">{selectedAdvisors.map((a) => a.name).join(", ")}</p>
           </div>
-          <Button variant="outline" className="rounded-full" onClick={() => { setSummary(null); setMessages([]); }}>
+          <Button variant="secondaryOutline" onClick={() => { setSummary(null); setMessages([]); }}>
             New session
           </Button>
         </div>
@@ -160,7 +160,7 @@ export default function WorkingSession({ company, companyId, advisors }) {
 
       {selectedAdvisors.length > 0 && messages.length > 0 && (
         <div className="flex justify-end mb-3">
-          <Button onClick={wrapUp} disabled={wrappingUp || loading || messages.length < 2} variant="outline" className="rounded-full text-sm">
+          <Button onClick={wrapUp} disabled={wrappingUp || loading || messages.length < 2} variant="secondaryOutline" className="text-sm">
             {wrappingUp ? "Wrapping up…" : "Wrap up & summarise"}
           </Button>
         </div>
@@ -175,7 +175,7 @@ export default function WorkingSession({ company, companyId, advisors }) {
           className="resize-none"
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
         />
-        <Button onClick={send} disabled={!input.trim() || selectedAdvisors.length === 0 || loading} variant="brand" className="rounded-xl h-11 px-5 shrink-0">
+        <Button onClick={send} disabled={!input.trim() || selectedAdvisors.length === 0 || loading} variant="primary" className="h-11 px-5 shrink-0">
           <Send className="w-4 h-4" />
         </Button>
       </div>

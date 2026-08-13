@@ -77,7 +77,7 @@ export default function GanttTimeline({ projects, tasks, onTasksChange }) {
         {unscheduled.map((t) => (
           <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/40 px-4 py-2.5">
             <span className="text-sm font-medium truncate">{t.title}</span>
-            <Button size="sm" variant="outline" onClick={() => openEdit(t)} className="rounded-full shrink-0"><CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> Add dates</Button>
+            <Button size="sm" variant="secondaryOutline" onClick={() => openEdit(t)} className="shrink-0"><CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> Add dates</Button>
           </div>
         ))}
       </div>

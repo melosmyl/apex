@@ -21,9 +21,8 @@ export default function VoiceControls({
       <div className="flex items-center justify-center gap-2 flex-wrap">
         {/* Mute */}
         <Button
-          variant={isMuted ? "destructive" : "outline"}
+          variant={isMuted ? "destructive" : "secondaryOutline"}
           size="sm"
-          className="rounded-full"
           onClick={onToggleMute}
           title={isMuted ? "Unmute" : "Mute"}
         >
@@ -32,9 +31,8 @@ export default function VoiceControls({
 
         {/* Pause/Resume */}
         <Button
-          variant="outline"
+          variant="secondaryOutline"
           size="sm"
-          className="rounded-full"
           onClick={onTogglePause}
           title={isPaused ? "Resume" : "Pause"}
         >
@@ -46,7 +44,7 @@ export default function VoiceControls({
           <Button
             variant="destructive"
             size="sm"
-            className="rounded-full animate-pulse"
+            className="animate-pulse"
             onClick={onInterrupt}
             title="Interrupt"
           >
@@ -56,37 +54,37 @@ export default function VoiceControls({
 
         {/* Skip response */}
         {isSpeaking && (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={onSkip} title="Skip">
+          <Button variant="secondaryOutline" size="sm" onClick={onSkip} title="Skip">
             <SkipForward className="w-4 h-4" />
           </Button>
         )}
 
         {/* Repeat */}
         {isSpeaking || isListening ? (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={onRepeat} title="Repeat last">
+          <Button variant="secondaryOutline" size="sm" onClick={onRepeat} title="Repeat last">
             <RotateCw className="w-4 h-4" />
           </Button>
         ) : null}
 
         {/* Ask advisors to discuss */}
         {isListening && selectedAdvisors?.length > 1 && (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={onExchange} title="Let advisors discuss">
+          <Button variant="secondaryOutline" size="sm" onClick={onExchange} title="Let advisors discuss">
             <Users className="w-4 h-4 mr-1.5" /> Advisors discuss
           </Button>
         )}
 
         {/* Switch to text */}
-        <Button variant="outline" size="sm" className="rounded-full" onClick={onShowText} title="Type instead">
+        <Button variant="secondaryOutline" size="sm" onClick={onShowText} title="Type instead">
           <MessageSquare className="w-4 h-4" />
         </Button>
 
         {/* View transcript */}
-        <Button variant="outline" size="sm" className="rounded-full" onClick={onShowTranscript} title="View transcript">
+        <Button variant="secondaryOutline" size="sm" onClick={onShowTranscript} title="View transcript">
           <Hand className="w-4 h-4" />
         </Button>
 
         {/* End meeting */}
-        <Button variant="destructive" size="sm" className="rounded-full" onClick={onEnd} title="End meeting">
+        <Button variant="destructive" size="sm" onClick={onEnd} title="End meeting">
           <Phone className="w-4 h-4 mr-1.5 rotate-[135deg]" /> End
         </Button>
       </div>

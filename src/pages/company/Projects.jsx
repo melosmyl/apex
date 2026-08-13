@@ -41,10 +41,10 @@ export default function Projects() {
   return (
     <div>
       <PageHeader eyebrow="Plan & execute" title="Projects" description="Turn board decisions into structured, owned work.">
-        <Button onClick={() => setOpen(true)} className="rounded-full px-5"><Plus className="w-4 h-4 mr-1.5" /> New project</Button>
+        <Button onClick={() => setOpen(true)} variant="primary" className="px-5"><Plus className="w-4 h-4 mr-1.5" /> New project</Button>
       </PageHeader>
       {items === null ? <div className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />
-        : items.length === 0 ? <EmptyState icon={FolderKanban} title="No projects yet" description="Create a project to organise objectives, owners and timelines." action={<Button onClick={() => setOpen(true)} className="rounded-full px-6"><Plus className="w-4 h-4 mr-1.5" /> New project</Button>} />
+        : items.length === 0 ? <EmptyState icon={FolderKanban} title="No projects yet" description="Create a project to organise objectives, owners and timelines." action={<Button onClick={() => setOpen(true)} variant="primary" className="px-6"><Plus className="w-4 h-4 mr-1.5" /> New project</Button>} />
         : (
         <>
           <div className="flex items-center gap-1 p-1 bg-secondary/60 rounded-full w-fit mb-6">

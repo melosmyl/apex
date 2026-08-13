@@ -171,18 +171,18 @@ export default function DocumentDetailDialog({
 
         {/* Actions bar — visible near title */}
         <div className="flex flex-wrap items-center gap-2 py-3 border-b border-border/50">
-          <DocumentDownloadButton doc={doc} variant="default" size="sm" />
+          <DocumentDownloadButton doc={doc} variant="primary" size="sm" />
           {doc.native_file_url && (
-            <Button variant="ghost" size="sm" className="rounded-full" onClick={() => window.open(doc.native_file_url, "_blank")}>
+            <Button variant="ghost" size="sm" onClick={() => window.open(doc.native_file_url, "_blank")}>
               <Eye className="w-3.5 h-3.5 mr-1" /> Open Preview
             </Button>
           )}
           {doc.status !== "approved" && doc.status !== "archived" && !showRevision && (
-            <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setShowRevision(true)}>
+            <Button variant="ghost" size="sm" onClick={() => setShowRevision(true)}>
               <RefreshCw className="w-3.5 h-3.5 mr-1" /> Request Revision
             </Button>
           )}
-          <Button variant="ghost" size="sm" className="rounded-full" disabled={regenerating} onClick={async () => {
+          <Button variant="ghost" size="sm" disabled={regenerating} onClick={async () => {
             setRegenerating(true);
             try {
               await regenerateDeliverable({ companyId: doc.company_id, documentId: doc.id });
@@ -193,19 +193,19 @@ export default function DocumentDetailDialog({
           </Button>
           {doc.share_token ? (
             <>
-              <Button variant="ghost" size="sm" className="rounded-full" onClick={() => copyToClipboard(`${window.location.origin}/share/document/${doc.share_token}`, "Public link copied — anyone with it can view this document, no account needed.")}>
+              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(`${window.location.origin}/share/document/${doc.share_token}`, "Public link copied — anyone with it can view this document, no account needed.")}>
                 <Share2 className="w-3.5 h-3.5 mr-1" /> Copy Public Link
               </Button>
-              <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" disabled={sharingBusy} onClick={revokeSharing}>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" disabled={sharingBusy} onClick={revokeSharing}>
                 Revoke
               </Button>
             </>
           ) : (
-            <Button variant="ghost" size="sm" className="rounded-full" disabled={sharingBusy} onClick={enableSharing}>
+            <Button variant="ghost" size="sm" disabled={sharingBusy} onClick={enableSharing}>
               <Share2 className="w-3.5 h-3.5 mr-1" /> Share Publicly
             </Button>
           )}
-          <Button variant="ghost" size="sm" className="rounded-full ml-auto" onClick={archive} disabled={busy || doc.status === "archived"}>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={archive} disabled={busy || doc.status === "archived"}>
             <Archive className="w-3.5 h-3.5 mr-1" /> Archive
           </Button>
         </div>
@@ -256,8 +256,7 @@ export default function DocumentDetailDialog({
             {/* Generate file for documents without native files */}
             {!doc.native_file_url && !doc.pdf_file_url && doc.status !== "generating" && doc.status !== "failed" && (
               <Button
-                variant="default"
-                className="rounded-full"
+                variant="primary"
                 disabled={regenerating}
                 onClick={async () => {
                   setRegenerating(true);
@@ -389,22 +388,22 @@ export default function DocumentDetailDialog({
         {!editing && (
           <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-border/50">
             {doc.status !== "approved" && doc.status !== "archived" && (
-              <Button onClick={approve} disabled={busy} className="rounded-full bg-emerald-700 hover:bg-emerald-800"><Check className="w-4 h-4 mr-1.5" /> Approve</Button>
+              <Button onClick={approve} disabled={busy} variant="primary"><Check className="w-4 h-4 mr-1.5" /> Approve</Button>
             )}
             {doc.status !== "approved" && doc.status !== "archived" && !showRevision && (
-              <Button variant="outline" onClick={() => setShowRevision(true)} className="rounded-full"><RefreshCw className="w-4 h-4 mr-1.5" /> Request Revision</Button>
+              <Button variant="secondaryOutline" onClick={() => setShowRevision(true)}><RefreshCw className="w-4 h-4 mr-1.5" /> Request Revision</Button>
             )}
             {showRevision && (
               <div className="w-full space-y-2">
                 <Textarea value={revisionNotes} onChange={(e) => setRevisionNotes(e.target.value)} rows={3} placeholder="What needs to change? This feedback goes to the advisor." />
                 <div className="flex justify-end gap-2">
                   <Button variant="ghost" onClick={() => { setShowRevision(false); setRevisionNotes(""); }}>Cancel</Button>
-                  <Button onClick={requestRevision} disabled={busy || !revisionNotes.trim()} className="rounded-full"><RefreshCw className="w-4 h-4 mr-1.5" /> Send to Advisor</Button>
+                  <Button onClick={requestRevision} disabled={busy || !revisionNotes.trim()} variant="primary"><RefreshCw className="w-4 h-4 mr-1.5" /> Send to Advisor</Button>
                 </div>
               </div>
             )}
-            <Button variant="outline" onClick={() => setEditing(true)} className="rounded-full"><Edit3 className="w-4 h-4 mr-1.5" /> Edit</Button>
-            <Button variant="ghost" onClick={archive} disabled={busy || doc.status === "archived"} className="rounded-full"><Archive className="w-4 h-4 mr-1.5" /> Archive</Button>
+            <Button variant="secondaryOutline" onClick={() => setEditing(true)}><Edit3 className="w-4 h-4 mr-1.5" /> Edit</Button>
+            <Button variant="ghost" onClick={archive} disabled={busy || doc.status === "archived"}><Archive className="w-4 h-4 mr-1.5" /> Archive</Button>
           </div>
         )}
       </DialogContent>

@@ -57,7 +57,7 @@ export default function CompanySettings() {
           </div>
           <div className="flex gap-2">
             <Input value={newPriority} onChange={(e)=>setNewPriority(e.target.value)} placeholder="Add a priority…" onKeyDown={(e)=>{if(e.key==="Enter"&&newPriority.trim()){set("priorities",[...form.priorities,newPriority.trim()]);setNewPriority("");}}} />
-            <Button variant="outline" onClick={()=>{if(newPriority.trim()){set("priorities",[...form.priorities,newPriority.trim()]);setNewPriority("");}}}><Plus className="w-4 h-4" /></Button>
+            <Button variant="secondaryOutline" onClick={()=>{if(newPriority.trim()){set("priorities",[...form.priorities,newPriority.trim()]);setNewPriority("");}}}><Plus className="w-4 h-4" /></Button>
           </div>
         </div>
 

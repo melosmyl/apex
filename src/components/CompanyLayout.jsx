@@ -44,7 +44,7 @@ export default function CompanyLayout() {
   const SidebarInner =
   <div className="flex flex-col h-full" style={SIDEBAR_DARK}>
       <div className="px-6 py-6 border-b border-white/10">
-        <button onClick={() => navigate("/")} className="flex items-center gap-2 opacity-60 hover:opacity-100 text-sm mb-4 transition-opacity">
+        <button onClick={() => navigate("/companies")} className="flex items-center gap-2 opacity-60 hover:opacity-100 text-sm mb-4 transition-opacity">
           <ChevronLeft className="w-4 h-4" /> My Companies
         </button>
         <div className="flex items-center gap-3">
@@ -63,8 +63,14 @@ export default function CompanyLayout() {
         key={item.to}
         to={`/company/${companyId}/${item.to}`}
         className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-        isActive ? "bg-brand text-brand-foreground font-medium" : "opacity-70 hover:opacity-100 hover:bg-white/5"}`
+        // A left-edge marker rather than a full fill — a solid bg-brand pill
+        // was the loudest thing on screen against the dark sidebar, and it
+        // competed with orange's actual meaning ("the user caused this")
+        // elsewhere in the app. Active is now: the label brightens to full
+        // opacity, and a 3px orange bar marks the position — nothing about
+        // it is a fill the user might mistake for a call to attention.
+        `relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+        isActive ? "opacity-100 font-medium before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-4 before:w-[3px] before:rounded-full before:bg-brand" : "opacity-70 hover:opacity-100 hover:bg-white/5"}`
 
         }>
 

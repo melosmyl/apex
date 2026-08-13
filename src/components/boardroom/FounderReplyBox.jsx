@@ -52,7 +52,7 @@ export default function FounderReplyBox({ onSubmit }) {
       </div>
       {error && <p className="text-sm text-destructive mt-2">{error}</p>}
       <div className="flex justify-end mt-2">
-        <Button onClick={submit} disabled={!message.trim() || sending} className="rounded-full px-5">
+        <Button onClick={submit} disabled={!message.trim() || sending} variant="primary" className="px-5">
           {sending ? (
             <>
               <div className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />

@@ -75,21 +75,21 @@ export default function ExecutiveTeam() {
       <PageHeader eyebrow="The heart of the platform" title="Executive Team"
       description="Assemble your executive team — add up to 6 specialist AI advisors, or invite real collaborators.">
         <div className="flex gap-2">
-          <Button onClick={() => setAddOpen(true)} className="rounded-full px-5 bg-[#3b6e21]"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
-          <Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
+          <Button onClick={() => setAddOpen(true)} variant="primary" className="px-5"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
+          <Button onClick={() => setInviteOpen(true)} variant="secondaryOutline" className="px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
         </div>
       </PageHeader>
 
       {loadError ?
       <EmptyState icon={RefreshCw} title="Couldn't load your team"
       description={`A network error occurred${loadError ? `: ${loadError}` : ""}. Please check your connection and try again.`}
-      action={<Button onClick={load} className="rounded-full px-6"><RefreshCw className="w-4 h-4 mr-1.5" /> Retry</Button>} /> :
+      action={<Button onClick={load} variant="primary" className="px-6"><RefreshCw className="w-4 h-4 mr-1.5" /> Retry</Button>} /> :
       advisors === null ?
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{[0, 1, 2].map((i) => <div key={i} className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />)}</div> :
       advisors.length === 0 ?
       <EmptyState icon={Users} title="Your boardroom is empty"
       description="Invite AI advisors from the library or bring in real collaborators to build your executive team."
-      action={<div className="flex gap-2 justify-center"><Button onClick={() => setAddOpen(true)} className="rounded-full px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button><Button onClick={() => setInviteOpen(true)} variant="outline" className="rounded-full px-6"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button></div>} /> :
+      action={<div className="flex gap-2 justify-center"><Button onClick={() => setAddOpen(true)} variant="primary" className="px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button><Button onClick={() => setInviteOpen(true)} variant="secondaryOutline" className="px-6"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button></div>} /> :
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {advisors.map((a) => (

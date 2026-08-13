@@ -180,10 +180,10 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
       {error && <p className="text-sm text-destructive text-center mb-4">{error}</p>}
 
       <div className="flex items-center justify-between">
-        <Button onClick={onBack} variant="ghost" className="rounded-full px-5" disabled={creating}>
+        <Button onClick={onBack} variant="ghost" className="px-5" disabled={creating}>
           Back
         </Button>
-        <Button onClick={handleBegin} variant="brand" className="rounded-full px-8 h-12" disabled={creating || advisors.length < 3}>
+        <Button onClick={handleBegin} variant="primary" className="px-8 h-12" disabled={creating || advisors.length < 3}>
           {creating ? "Setting up your company…" : "Begin" } {!creating && <ArrowRight className="w-4 h-4 ml-1.5" />}
         </Button>
       </div>

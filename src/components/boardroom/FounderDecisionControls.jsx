@@ -85,7 +85,7 @@ export default function FounderDecisionControls({ meetingId, nextActions = [], c
       )}
 
       <div className="flex justify-end">
-        <Button onClick={save} disabled={saving || decision === "pending"} className="rounded-full px-6">
+        <Button onClick={save} disabled={saving || decision === "pending"} variant="primary" className="px-6">
           {saved ? "Saved" : saving ? "Saving…" : "Save decision"}
         </Button>
       </div>

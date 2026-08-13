@@ -63,7 +63,8 @@ export default function CaptureInput({ companyId, onCaptured, pendingNodeAnswer,
       />
       <Button
         size="icon"
-        className="rounded-full shrink-0"
+        variant="primary"
+        className="shrink-0"
         disabled={!text.trim() || state === "sending"}
         onClick={submit}
         aria-label="Capture"

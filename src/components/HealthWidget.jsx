@@ -90,12 +90,12 @@ export default function HealthWidget() {
               <span className="text-sm">{battery}%</span>
             </div>
           )}
-          <Button onClick={disconnect} variant="ghost" size="sm" className="ml-auto rounded-full">
+          <Button onClick={disconnect} variant="ghost" size="sm" className="ml-auto">
             <X className="w-4 h-4" /> Disconnect
           </Button>
         </div>
       ) : (
-        <Button onClick={connect} disabled={connecting} variant="outline" className="rounded-full">
+        <Button onClick={connect} disabled={connecting} variant="secondaryOutline">
           <Bluetooth className="w-4 h-4 mr-1.5" />
           {connecting ? "Connecting…" : "Connect health device"}
         </Button>

@@ -25,16 +25,30 @@
     --destructive-foreground: 40 20% 97%;
     --border: 40 16% 74%;
     --input: 40 16% 74%;
-    --ring: 43 70% 40%;
+    --ring: 18 80% 45%;
 
-    /* Signal amber — the one accent app-wide. The landing/auth/free-meeting
-       pages override this locally to a deep indigo (IDENTITY_ACCENT_STYLE
-       in src/lib/branding.js) — that identity is deliberately separate from
-       the product interior, which stays amber-only: nothing else may draw
-       the eye as importance or interactivity. */
-    --brand: 43 75% 40%;
-    --brand-foreground: 40 20% 98%;
-    --brand-soft: 43 55% 90%;
+    /* Signal orange — the one accent for anything the user did or needs to
+       attend to. Two tokens, one hue, different jobs:
+       --brand is the bright fill for marks (badges, dots, large numerals,
+       confidence bars) — never small text, so AA text-contrast doesn't
+       apply and it can stay vivid. --brand-text is a darker value of the
+       same hue for the rare case where orange has to *be* text; it clears
+       4.5:1 against both --background and --card (checked, not assumed).
+       Darkening the single accent itself to clear AA (~L36) reads as burnt
+       orange/rust — this split exists specifically to avoid that. */
+    --brand: 18 85% 52%;
+    --brand-foreground: 220 8% 10%;
+    --brand-soft: 18 75% 95%;
+    --brand-text: 18 85% 36%;
+
+    /* Deep indigo — reserved for live/positional state only: the product
+       doing something on its own right now (someone is speaking, you are
+       here, in progress). Never for buttons, never for anything the user
+       caused — that's orange. No separate text variant needed: this hue
+       clears AA as text directly (7.2:1+ against both surfaces). */
+    --live: 240 60% 45%;
+    --live-foreground: 40 20% 98%;
+    --live-soft: 240 45% 95%;
 
     /* Hairline-first — shadows are a last resort, not the default */
     --shadow-soft: 0 1px 2px rgba(20,20,15,0.04);
@@ -83,10 +97,15 @@
     --destructive-foreground: 40 10% 92%;
     --border: 220 6% 17%;
     --input: 220 6% 17%;
-    --ring: 43 65% 50%;
-    --brand: 43 70% 52%;
+    --ring: 18 80% 55%;
+    --brand: 18 85% 55%;
     --brand-foreground: 220 8% 9%;
-    --brand-soft: 43 30% 20%;
+    --brand-soft: 18 40% 20%;
+    --brand-text: 18 75% 65%;
+
+    --live: 240 55% 68%;
+    --live-foreground: 220 8% 9%;
+    --live-soft: 240 30% 20%;
 
     --shadow-soft: 0 1px 2px rgba(0,0,0,0.3);
     --shadow-card: 0 2px 6px rgba(0,0,0,0.35);
@@ -176,5 +195,116 @@
   .prose-editorial blockquote {
     border-left: 2px solid hsl(var(--brand));
     padding-left: 1.25rem; font-style: italic; color: hsl(var(--muted-foreground));
+  }
+}
+
+@layer components {
+  /* Metal button — steel only. A dark indigo metal skin existed briefly
+     for a liveMetal variant; removed (product owner, 2026-08-13) — indigo
+     stays a token for live/positional state (speaking indicator, "you are
+     here", in-progress) but never appears on a button in any form. Buttons
+     are steel or bordered outline, nothing else.
+
+     The mechanic: a short, tight top-to-mid gradient (not an even wash —
+     that reads as a soft PNG sticker, not a machined surface), a hard 1px
+     border darker than the fill, a single-pixel inset highlight along the
+     top edge, and a tight low-opacity drop shadow. :active inverts the
+     gradient, swaps the drop shadow for an inset one, and (via
+     .btn-metal-label) drops the visible label 1px — the whole thing should
+     read as a physical button actually depressing, not a color swap.
+     Hover only ever brightens the existing stops; it never transitions the
+     gradient itself. Colour never touches this — accent tokens are for
+     marks and live-state elsewhere, not buttons. */
+  .btn-metal {
+    /* A real light-top/dark-bottom jump (L97 down to L53, ~44 points) held
+       across a short distance (32%) rather than an even wash — the first
+       pass here was L92→L69 (23 points), which read as grey, not metal. */
+    --metal-top: hsl(40 18% 97%);
+    --metal-mid: hsl(40 11% 87%);
+    --metal-bottom: hsl(40 9% 53%);
+    --metal-border: hsl(40 14% 30%);
+    background-image: linear-gradient(180deg, var(--metal-top) 0%, var(--metal-mid) 32%, var(--metal-bottom) 100%);
+    border: 1px solid var(--metal-border);
+    color: hsl(220 8% 10%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 1px 3px rgba(20, 15, 10, 0.22),
+      0 1px 1px rgba(20, 15, 10, 0.12);
+    /* !important: defeats the shared transition-all utility from the cva
+       base classes, which sits in Tailwind's utilities layer and otherwise
+       wins over this components-layer rule regardless of source order —
+       without it, background-image (the gradient) would animate on hover,
+       which the brief explicitly rules out. */
+    transition: box-shadow 150ms ease !important;
+  }
+  /* [data-force-state] is not a demo hack with its own values — it's the
+     literal same declaration block as the real pseudo-class, matched by an
+     extra selector. A review harness sets the attribute to show a state
+     without faking it in a separate style object; there is no second copy
+     of these numbers to drift out of sync. */
+  .btn-metal:hover:not(:disabled),
+  .btn-metal[data-force-state="hover"] {
+    --metal-top: hsl(40 20% 99%);
+    --metal-mid: hsl(40 13% 92%);
+    --metal-bottom: hsl(40 10% 58%);
+  }
+  .btn-metal:active:not(:disabled),
+  .btn-metal[data-force-state="active"] {
+    /* Fully inverted (dark where light was) plus a materially stronger
+       inset — the first pass's inset (0.32 alpha, 4px blur, no spread)
+       barely registered next to a weak rest-state shadow. This needs to
+       be unmistakable at a glance, not a subtle cue. */
+    background-image: linear-gradient(180deg, var(--metal-bottom) 0%, var(--metal-mid) 68%, var(--metal-top) 100%);
+    box-shadow:
+      inset 0 2px 5px rgba(20, 15, 10, 0.55),
+      inset 0 1px 3px rgba(20, 15, 10, 0.4);
+  }
+
+  /* Disabled must read as flatter and quieter than rest, not as a
+     lower-opacity copy of the same vivid surface — the first pass just
+     dropped the shadow and left the full-contrast gradient + the shared
+     disabled:opacity-50 utility to do the work, which read as *more*
+     solid (a flat pale block with no shadow to make it recede). This
+     replaces the gradient outright with a flat, low-contrast fill and
+     overrides that opacity utility so the flatness itself carries it. */
+  .btn-metal:disabled {
+    background-image: none;
+    background-color: hsl(40 8% 88%);
+    border-color: hsl(40 8% 78%);
+    color: hsl(40 6% 55%);
+    box-shadow: none;
+    opacity: 1 !important;
+  }
+  .btn-metal-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: transform 150ms ease;
+  }
+  .btn-metal:active:not(:disabled) .btn-metal-label,
+  .btn-metal[data-force-state="active"] .btn-metal-label {
+    transform: translateY(1px);
+  }
+
+  /* Secondary — no metal at all, per the brief: transparent fill, a firm
+     near-black border, same corners and mono label as primary so the two
+     read as one language. */
+  .btn-outline-secondary {
+    background-color: transparent;
+    border: 1px solid hsl(220 8% 15%);
+    color: hsl(220 8% 10%);
+    transition: background-color 150ms ease, border-color 150ms ease !important;
+  }
+  .btn-outline-secondary:hover:not(:disabled),
+  .btn-outline-secondary[data-force-state="hover"] {
+    background-color: hsl(220 8% 10% / 0.05);
+  }
+  .btn-outline-secondary:active:not(:disabled),
+  .btn-outline-secondary[data-force-state="active"] {
+    background-color: hsl(220 8% 10% / 0.09);
+  }
+  .btn-outline-secondary:active:not(:disabled) .btn-metal-label,
+  .btn-outline-secondary[data-force-state="active"] .btn-metal-label {
+    transform: translateY(1px);
   }
 }

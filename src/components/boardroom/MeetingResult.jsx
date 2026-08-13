@@ -46,11 +46,11 @@ function ShareMeetingControl({ meetingId, initialToken, status }) {
 
   return token ? (
     <div className="flex items-center gap-2">
-      <Button variant="outline" size="sm" className="rounded-full" onClick={() => copy(token)}><Share2 className="w-3.5 h-3.5 mr-1.5" /> Copy Public Link</Button>
-      <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" disabled={busy} onClick={revoke}>Revoke</Button>
+      <Button variant="secondaryOutline" size="sm" onClick={() => copy(token)}><Share2 className="w-3.5 h-3.5 mr-1.5" /> Copy Public Link</Button>
+      <Button variant="ghost" size="sm" className="text-muted-foreground" disabled={busy} onClick={revoke}>Revoke</Button>
     </div>
   ) : (
-    <Button variant="outline" size="sm" className="rounded-full" disabled={busy} onClick={enable}><Share2 className="w-3.5 h-3.5 mr-1.5" /> Share Publicly</Button>
+    <Button variant="secondaryOutline" size="sm" disabled={busy} onClick={enable}><Share2 className="w-3.5 h-3.5 mr-1.5" /> Share Publicly</Button>
   );
 }
 
@@ -121,7 +121,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         )}
         {onRecordDecision && (
           <div className="flex justify-end mt-4">
-            <Button onClick={onRecordDecision} variant="outline" className="rounded-full px-5">Record in Decision Centre <ArrowRight className="w-4 h-4 ml-1.5" /></Button>
+            <Button onClick={onRecordDecision} variant="secondaryOutline" className="px-5">Record in Decision Centre <ArrowRight className="w-4 h-4 ml-1.5" /></Button>
           </div>
         )}
       </div>

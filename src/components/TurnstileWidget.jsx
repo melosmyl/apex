@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from "react";
+import { assertLiveSiteKeyInProduction } from "@/lib/turnstile";
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+assertLiveSiteKeyInProduction(SITE_KEY);
 
 // Renders nothing until a site key is configured — lets this flow keep
 // working in local/dev environments before Cloudflare Turnstile is set up,

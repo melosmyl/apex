@@ -172,7 +172,7 @@ export default function Admin() {
                 <Textarea className="text-xs" rows={2} value={editing[a.id]?.system_instructions ?? a.system_instructions ?? ""} onChange={e => updateField(a.id, "system_instructions", e.target.value)} />
               </div>
               <div className="flex justify-end mt-2">
-                <Button size="sm" variant="outline" onClick={() => saveAdvisor(a.id)} disabled={saving === a.id}>
+                <Button size="sm" variant="secondaryOutline" onClick={() => saveAdvisor(a.id)} disabled={saving === a.id}>
                   {saving === a.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
                 </Button>
               </div>
@@ -230,7 +230,7 @@ export default function Admin() {
               </div>
             ))}
             <div className="sm:col-span-2 lg:col-span-3 flex justify-end">
-              <Button onClick={saveLimits} disabled={saving === "limits"} className="rounded-full">
+              <Button onClick={saveLimits} disabled={saving === "limits"} variant="primary">
                 {saving === "limits" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save limits
               </Button>
             </div>

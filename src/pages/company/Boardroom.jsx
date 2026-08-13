@@ -66,7 +66,7 @@ export default function Boardroom() {
         <EmptyState
           title="Assemble your executive team first"
           description="Add at least one AI advisor to start using the Boardroom."
-          action={<Button onClick={() => navigate(`/company/${companyId}/team`)} className="rounded-full px-6">Go to Executive Team</Button>}
+          action={<Button onClick={() => navigate(`/company/${companyId}/team`)} variant="primary" className="px-6">Go to Executive Team</Button>}
         />
       </div>
     );
