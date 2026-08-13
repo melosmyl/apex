@@ -192,7 +192,7 @@ Do not build these. They are competitor surface area aimed at a different buyer,
 ## Standing constraints
 
 - **Supabase Edge Functions:** "Enforce JWT Verification" must be **OFF** for any function performing its own manual auth check, or the platform rejects the request before function code runs. Exception: `adminApi` keeps it **ON** deliberately.
-- **Schema changes** go through `supabase/migrations/`.
+- **Schema changes** go through `supabase/migrations/` — and must actually be applied with `supabase db push --linked` (or `supabase db query --linked --file <path>` for a single targeted statement), never by pasting into the Supabase Dashboard SQL Editor. That habit is what caused a real gap: 17 objects (16 migrations plus `get_my_profile()`) existed live with zero record in the CLI's tracking table, traced 2026-08-13 to `migration_001_initial_schema.sql`'s own original header instructing the Dashboard-paste workflow — a one-time instruction that just kept being followed long after the CLI was linked and could have run `db push` instead. Reconciled once; don't let it drift again.
 - **Testing** uses synthetic seed data that is deleted afterwards — keep the database clean of fabricated history.
 - **Available time is ~15–20 hrs/week.** Prefer the smaller change that ships.
 
