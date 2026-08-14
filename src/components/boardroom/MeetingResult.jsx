@@ -1,9 +1,11 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical, Share2, ListOrdered } from "lucide-react";
+import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical, Share2, ListOrdered, MessageSquare } from "lucide-react";
 import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
+import FounderReplyBox from "@/components/boardroom/FounderReplyBox";
 import BoardMemoryNote from "@/components/boardroom/BoardMemoryNote";
 import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
 import BoardUncertaintyNote from "@/components/boardroom/BoardUncertaintyNote";
@@ -56,10 +58,12 @@ function ShareMeetingControl({ meetingId, initialToken, status }) {
 
 // The chair's ranked close: at most 3 things to do before spending more
 // time or money on this, not a flat list of everything anyone mentioned.
-// These are exactly what became real tasks (see runChairSynthesis), so
-// this doubles as the "added to Tasks" confirmation — skipped for
-// anonymous free-meeting sessions, which never get tasks created.
-function PriorityClose({ priorityFrame, priorityActions, isAnonymous }) {
+// These are exactly what became real tasks (see runChairSynthesis) — each
+// one has a real Execute -> generate-deliverable path on the Tasks page,
+// so the link through is the point: the board can produce the research,
+// not just recommend it. Skipped for anonymous free-meeting sessions,
+// which never get tasks created.
+function PriorityClose({ priorityFrame, priorityActions, isAnonymous, companyId, meetingId }) {
   if (!priorityActions?.length) return null;
   return (
     <div className="bg-card border border-border/70 rounded-2xl p-6">
@@ -79,7 +83,30 @@ function PriorityClose({ priorityFrame, priorityActions, isAnonymous }) {
           </li>
         ))}
       </ol>
-      {!isAnonymous && <p className="text-xs text-muted-foreground mt-4">Added to Tasks.</p>}
+      {!isAnonymous && (
+        <div className="flex items-center justify-between gap-3 mt-4">
+          <p className="text-xs text-muted-foreground">Added to Tasks — your board can do this work, not just recommend it.</p>
+          <Link to={`/company/${companyId}/tasks?meeting=${meetingId}`} className="shrink-0">
+            <Button variant="secondaryOutline" size="sm">View in Tasks <ArrowRight className="w-3.5 h-3.5 ml-1.5" /></Button>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The main thing we want a founder to do next — visible by default, not
+// buried inside the collapsed Executive Discussion accordion. Calls
+// runFounderFollowup, which adds the founder's message to the transcript
+// and gets real responses from every advisor who was in this meeting —
+// the same debate engine, one more round, not a separate chat.
+function AskTheBoard({ onSubmit }) {
+  if (!onSubmit) return null;
+  return (
+    <div className="bg-card border border-border/70 rounded-2xl p-6">
+      <div className="flex items-center gap-2 mb-1"><MessageSquare className="w-4 h-4 text-muted-foreground" /><h4 className="font-display text-base">Ask the board</h4></div>
+      <p className="text-sm text-muted-foreground mb-4">Share more context, challenge a recommendation, or ask a follow-up — every advisor who was in this meeting will respond.</p>
+      <FounderReplyBox onSubmit={onSubmit} />
     </div>
   );
 }
@@ -156,12 +183,14 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         )}
       </div>
 
+      <AskTheBoard onSubmit={onFollowup} />
+
       <BoardMemoryNote memoryContext={result.memory_context} companyId={companyId} />
       <BoardUncertaintyNote resolution={resolution} />
 
-      <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
+      <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 
-      <PriorityClose priorityFrame={resolution.priority_frame} priorityActions={resolution.priority_actions} isAnonymous={isAnonymous} />
+      <PriorityClose priorityFrame={resolution.priority_frame} priorityActions={resolution.priority_actions} isAnonymous={isAnonymous} companyId={companyId} meetingId={meetingId} />
 
       <FounderDecisionControls meetingId={result.meeting_id} />
 

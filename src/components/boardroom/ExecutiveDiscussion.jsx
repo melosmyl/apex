@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
-import FounderReplyBox from "@/components/boardroom/FounderReplyBox";
 import PinnableText from "@/components/pins/PinnableText";
 import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
 import { absenteesByRound } from "@/lib/boardroom";
@@ -178,7 +177,7 @@ function DiscussionEvaluation({ evaluation }) {
   );
 }
 
-export default function ExecutiveDiscussion({ transcript = [], evaluation, advisors = [], onFollowup, meetingId, companyId, meetingTitle }) {
+export default function ExecutiveDiscussion({ transcript = [], evaluation, advisors = [], meetingId, companyId, meetingTitle }) {
   const { createPin } = usePin();
   const [expanded, setExpanded] = useState(false);
   const [filterAdvisor, setFilterAdvisor] = useState("all");
@@ -300,7 +299,6 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
               );
             })}
           </div>
-          {onFollowup && <FounderReplyBox onSubmit={onFollowup} />}
         </div>
       )}
     </div>

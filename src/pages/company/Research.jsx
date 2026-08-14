@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useOutletContext } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Search, Sparkles, Trash2, Upload, Paperclip, Loader2 } from "lucide-react";
+import { Search, Trash2, Upload, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -14,68 +12,35 @@ const TYPES = ["Competitor Analysis", "Industry Trends", "Customer Behaviour", "
 
 export default function Research() {
   const { companyId } = useParams();
-  const { company } = useOutletContext();
   const [items, setItems] = useState(null);
   const [topic, setTopic] = useState("");
-  const [busy, setBusy] = useState(false);
   const [view, setView] = useState(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadForm, setUploadForm] = useState({ title: "", file_url: "", file_name: "" });
 
   const load = () => base44.entities.Document.filter({ company_id: companyId, kind: "research" }, "-created_date", 100).then(setItems);
   useEffect(() => { load(); }, [companyId]);
 
-  const run = async (t) => {
-    const query = t || topic;
-    if (!query.trim()) return;
-    setBusy(true);
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `Produce a concise, executive-grade research briefing for ${company.name} (industry: ${company.industry || "N/A"}; about: ${company.description || company.tagline || "N/A"}).\n\nResearch request: "${query}".\n\nReturn a well-structured briefing with clear sections, key findings, and implications for this company. Keep it sharp and decision-useful.`,
-      add_context_from_internet: true,
-      model: "gemini_3_flash",
-    });
-    await base44.entities.Document.create({ company_id: companyId, kind: "research", title: query, category: "Competitor Research", content: typeof res === "string" ? res : JSON.stringify(res) });
-    setTopic(""); setBusy(false); load();
-  };
-
   const remove = async (d) => { await base44.entities.Document.delete(d.id); setView(null); load(); };
-
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setUploadForm(f => ({ ...f, file_url, file_name: file.name, title: f.title || file.name.replace(/\.[^.]+$/, "") }));
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const saveUpload = async () => {
-    if (!uploadForm.title.trim() || !uploadForm.file_url) return;
-    await base44.entities.Document.create({ company_id: companyId, kind: "research", title: uploadForm.title, category: "Competitor Research", content: "", file_url: uploadForm.file_url, file_name: uploadForm.file_name });
-    setUploadForm({ title: "", file_url: "", file_name: "" }); setUploadOpen(false); load();
-  };
 
   return (
     <div>
       <PageHeader eyebrow="On-demand intelligence" title="Research Hub"
         description="Request research your board can reference in future meetings.">
-        <Button onClick={() => setUploadOpen(true)} variant="secondaryOutline" className="px-5"><Upload className="w-4 h-4 mr-1.5" /> Upload</Button>
+        <Button variant="secondaryOutline" className="px-5" disabled title="Coming soon — uploading isn't wired up yet"><Upload className="w-4 h-4 mr-1.5" /> Upload</Button>
       </PageHeader>
 
-      <div className="bg-card border border-border/70 rounded-2xl p-6 mb-8 rise-in">
+      {/* Requesting research isn't wired to a real backend yet — disabled
+          rather than left looking live, so it reads as unfinished, not
+          broken. See DocumentManager/DocumentLibrary/Pins for the same
+          treatment on the other base44.integrations.Core.* call sites. */}
+      <div className="bg-card border border-border/70 rounded-2xl p-6 mb-8 rise-in opacity-60" title="Coming soon">
         <div className="flex flex-col sm:flex-row gap-3">
-          <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What should we research?" className="rounded-full" disabled={busy} onKeyDown={(e)=>e.key==="Enter"&&run()} />
-          <Button onClick={() => run()} disabled={busy || !topic.trim()} variant="primary" className="px-6">
-            {busy ? <><Sparkles className="w-4 h-4 mr-2 animate-pulse" /> Researching…</> : <><Search className="w-4 h-4 mr-2" /> Research</>}
-          </Button>
+          <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What should we research?" className="rounded-full" disabled />
+          <Button disabled variant="primary" className="px-6"><Search className="w-4 h-4 mr-2" /> Research</Button>
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
-          {TYPES.map((t) => <button key={t} disabled={busy} onClick={() => run(t)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors disabled:opacity-50">{t}</button>)}
+          {TYPES.map((t) => <button key={t} disabled className="text-xs text-muted-foreground bg-secondary rounded-full px-3 py-1.5 opacity-50">{t}</button>)}
         </div>
+        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mt-3">Coming soon</p>
       </div>
 
       {items === null ? <div className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />
@@ -110,30 +75,6 @@ export default function Research() {
               </a>
             )}
           </>}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle className="font-display text-2xl font-light">Upload research</DialogTitle></DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div><Label className="mb-1.5 block">Title</Label><Input value={uploadForm.title} onChange={(e)=>setUploadForm(f=>({...f,title:e.target.value}))} autoFocus /></div>
-            <div>
-              <Label className="mb-1.5 block">File</Label>
-              {uploadForm.file_url ? (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-input bg-secondary/40 px-3 py-2">
-                  <div className="flex items-center gap-2 min-w-0 text-sm"><Paperclip className="w-4 h-4 shrink-0 text-muted-foreground" /><span className="truncate">{uploadForm.file_name || "Attachment"}</span></div>
-                  <button type="button" onClick={()=>setUploadForm(f=>({...f,file_url:"",file_name:""}))} className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
-                </div>
-              ) : (
-                <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-input bg-secondary/30 px-3 py-4 text-sm text-muted-foreground cursor-pointer hover:bg-secondary/60 transition-colors">
-                  {uploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</> : <><Paperclip className="w-4 h-4" /> Attach a file</>}
-                  <input type="file" onChange={handleFile} className="hidden" disabled={uploading} />
-                </label>
-              )}
-            </div>
-            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={()=>setUploadOpen(false)}>Cancel</Button><Button onClick={saveUpload} disabled={!uploadForm.title.trim() || !uploadForm.file_url || uploading}>Save</Button></div>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

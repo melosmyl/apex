@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useOutletContext, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Pin, Search, LayoutGrid, List, ChevronDown, ChevronRight, AlertTriangle, Sparkles, Loader2, Pin as PinIcon } from "lucide-react";
+import { Pin, Search, LayoutGrid, List, ChevronDown, ChevronRight, AlertTriangle, Sparkles, Pin as PinIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PageHeader from "@/components/PageHeader";
@@ -171,6 +171,10 @@ export default function Pins() {
     setDialogOpen(true);
   };
 
+  // Not wired to a real backend — base44.integrations.Core.InvokeLLM doesn't
+  // exist in this codebase's client. Left in place (unreachable, since the
+  // button is disabled below) rather than deleted, since the prompt/schema
+  // here is exactly what a real edge function should do once one exists.
   const generateAISummary = async () => {
     setAiSummarizing(true);
     setAiSummary(null);
@@ -227,8 +231,8 @@ Cite pin titles when referencing specific points. Do not invent conclusions not 
             <button onClick={() => setView("grid")} className={`p-1.5 rounded ${view === "grid" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><LayoutGrid className="w-4 h-4" /></button>
             <button onClick={() => setView("list")} className={`p-1.5 rounded ${view === "list" ? "bg-card shadow-sm" : "text-muted-foreground"}`}><List className="w-4 h-4" /></button>
           </div>
-          <Button variant="secondaryOutline" onClick={generateAISummary} disabled={aiSummarizing || !filtered.length}>
-            {aiSummarizing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1.5" />}
+          <Button variant="secondaryOutline" disabled title="Coming soon">
+            <Sparkles className="w-4 h-4 mr-1.5" />
             AI Summary
           </Button>
         </div>

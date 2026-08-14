@@ -13,7 +13,7 @@ import FolderSidebar from "@/components/documents/FolderSidebar";
 import DocumentCard from "@/components/documents/DocumentCard";
 import DocumentDetailDialog from "@/components/documents/DocumentDetailDialog";
 import {
-  Plus, Search, LayoutGrid, List, FileText, SlidersHorizontal, X, Paperclip, Loader2, Trash2
+  Plus, Search, LayoutGrid, List, FileText, SlidersHorizontal, X, Paperclip, Trash2
 } from "lucide-react";
 import {
   FOLDERS, DOCUMENT_TYPES, CONTENT_FORMATS, STATUS_CONFIG,
@@ -44,8 +44,6 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
     title: "", document_type: "Other", content: "", description: "",
     file_url: "", file_name: "", tags: ""
   });
-  const [uploading, setUploading] = useState(false);
-
   const load = () => {
     base44.entities.Document.filter({ company_id: companyId, kind: "document" }, sort, 200).then(setItems);
     base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then(setAdvisors);
@@ -90,16 +88,6 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
       return true;
     });
   }, [items, selectedFolder, filterType, filterStatus, search]);
-
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setForm(f => ({ ...f, file_url, file_name: file.name }));
-    } finally { setUploading(false); }
-  };
 
   const create = async () => {
     if (!form.title.trim()) return;
@@ -269,21 +257,13 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
             </div>
             <div>
               <Label className="mb-1.5 block">Attachment</Label>
-              {form.file_url ? (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-input bg-secondary/40 px-3 py-2">
-                  <div className="flex items-center gap-2 min-w-0 text-sm"><Paperclip className="w-4 h-4 shrink-0 text-muted-foreground" /><span className="truncate">{form.file_name || "Attachment"}</span></div>
-                  <button type="button" onClick={() => setForm(f => ({ ...f, file_url: "", file_name: "" }))} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-4 h-4" /></button>
-                </div>
-              ) : (
-                <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-input bg-secondary/30 px-3 py-4 text-sm text-muted-foreground cursor-pointer hover:bg-secondary/60 transition-colors">
-                  {uploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</> : <><Paperclip className="w-4 h-4" /> Attach a file</>}
-                  <input type="file" onChange={handleFile} className="hidden" disabled={uploading} />
-                </label>
-              )}
+              <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-input bg-secondary/30 px-3 py-4 text-sm text-muted-foreground opacity-60" title="Coming soon — file attachments aren't wired up yet">
+                <Paperclip className="w-4 h-4" /> Attach a file — coming soon
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
-              <Button onClick={create} disabled={!form.title.trim() || uploading}>Create Document</Button>
+              <Button onClick={create} disabled={!form.title.trim()}>Create Document</Button>
             </div>
           </div>
         </DialogContent>

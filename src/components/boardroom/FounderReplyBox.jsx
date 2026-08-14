@@ -28,8 +28,7 @@ export default function FounderReplyBox({ onSubmit }) {
   };
 
   return (
-    <div className="border-t border-border/50 p-4">
-      <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Reply to the board</div>
+    <div>
       <div className="relative">
         <Textarea
           value={message}
