@@ -78,6 +78,36 @@ function formatTranscriptForChair(transcript) {
   return text;
 }
 
+// Verify-then-deterministic-fallback, same pattern as startBoardMeeting's
+// buildChairOpening: the CONVERGENCE instruction asks the model to name
+// both advisors explicitly, but that's a natural-language instruction and
+// the model doesn't always follow it (confirmed live — a second synthesis
+// run on the same transcript captured the convergence *theme* without
+// naming both advisors). We already know the fact for certain from the
+// embedding check in runBoardDiscussion, so it shouldn't depend on the
+// model remembering to say it. Appends rather than replaces — whatever
+// else the model correctly wrote in areas_of_agreement is real and stays.
+function ensureConvergenceNamed(resolution, convergence, independentResponses) {
+  const areas = resolution.areas_of_agreement || [];
+  const unnamed = convergence.filter(pair => {
+    const names = pair.advisors || [];
+    return names.length >= 2 && !areas.some(line => names.every(n => line.includes(n)));
+  });
+  if (!unnamed.length) return resolution;
+
+  console.error('Chair resolution did not name convergence explicitly for:', unnamed.map(p => p.advisors.join(' & ')).join(', '), '— appending deterministic fallback.');
+  const fallbackLines = unnamed.map(pair => {
+    const [first, ...rest] = pair.advisors;
+    const shared = independentResponses.find(r => r.advisor_name === first)?.recommendation;
+    const names = rest.length ? `${pair.advisors.slice(0, -1).join(', ')} and ${pair.advisors[pair.advisors.length - 1]}` : first;
+    return shared
+      ? `${names} independently reached the same recommendation: ${shared}`
+      : `${names} independently reached the same recommendation.`;
+  });
+  resolution.areas_of_agreement = [...areas, ...fallbackLines];
+  return resolution;
+}
+
 async function callAdvisor(supabaseUrl, serviceKey, payload) {
   const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
     method: 'POST',
@@ -202,6 +232,8 @@ Deno.serve(async (req) => {
     if (typeof resolution.overall_confidence_score === 'number' && resolution.overall_confidence_score > 0 && resolution.overall_confidence_score <= 1) {
       resolution.overall_confidence_score = Math.round(resolution.overall_confidence_score * 100);
     }
+
+    ensureConvergenceNamed(resolution, convergence, independentResponses);
 
     // Capped defensively here too, not just by prompt — the schema asks for
     // "at most 3" but nothing in structured-output enforces that, and the
