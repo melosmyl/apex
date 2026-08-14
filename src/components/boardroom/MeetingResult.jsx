@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical, Share2 } from "lucide-react";
+import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical, Share2, ListChecks } from "lucide-react";
 import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
@@ -51,6 +51,26 @@ function ShareMeetingControl({ meetingId, initialToken, status }) {
     </div>
   ) : (
     <Button variant="secondaryOutline" size="sm" disabled={busy} onClick={enable}><Share2 className="w-3.5 h-3.5 mr-1.5" /> Share Publicly</Button>
+  );
+}
+
+// Next actions become real tasks automatically (see runChairSynthesis) —
+// this is a read-only confirmation that it happened, not a control. Skipped
+// for anonymous free-meeting sessions, which never get tasks created.
+function CommitmentsNote({ nextActions, isAnonymous }) {
+  if (isAnonymous || !nextActions?.length) return null;
+  return (
+    <div className="bg-card border border-border/70 rounded-2xl p-6">
+      <div className="flex items-center gap-2 mb-3"><ListChecks className="w-4 h-4 text-muted-foreground" /><h4 className="font-display text-base">Added to Tasks</h4></div>
+      <div className="space-y-2">
+        {nextActions.map((a, i) => (
+          <div key={i} className="flex items-center gap-3 bg-secondary/60 rounded-lg px-3 py-2">
+            <span className="text-sm flex-1">{a.title}</span>
+            {a.assigned_to && <span className="text-xs text-muted-foreground shrink-0">{a.assigned_to}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -131,7 +151,9 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
 
       <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 
-      <FounderDecisionControls meetingId={result.meeting_id} nextActions={resolution.next_actions} companyId={companyId} isAnonymous={isAnonymous} />
+      <CommitmentsNote nextActions={resolution.next_actions} isAnonymous={isAnonymous} />
+
+      <FounderDecisionControls meetingId={result.meeting_id} />
 
       <div>
         <h4 className="font-display text-lg mb-3">Advisor Perspectives</h4>

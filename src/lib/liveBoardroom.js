@@ -1,6 +1,33 @@
 import { base44 } from "@/api/base44Client";
 import { embedDecisionInBackground } from "@/lib/boardroom";
 
+// Mirrors supabase/functions/_shared/advisorResolution.ts — same resolution
+// logic (exact name, then role-fuzzy, then meeting participant, then chair)
+// but duplicated here rather than imported: that module is Deno edge-
+// function code, this runs in the browser bundle. assigned_to on a voice
+// summary's tasks_and_owners is the same free-text-from-the-model shape as
+// the async meeting flow's next_actions, so it needs the same treatment.
+const FOUNDER_LABEL = "Founder";
+
+function resolveAssignee(rawAssignedTo, advisors, participantNames) {
+  if (!rawAssignedTo || rawAssignedTo.trim().toLowerCase() === "founder") return FOUNDER_LABEL;
+
+  const exact = advisors.find((a) => a.name === rawAssignedTo);
+  if (exact) return exact.name;
+
+  const needle = rawAssignedTo.toLowerCase();
+  const byRole = advisors.find((a) => {
+    const role = (a.role || "").toLowerCase();
+    return role && (needle.includes(role) || role.includes(needle.split(" ")[0]));
+  });
+  if (byRole) return byRole.name;
+
+  const participant = advisors.find((a) => (participantNames || []).includes(a.name));
+  if (participant) return participant.name;
+
+  return advisors[0]?.name || FOUNDER_LABEL;
+}
+
 export async function startVoiceSession({ companyId, topic, advisorIds, advisorNames, settings }) {
   const meeting = await base44.entities.BoardMeeting.create({
     company_id: companyId,
@@ -64,15 +91,21 @@ export async function resumeSession(sessionId) {
   return { session, messages };
 }
 
-export async function saveMeetingResults({ companyId, sessionId, summary, advisorNames, topic }) {
+export async function saveMeetingResults({ companyId, sessionId, summary, advisors = [], advisorNames, topic }) {
   const tasks = [];
   if (summary.tasks_and_owners?.length) {
+    // source_meeting_id links these back to the meeting for the
+    // accountability follow-up, same as the async text-meeting flow
+    // (runChairSynthesis) — the session record carries the real meeting id.
+    const session = await base44.entities.VoiceMeetingSession.get(sessionId);
     const created = await base44.entities.Task.bulkCreate(
       summary.tasks_and_owners.map(t => ({
         company_id: companyId,
         title: t.title,
-        assigned_to: t.assigned_to || "Unassigned",
+        assigned_to: resolveAssignee(t.assigned_to, advisors, advisorNames),
+        created_by: "Boardroom",
         status: "todo",
+        source_meeting_id: session?.meeting_id || null,
       }))
     );
     tasks.push(...(Array.isArray(created) ? created : [created]));

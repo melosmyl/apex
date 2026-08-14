@@ -1,4 +1,18 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveAdvisor } from '../_shared/advisorResolution.ts';
+
+// A next_action's assigned_to is either a genuine self-assignment ("Founder"
+// — no advisor raised it, so there's no advisor to attribute it to or to
+// notice when it's done) or something raised during the meeting (a real
+// advisor's name, a role, or occasionally a fabricated team that doesn't
+// exist in this product). Only the latter goes through resolveAdvisor.
+const FOUNDER_LABEL = 'Founder';
+
+function resolveTaskAssignee(rawAssignedTo, advisors, participantNames) {
+  if (!rawAssignedTo || rawAssignedTo.trim().toLowerCase() === 'founder') return FOUNDER_LABEL;
+  const advisor = resolveAdvisor(rawAssignedTo, advisors, participantNames);
+  return advisor?.name || FOUNDER_LABEL;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -159,6 +173,15 @@ Deno.serve(async (req) => {
     }
 
     const nextActions = resolution.next_actions || [];
+    // Resolve each action's assignee to a real advisor name (or the literal
+    // "Founder" for genuine self-assignments) before this is stored or
+    // returned — one resolution pass feeds both the displayed resolution
+    // and the tasks created below, so the two can never show different
+    // names for the same commitment.
+    const nonHumanAdvisors = (advisors || []).filter(a => a.type !== 'human');
+    nextActions.forEach(a => {
+      a.assigned_to = resolveTaskAssignee(a.assigned_to, nonHumanAdvisors, meeting.participants);
+    });
     const discussionField = discussionTranscript.length > 0
       ? discussionTranscript.map(m => ({ advisor: m.advisor_name, role: m.role, message: m.message, stance: m.message_type }))
       : [
@@ -178,6 +201,38 @@ Deno.serve(async (req) => {
       discussion: discussionField,
     }).eq('id', meeting.id).select().single();
 
+    // Commitments become real tasks automatically — linked back to this
+    // meeting via source_meeting_id, which is what the accountability
+    // follow-up (loadOpenCommitments) reads. Skipped for anonymous
+    // free-meeting sessions: RLS already has a restrictive "no tasks for
+    // anonymous users" insert policy, but this uses the service-role client
+    // (which bypasses RLS), so that intent has to be enforced here too.
+    // Best-effort: a failure here shouldn't fail the whole synthesis
+    // response, since the resolution itself is the primary deliverable.
+    let createdTasks = [];
+    if (!user.is_anonymous && nextActions.length > 0) {
+      try {
+        const taskRows = nextActions
+          .filter(a => a.title)
+          .map(a => ({
+            company_id: meeting.company_id,
+            created_by_id: user.id,
+            title: a.title,
+            assigned_to: a.assigned_to,
+            created_by: 'Boardroom',
+            status: 'todo',
+            source_meeting_id: meeting.id,
+          }));
+        if (taskRows.length) {
+          const { data: inserted, error: taskError } = await db.from('tasks').insert(taskRows).select();
+          if (taskError) throw taskError;
+          createdTasks = inserted || [];
+        }
+      } catch (taskErr) {
+        console.error('runChairSynthesis: failed to create tasks from next_actions:', taskErr.message);
+      }
+    }
+
     return Response.json({
       meeting_id: meeting.id, status: 'complete',
       independent_responses: independentResponses, challenge_responses: challengeResponses,
@@ -185,6 +240,7 @@ Deno.serve(async (req) => {
       board_resolution: resolution, meeting: updated,
       memory_context: meeting.memory_context || null,
       chair_opening: meeting.chair_opening || null,
+      created_tasks: createdTasks,
     }, { headers: corsHeaders });
   } catch (error) {
     console.error('runChairSynthesis error:', error);

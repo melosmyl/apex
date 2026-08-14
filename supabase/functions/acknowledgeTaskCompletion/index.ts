@@ -8,36 +8,12 @@
 // creation: acknowledgment follows what the founder actually committed to.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolveAdvisor } from '../_shared/advisorResolution.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// task.assigned_to is free text from the Chair's next_actions — sometimes a
-// real advisor name, sometimes a role/team descriptor ("Marketing Team").
-// Resolve it to a real advisor so a specific voice can speak, rather than
-// silently failing whenever it isn't an exact name match.
-function resolveSpeaker(assignedTo, advisors, participantNames) {
-  if (assignedTo) {
-    const exact = advisors.find(a => a.name === assignedTo);
-    if (exact) return exact;
-
-    const needle = assignedTo.toLowerCase();
-    const byRole = advisors.find(a => {
-      const role = (a.role || '').toLowerCase();
-      return role && (needle.includes(role) || role.includes(needle.split(' ')[0]));
-    });
-    if (byRole) return byRole;
-  }
-
-  // Prefer whoever was actually in the meeting that produced this commitment.
-  const participant = advisors.find(a => (participantNames || []).includes(a.name));
-  if (participant) return participant;
-
-  const chair = advisors.find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
-  return chair || advisors[0] || null;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -64,7 +40,7 @@ Deno.serve(async (req) => {
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', task.company_id).neq('type', 'human');
     if (!advisors?.length) return Response.json({ error: 'No advisors available to speak' }, { status: 400, headers: corsHeaders });
 
-    const speaker = resolveSpeaker(task.assigned_to, advisors, meeting?.participants);
+    const speaker = resolveAdvisor(task.assigned_to, advisors, meeting?.participants);
     if (!speaker) return Response.json({ error: 'Could not resolve an advisor to speak' }, { status: 400, headers: corsHeaders });
 
     let prompt = `The founder just marked this task as done: "${task.title}"\n`;

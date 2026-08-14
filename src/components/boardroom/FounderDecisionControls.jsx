@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Edit3, CircleDot, ListChecks } from "lucide-react";
+import { Check, X, Edit3, CircleDot } from "lucide-react";
 
 const OPTIONS = [
   { value: "accept", label: "Accept", icon: Check },
@@ -11,14 +11,15 @@ const OPTIONS = [
   { value: "undecided", label: "Undecided", icon: CircleDot },
 ];
 
-export default function FounderDecisionControls({ meetingId, nextActions = [], companyId, isAnonymous }) {
+// Next actions become real tasks automatically server-side (see
+// runChairSynthesis) — this component only records the founder's own
+// decision about the resolution. See CommitmentsNote for the read-only
+// "these were added to Tasks" confirmation.
+export default function FounderDecisionControls({ meetingId }) {
   const [decision, setDecision] = useState("pending");
   const [notes, setNotes] = useState("");
-  const [selectedTasks, setSelectedTasks] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  const toggleTask = (i) => setSelectedTasks(prev => prev.includes(i) ? prev.filter(j => j !== i) : [...prev, i]);
 
   const save = async () => {
     setSaving(true);
@@ -26,18 +27,6 @@ export default function FounderDecisionControls({ meetingId, nextActions = [], c
       await base44.entities.BoardMeeting.update(meetingId, {
         founder_decision: decision, founder_decision_notes: notes,
       });
-      // Anonymous free-meeting sessions can't create tasks (RLS-enforced) —
-      // the checkboxes below are hidden for them too, so selectedTasks is
-      // always empty here, but skip explicitly rather than rely on that.
-      if (!isAnonymous && selectedTasks.length) {
-        await base44.entities.Task.bulkCreate(
-          selectedTasks.map(i => ({
-            company_id: companyId, title: nextActions[i].title,
-            assigned_to: nextActions[i].assigned_to || "", created_by: "Boardroom", status: "todo",
-            source_meeting_id: meetingId,
-          }))
-        );
-      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } finally {
@@ -68,21 +57,6 @@ export default function FounderDecisionControls({ meetingId, nextActions = [], c
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
           placeholder="Add your thoughts, conditions, or your own final decision…" />
       </div>
-
-      {!isAnonymous && nextActions.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-3"><ListChecks className="w-4 h-4 text-muted-foreground" /><h4 className="font-display text-base">Turn next actions into tasks</h4></div>
-          <div className="space-y-2">
-            {nextActions.map((a, i) => (
-              <label key={i} className="flex items-center gap-3 bg-secondary/60 rounded-lg px-3 py-2 cursor-pointer">
-                <input type="checkbox" checked={selectedTasks.includes(i)} onChange={() => toggleTask(i)} className="rounded" />
-                <span className="text-sm flex-1">{a.title}</span>
-                {a.assigned_to && <span className="text-xs text-muted-foreground">{a.assigned_to}</span>}
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="flex justify-end">
         <Button onClick={save} disabled={saving || decision === "pending"} variant="primary" className="px-6">

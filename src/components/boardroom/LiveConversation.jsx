@@ -61,6 +61,7 @@ export default function LiveConversation({ company, companyId, advisors }) {
       companyId,
       sessionId: voiceMeeting.sessionId,
       summary: finalSummary,
+      advisors: selectedAdvisors,
       advisorNames: selectedAdvisors.map((a) => a.name),
       topic,
     });
