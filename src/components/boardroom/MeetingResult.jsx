@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical, Share2, ListChecks } from "lucide-react";
+import { AlertTriangle, Lightbulb, Gavel, ArrowRight, FlaskConical, Share2, ListOrdered } from "lucide-react";
 import AdvisorResponseCard from "@/components/boardroom/AdvisorResponseCard";
 import FounderDecisionControls from "@/components/boardroom/FounderDecisionControls";
 import ExecutiveDiscussion from "@/components/boardroom/ExecutiveDiscussion";
@@ -54,22 +54,32 @@ function ShareMeetingControl({ meetingId, initialToken, status }) {
   );
 }
 
-// Next actions become real tasks automatically (see runChairSynthesis) —
-// this is a read-only confirmation that it happened, not a control. Skipped
-// for anonymous free-meeting sessions, which never get tasks created.
-function CommitmentsNote({ nextActions, isAnonymous }) {
-  if (isAnonymous || !nextActions?.length) return null;
+// The chair's ranked close: at most 3 things to do before spending more
+// time or money on this, not a flat list of everything anyone mentioned.
+// These are exactly what became real tasks (see runChairSynthesis), so
+// this doubles as the "added to Tasks" confirmation — skipped for
+// anonymous free-meeting sessions, which never get tasks created.
+function PriorityClose({ priorityFrame, priorityActions, isAnonymous }) {
+  if (!priorityActions?.length) return null;
   return (
     <div className="bg-card border border-border/70 rounded-2xl p-6">
-      <div className="flex items-center gap-2 mb-3"><ListChecks className="w-4 h-4 text-muted-foreground" /><h4 className="font-display text-base">Added to Tasks</h4></div>
-      <div className="space-y-2">
-        {nextActions.map((a, i) => (
-          <div key={i} className="flex items-center gap-3 bg-secondary/60 rounded-lg px-3 py-2">
-            <span className="text-sm flex-1">{a.title}</span>
-            {a.assigned_to && <span className="text-xs text-muted-foreground shrink-0">{a.assigned_to}</span>}
-          </div>
+      <div className="flex items-center gap-2 mb-1"><ListOrdered className="w-4 h-4 text-muted-foreground" /><h4 className="font-display text-base">Before spending more time on this</h4></div>
+      {priorityFrame && <p className="text-sm text-muted-foreground mb-4">{priorityFrame}</p>}
+      <ol className="space-y-3">
+        {priorityActions.map((a, i) => (
+          <li key={i} className="flex gap-3 bg-secondary/60 rounded-lg px-3 py-2.5">
+            <span className="font-display text-base text-muted-foreground shrink-0">{i + 1}</span>
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-sm font-medium">{a.title}</span>
+                {a.assigned_to && <span className="text-xs text-muted-foreground shrink-0">{a.assigned_to}</span>}
+              </div>
+              {a.why_first && <p className="text-xs text-muted-foreground mt-0.5">{a.why_first}</p>}
+            </div>
+          </li>
         ))}
-      </div>
+      </ol>
+      {!isAnonymous && <p className="text-xs text-muted-foreground mt-4">Added to Tasks.</p>}
     </div>
   );
 }
@@ -151,7 +161,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
 
       <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} onFollowup={onFollowup} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 
-      <CommitmentsNote nextActions={resolution.next_actions} isAnonymous={isAnonymous} />
+      <PriorityClose priorityFrame={resolution.priority_frame} priorityActions={resolution.priority_actions} isAnonymous={isAnonymous} />
 
       <FounderDecisionControls meetingId={result.meeting_id} />
 

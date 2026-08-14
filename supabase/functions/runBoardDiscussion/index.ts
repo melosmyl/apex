@@ -1,4 +1,56 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
+
+// Round 1 runs every advisor independently and in parallel (see
+// startBoardMeeting) — nothing stops two advisors reaching for the same
+// generic-but-plausible answer there. This is the check for that: embed
+// each advisor's round-1 recommendation and flag pairs whose recommendations
+// are near-identical, so round 2 can ask them to address it directly rather
+// than silently restating the same thing past each other for the rest of
+// the discussion.
+const CONVERGENCE_THRESHOLD = 0.90;
+
+async function detectConvergence(independentResponses) {
+  const withText = independentResponses.filter(r => (r.recommendation || '').trim());
+  if (withText.length < 2) return [];
+
+  let embeddings;
+  try {
+    embeddings = await Promise.all(withText.map(r => embedText(r.recommendation)));
+  } catch (e) {
+    console.error('Convergence detection skipped (embedding failed):', e.message);
+    return [];
+  }
+
+  const pairs = [];
+  for (let i = 0; i < withText.length; i++) {
+    for (let j = i + 1; j < withText.length; j++) {
+      const sim = cosineSimilarity(embeddings[i], embeddings[j]);
+      if (sim >= CONVERGENCE_THRESHOLD) {
+        pairs.push({ names: [withText[i].advisor_name, withText[j].advisor_name], similarity: sim });
+      }
+    }
+  }
+  return pairs;
+}
+
+// A candidate pair (flagged from round-1 similarity) survives to the final
+// "converged" list unless one of them actually differentiated during
+// discussion — a challenge/rebuttal aimed at the other, or a changed
+// opinion with a genuinely new position. No differentiation found across
+// the whole discussion means they really did just say the same thing in
+// parallel, which is the case worth presenting once, not twice.
+function stillConverged(pair, transcript) {
+  const [nameA, nameB] = pair.names;
+  const laterMessages = transcript.filter(m => m.round > 1 && (m.advisor_name === nameA || m.advisor_name === nameB));
+  const differentiated = laterMessages.some(m => {
+    const other = m.advisor_name === nameA ? nameB : nameA;
+    const addressedOther = m.reply_to_advisor === other;
+    const isDistinguishing = ['challenge', 'rebuttal'].includes(m.message_type) || (m.changed_opinion && m.new_position);
+    return addressedOther && isDistinguishing;
+  });
+  return !differentiated;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,7 +107,7 @@ function formatTranscript(transcript, currentAdvisorId) {
   return text;
 }
 
-function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound) {
+function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs) {
   const ownInitial = transcript.find(m => m.advisor_id === advisor.id && m.round === 1);
   let context = `=== EXECUTIVE BOARD DISCUSSION ===\n`;
   context += `You are in Round ${round} of ${maxRounds} of a structured board discussion.\n\n`;
@@ -67,8 +119,19 @@ function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRou
   if (priorTranscript.length) {
     context += `DISCUSSION SO FAR:\n${formatTranscript(priorTranscript, advisor.id)}\n`;
   }
+  // Raised only in round 2, once, right when it's actionable — round 1 is
+  // deliberately independent (see startBoardMeeting) so this can't be known
+  // any earlier, and repeating it every round would just be noise once
+  // it's been addressed.
+  const ownPair = round === 2 ? (convergencePairs || []).find(p => p.names.includes(advisor.name)) : null;
+  if (ownPair) {
+    const other = ownPair.names.find(n => n !== advisor.name);
+    context += `NOTE: your independent recommendation landed very close to ${other}'s. Do exactly one of two things about this — do not do both, and do not invent a difference that isn't real:\n`;
+    context += `- If you genuinely agree and have nothing to add beyond their reasoning, say so plainly and set agrees_with to "${other}". Real agreement is a legitimate, valuable outcome — it is not a failure to have a distinct opinion.\n`;
+    context += `- If you actually see it differently — different risk tolerance, sequencing, cost, or what you'd do first — say so concretely, addressed to ${other} by name. A manufactured distinction to look independent is worse than honest agreement.\n\n`;
+  }
   if (isLastRound) {
-    context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. If you are now in agreement with another advisor, say so explicitly.\n`;
+    context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. If you are now in agreement with another advisor, say so explicitly and set agrees_with to their name.\n`;
   } else {
     context += `YOUR TASK: Contribute to the discussion. You may:\n`;
     context += `- Question another advisor's reasoning or ask for evidence\n- Challenge an assumption or identify a weakness\n- Defend your position against criticism\n- Change your opinion if persuaded (explain why)\n- Support another advisor's argument\n- Identify a risk nobody has mentioned\n- Introduce new information or evidence\n- Say the question itself is wrong, and name the question that should be asked instead\n\n`;
@@ -145,15 +208,18 @@ Deno.serve(async (req) => {
         new_risks: { type: 'array', items: { type: 'string' }, description: 'Any new risks or blind spots you have identified that have not been mentioned yet' },
         confidence_score: { type: 'number', description: 'Your current confidence in your recommendation, 0-100' },
         answerable: { type: 'boolean', description: 'false if the question genuinely cannot be answered well without missing information — see HONEST UNCERTAINTY. true otherwise (the default).' },
+        agrees_with: { type: 'string', description: 'Name of another advisor whose position you now fully agree with and have nothing to add to. Leave empty if you have your own distinct view — do not fill this in just to seem cooperative.' },
       },
       required: ['message', 'message_type', 'confidence_score'],
     };
+
+    const convergencePairs = await detectConvergence(independentResponses);
 
     for (let round = 2; round <= maxRounds; round++) {
       const isLastRound = round === maxRounds;
 
       const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
-        const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound);
+        const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs);
         return callAdvisor(supabaseUrl, serviceKey, {
           advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id,
           system_instructions: null, company_context: null, meeting_context: meetingContext,
@@ -173,6 +239,7 @@ Deno.serve(async (req) => {
           new_position: resp.new_position || null, new_risks: resp.new_risks || [],
           confidence_score: resp.confidence_score || 0,
           answerable: resp.answerable !== false,
+          agrees_with: resp.agrees_with || null,
           provider_used: r.data.provider_used, model_used: r.data.model_used,
         };
       }).filter(Boolean);
@@ -184,16 +251,28 @@ Deno.serve(async (req) => {
         discussion_transcript: transcript, discussion_rounds_completed: round,
       }).eq('id', meeting.id);
 
+      // Previously this only looked at changed_opinion/new_risks, which
+      // stops the discussion exactly when two advisors quietly agree —
+      // neither needs to change their mind or surface a new risk to keep
+      // agreeing. That's the convergence bug: the loop would exit after a
+      // single discussion round in precisely the case that most needed
+      // more rounds. When convergence was flagged pre-discussion, run the
+      // full maxRounds so there's a genuine chance to either differentiate
+      // or explicitly confirm agreement, rather than exiting on silence.
       const changes = roundMessages.filter(m => m.changed_opinion || (m.new_risks && m.new_risks.length > 0));
-      if (changes.length === 0 && !isLastRound) break;
+      if (changes.length === 0 && !isLastRound && convergencePairs.length === 0) break;
     }
+
+    const finalConvergence = convergencePairs.filter(p => stillConverged(p, transcript));
 
     await db.from('board_meetings').update({
       status: 'discussion_complete', discussion_transcript: transcript,
+      convergence: finalConvergence.map(p => ({ advisors: p.names })),
     }).eq('id', meeting.id);
 
     return Response.json({
       meeting_id: meeting.id, status: 'discussion_complete', discussion_transcript: transcript,
+      convergence: finalConvergence.map(p => ({ advisors: p.names })),
     }, { headers: corsHeaders });
   } catch (error) {
     console.error('runBoardDiscussion error:', error);

@@ -45,3 +45,14 @@ export function noteEmbeddingText(note: { raw_text?: string; tags?: string[] }):
   return [note.raw_text, note.tags?.length ? note.tags.join(', ') : null]
     .filter(Boolean).join('\n\n');
 }
+
+export function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  if (magA === 0 || magB === 0) return 0;
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
