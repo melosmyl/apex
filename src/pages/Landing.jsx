@@ -67,6 +67,19 @@ function Section({ children, className = "", dark = false }) {
 export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
+      {/* No persistent header on this page by design, but a returning user
+          with an existing account still needs a way back in without
+          already knowing the /login URL — the only other links here
+          ("Sit in on one" / "Take a seat") both go to the anonymous /board
+          flow, which reads as sign-up, not sign-in. Fixed rather than
+          scrolled-to in the footer, so it's found immediately. */}
+      <Link
+        to="/login"
+        className="fixed top-5 right-5 sm:top-6 sm:right-8 z-50 font-mono text-[11px] tracking-[0.2em] uppercase text-foreground/60 hover:text-foreground transition-colors"
+      >
+        Log in
+      </Link>
+
       {/* 1. Hero — cream */}
       <Section className="pt-16 sm:pt-24 pb-16 sm:pb-24">
         <div className="max-w-5xl mx-auto text-center rise-in">
