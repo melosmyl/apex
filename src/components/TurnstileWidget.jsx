@@ -3,6 +3,7 @@ import { assertLiveSiteKeyInProduction } from "@/lib/turnstile";
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 assertLiveSiteKeyInProduction(SITE_KEY);
+const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 
 // Renders nothing until a site key is configured — lets this flow keep
 // working in local/dev environments before Cloudflare Turnstile is set up,
@@ -23,17 +24,25 @@ export default function TurnstileWidget({ onToken }) {
       });
     };
 
+    // One copy of api.js per page: a widget reset (remounted) while the
+    // script is still loading waits for that same script rather than
+    // injecting a second one.
+    let script = null;
     if (window.turnstile) {
       renderWidget();
     } else {
-      const script = document.createElement("script");
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-      script.async = true;
-      script.onload = renderWidget;
-      document.head.appendChild(script);
+      script = document.querySelector(`script[src="${SCRIPT_SRC}"]`);
+      if (!script) {
+        script = document.createElement("script");
+        script.src = SCRIPT_SRC;
+        script.async = true;
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", renderWidget);
     }
 
     return () => {
+      script?.removeEventListener("load", renderWidget);
       if (widgetId.current && window.turnstile) window.turnstile.remove(widgetId.current);
     };
   }, [onToken]);

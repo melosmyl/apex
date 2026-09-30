@@ -8,7 +8,7 @@ import { Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import TurnstileWidget from "@/components/TurnstileWidget";
-import { useCaptcha } from "@/lib/turnstile";
+import { useCaptcha, CAPTCHA_RETRY_MESSAGE } from "@/lib/turnstile";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -19,14 +19,20 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // take() spends the token as it's sent and starts a fresh one, so a
+    // failed attempt is never retried with a used or expired token.
+    const captchaToken = captcha.take();
+    if (captchaToken === null) {
+      setError(CAPTCHA_RETRY_MESSAGE);
+      return;
+    }
     setError("");
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password, captcha.token);
+      await base44.auth.loginViaEmailPassword(email, password, captchaToken);
       window.location.href = "/";
     } catch (err) {
-      setError(err.message || "Invalid email or password");
-      captcha.reset();
+      setError(err?.code === "captcha_failed" ? CAPTCHA_RETRY_MESSAGE : err.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }

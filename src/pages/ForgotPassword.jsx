@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import TurnstileWidget from "@/components/TurnstileWidget";
-import { useCaptcha } from "@/lib/turnstile";
+import { useCaptcha, CAPTCHA_RETRY_MESSAGE } from "@/lib/turnstile";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -18,18 +18,23 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const captchaToken = captcha.take();
+    if (captchaToken === null) {
+      setError(CAPTCHA_RETRY_MESSAGE);
+      return;
+    }
     setError("");
     setLoading(true);
     try {
-      await base44.auth.resetPasswordRequest(email, captcha.token);
+      await base44.auth.resetPasswordRequest(email, captchaToken);
       setSent(true);
     } catch (err) {
       // A rejected captcha means no email went out — say so and let them
-      // retry. Anything else still shows the neutral "if an account
-      // exists" message, so the form never reveals which emails have one.
+      // retry (take() already asked for a fresh token). Anything else still
+      // shows the neutral "if an account exists" message, so the form never
+      // reveals which emails have one.
       if (err?.code === "captcha_failed") {
-        setError("We couldn't verify you're human. Please try again.");
-        captcha.reset();
+        setError(CAPTCHA_RETRY_MESSAGE);
       } else {
         setSent(true);
       }

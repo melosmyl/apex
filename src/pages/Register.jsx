@@ -10,7 +10,7 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 import TurnstileWidget from "@/components/TurnstileWidget";
-import { useCaptcha } from "@/lib/turnstile";
+import { useCaptcha, CAPTCHA_RETRY_MESSAGE } from "@/lib/turnstile";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -31,19 +31,26 @@ export default function Register() {
       setError("Passwords do not match");
       return;
     }
+    // Taken only after the form's own checks pass, so a typo doesn't burn a
+    // token; take() then resets the widget, so the code screen's Resend gets
+    // its own fresh one.
+    const captchaToken = captcha.take();
+    if (captchaToken === null) {
+      setError(CAPTCHA_RETRY_MESSAGE);
+      return;
+    }
     setLoading(true);
     try {
-      const result = await base44.auth.register({ email, password, captchaToken: captcha.token });
+      const result = await base44.auth.register({ email, password, captchaToken });
       if (result?.session) {
         window.location.href = "/";
         return;
       }
       setShowOtp(true);
     } catch (err) {
-      setError(err.message || "Registration failed");
+      setError(err?.code === "captcha_failed" ? CAPTCHA_RETRY_MESSAGE : err.message || "Registration failed");
     } finally {
       setLoading(false);
-      captcha.reset();
     }
   };
 
@@ -65,20 +72,22 @@ export default function Register() {
 
   const handleResend = async () => {
     if (!captcha.ready) return;
+    // Spent before the request goes out: Resend has no loading state, so a
+    // double-click must not be able to send the same token twice.
+    const captchaToken = captcha.take();
+    if (captchaToken === null) {
+      setError(CAPTCHA_RETRY_MESSAGE);
+      return;
+    }
     setError("");
-    // Spend the token before the request goes out: Resend has no loading
-    // state, so a double-click would otherwise send the same single-use
-    // token twice and show a spurious captcha error.
-    const token = captcha.token;
-    captcha.reset();
     try {
-      await base44.auth.resendOtp(email, token);
+      await base44.auth.resendOtp(email, captchaToken);
       toast({
         title: "Code sent",
         description: "Check your email for the new code.",
       });
     } catch (err) {
-      setError(err.message || "Failed to resend code");
+      setError(err?.code === "captcha_failed" ? CAPTCHA_RETRY_MESSAGE : err.message || "Failed to resend code");
     }
   };
 

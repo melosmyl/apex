@@ -9,6 +9,7 @@ import { generateOnboardingPlan, createCompanyFromOnboarding } from "@/lib/onboa
 import { QUESTIONS as PROFILE_QUESTIONS } from "@/components/onboarding/GuidedOnboarding";
 import BoardDebate from "@/components/boardroom/BoardDebate";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import { useCaptcha, CAPTCHA_RETRY_MESSAGE } from "@/lib/turnstile";
 import { SITE_URL } from "@/lib/branding";
 
 function useFreeMeetingGate() {
@@ -66,7 +67,7 @@ export default function FreeMeeting() {
   const [phase, setPhase] = useState("intro"); // intro | form | starting | assembling | debate | blocked | error
   const [question, setQuestion] = useState("");
   const [answers, setAnswers] = useState({});
-  const [turnstileToken, setTurnstileToken] = useState(null);
+  const captcha = useCaptcha();
   const [blockedMessage, setBlockedMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [company, setCompany] = useState(null);
@@ -84,10 +85,14 @@ export default function FreeMeeting() {
     try {
       const { data: { session: existing } } = await supabase.auth.getSession();
       if (!existing) {
+        // take() spends the token on this one sign-in and starts a fresh
+        // one, so "Try again" never resends a used or expired token.
+        const captchaToken = captcha.take();
+        if (captchaToken === null) throw new Error(CAPTCHA_RETRY_MESSAGE);
         const { error: signInErr } = await supabase.auth.signInAnonymously(
-          turnstileToken ? { options: { captchaToken: turnstileToken } } : undefined
+          captchaToken ? { options: { captchaToken } } : undefined
         );
-        if (signInErr) throw new Error(signInErr.message);
+        if (signInErr) throw new Error(signInErr.code === "captcha_failed" ? CAPTCHA_RETRY_MESSAGE : signInErr.message);
       }
 
       const gateResult = await gate.check();
@@ -161,9 +166,9 @@ export default function FreeMeeting() {
               <Textarea value={answers.current_challenges || ""} onChange={(e) => set("current_challenges", e.target.value)} rows={2} placeholder="The thing you most need help with right now." />
             </div>
 
-            <TurnstileWidget onToken={setTurnstileToken} />
+            <TurnstileWidget key={captcha.widgetKey} onToken={captcha.setToken} />
 
-            <Button onClick={begin} disabled={!canSubmit} variant="primary" className="px-8 h-12 w-full sm:w-auto">
+            <Button onClick={begin} disabled={!canSubmit || !captcha.ready} variant="primary" className="px-8 h-12 w-full sm:w-auto">
               Convene the board <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </div>
