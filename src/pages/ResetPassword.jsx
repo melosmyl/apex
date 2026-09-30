@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { base44, supabase } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,8 +8,26 @@ import { Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 
 export default function ResetPassword() {
-  const [searchParams] = useSearchParams();
-  const resetToken = searchParams.get("token");
+  // The reset email's link goes through Supabase, which sends the browser
+  // back here with a recovery session in the URL #hash (implicit flow), not
+  // a ?token= — and the client signs the user in from it before
+  // getSession() resolves. An expired or reused link arrives with #error=…
+  // instead, and the client then keeps whatever session the browser already
+  // had, so the error has to be checked first: otherwise a stale link would
+  // show the form and change the password of whoever is signed in.
+  const [linkState, setLinkState] = useState("checking"); // checking | valid | invalid
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search);
+    if (params.get("error") || params.get("error_code")) {
+      setLinkState("invalid");
+      return;
+    }
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled) setLinkState(data.session ? "valid" : "invalid");
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,8 +43,10 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
-      await base44.auth.resetPassword({ resetToken, newPassword });
-      window.location.href = "/login";
+      await base44.auth.resetPassword({ newPassword });
+      // Drop the recovery session so the login page means what it says and
+      // a second click on the same email link finds nobody signed in.
+      await base44.auth.logout("/login");
     } catch (err) {
       setError(err.message || "Failed to reset password");
     } finally {
@@ -34,7 +54,9 @@ export default function ResetPassword() {
     }
   };
 
-  if (!resetToken) {
+  if (linkState === "checking") return null;
+
+  if (linkState === "invalid") {
     return (
       <AuthLayout
         title="Invalid reset link"
@@ -46,7 +68,7 @@ export default function ResetPassword() {
         }
       >
         <p className="text-sm text-foreground text-center">
-          The link you used appears to be incomplete. Please request a new password reset email.
+          The link you used is incomplete, expired, or has already been used. Please request a new password reset email.
         </p>
       </AuthLayout>
     );
