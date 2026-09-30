@@ -1,92 +1,10 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { callWithFallback, usageTotals, insertUsageLog, CALL_DEADLINE_MS } from '../_shared/llmCall.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-async function callOpenAI(model, systemPrompt, userPrompt, temperature, maxTokens, timeoutMs) {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model, temperature, max_tokens: maxTokens,
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-        response_format: { type: 'json_object' },
-      }),
-      signal: controller.signal,
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(`OpenAI error: ${data.error?.message || res.status}`);
-    return { content: data.choices[0].message.content, inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0 };
-  } finally { clearTimeout(timeout); }
-}
-
-const ANTHROPIC_NO_TEMP_MODELS = new Set([
-  'claude-sonnet-5', 'claude-sonnet-4-6',
-  'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6',
-  'claude-fable-5', 'claude-mythos-5',
-]);
-
-async function callAnthropic(model, systemPrompt, userPrompt, temperature, maxTokens, timeoutMs) {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const body = { model, system: systemPrompt, max_tokens: maxTokens, messages: [{ role: 'user', content: userPrompt }] };
-    if (!ANTHROPIC_NO_TEMP_MODELS.has(model)) body.temperature = temperature;
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(`Anthropic error: ${data.error?.message || res.status}`);
-    return { content: data.content[0].text, inputTokens: data.usage?.input_tokens || 0, outputTokens: data.usage?.output_tokens || 0 };
-  } finally { clearTimeout(timeout); }
-}
-
-const PROVIDERS = { openai: callOpenAI, anthropic: callAnthropic };
-
-function validateAndParse(content, requiredFields) {
-  if (!content) return { parsed: null, valid: false };
-  let parsed = null;
-  try { parsed = JSON.parse(content); }
-  catch {
-    const match = content.match(/\{[\s\S]*\}/);
-    if (match) { try { parsed = JSON.parse(match[0]); } catch { return { parsed: null, valid: false }; } }
-    else return { parsed: null, valid: false };
-  }
-  if (requiredFields?.length) {
-    for (const f of requiredFields) {
-      if (parsed[f] === undefined || parsed[f] === null) return { parsed, valid: false };
-    }
-  }
-  return { parsed, valid: true };
-}
-
-// Per-model rates where they differ meaningfully from the provider default —
-// the cheap tier is roughly 30x cheaper than gpt-4o, so pricing it at the
-// provider-level rate would hide the entire point of routing to it.
-const MODEL_RATES = {
-  'openai:gpt-4o-mini': { input: 0.00000015, output: 0.0000006 },
-};
-
-function estimateCost(provider, model, inputTokens, outputTokens) {
-  const providerRates = {
-    openai: { input: 0.000005, output: 0.000015 },
-    anthropic: { input: 0.000003, output: 0.000015 },
-  };
-  const r = MODEL_RATES[`${provider}:${model}`] || providerRates[provider] || providerRates.openai;
-  return Math.round((inputTokens * r.input + outputTokens * r.output) * 10000) / 10000;
-}
 
 // The cheap/fast tier for routine, non-strategic calls (e.g. document-spec
 // generation) — never used for board debate or chair synthesis, where
@@ -132,6 +50,7 @@ function buildUserPrompt(question, previousResponses) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const startedAt = Date.now();
 
   try {
     // Internal-only: this function is called by other backend functions using
@@ -207,59 +126,30 @@ Deno.serve(async (req) => {
     const userPrompt = buildUserPrompt(user_question, previous_responses);
     const requiredFields = output_schema?.required || [];
 
-    let result = null;
-    let lastError = null;
+    const { result, attempts, lastError } = await callWithFallback({
+      provider, model, fbProvider, fbModel, systemPrompt, userPrompt,
+      temperature: temp, maxTokens: maxLen, timeoutMs, retryCount, requiredFields,
+      deadlineAt: startedAt + CALL_DEADLINE_MS,
+    });
 
-    for (let attempt = 0; attempt <= retryCount && !result; attempt++) {
-      try {
-        const adapter = PROVIDERS[provider];
-        if (!adapter) throw new Error(`Unknown provider: ${provider}`);
-        const startTime = Date.now();
-        const raw = await adapter(model, systemPrompt, userPrompt, temp, maxLen, timeoutMs);
-        const latency = Date.now() - startTime;
-        const { parsed, valid } = validateAndParse(raw.content, requiredFields);
-        if (valid) {
-          result = { response: parsed, provider_used: provider, model_used: model, used_fallback: false, latency_ms: latency, input_tokens: raw.inputTokens, output_tokens: raw.outputTokens };
-        } else { lastError = 'Invalid response format'; }
-      } catch (e) {
-        console.error(`Provider ${provider} attempt ${attempt}: ${e.message}`);
-        lastError = e.message;
-      }
-    }
+    // Tokens and cost cover every attempt (failed ones were billed too);
+    // latency is the winning attempt's, or the whole call's when none won.
+    const totals = usageTotals(attempts);
+    await insertUsageLog(db, {
+      user_id: user_id || null, company_id: company_id || null, meeting_id: meeting_id || null, advisor_id: advisor_id || null,
+      provider: result ? result.provider_used : provider, model: result ? result.model_used : model,
+      request_type: request_type || 'unknown',
+      input_size: totals.input, output_size: totals.output, estimated_cost: totals.cost,
+      latency_ms: result ? result.latency_ms : Date.now() - startedAt,
+      status: result ? (result.used_fallback ? 'fallback_used' : 'success') : 'error',
+      error_code: !result ? lastError : null,
+      attempts,
+    });
 
-    if (!result && fbProvider && fbModel) {
-      for (let attempt = 0; attempt <= retryCount && !result; attempt++) {
-        try {
-          const adapter = PROVIDERS[fbProvider];
-          if (!adapter) throw new Error(`Unknown provider: ${fbProvider}`);
-          const startTime = Date.now();
-          const raw = await adapter(fbModel, systemPrompt, userPrompt, temp, maxLen, timeoutMs);
-          const latency = Date.now() - startTime;
-          const { parsed, valid } = validateAndParse(raw.content, requiredFields);
-          if (valid) {
-            result = { response: parsed, provider_used: fbProvider, model_used: fbModel, used_fallback: true, latency_ms: latency, input_tokens: raw.inputTokens, output_tokens: raw.outputTokens };
-          } else { lastError = 'Invalid response format (fallback)'; }
-        } catch (e) {
-          console.error(`Fallback ${fbProvider} attempt ${attempt}: ${e.message}`);
-          lastError = e.message;
-        }
-      }
-    }
-
-    const logStatus = result ? (result.used_fallback ? 'fallback_used' : 'success') : 'error';
-    try {
-      await db.from('ai_usage_logs').insert({
-        user_id: user_id || null, company_id: company_id || null, meeting_id: meeting_id || null, advisor_id: advisor_id || null,
-        provider: result ? result.provider_used : provider, model: result ? result.model_used : model,
-        request_type: request_type || 'unknown',
-        input_size: result ? result.input_tokens : 0, output_size: result ? result.output_tokens : 0,
-        estimated_cost: estimateCost(result ? result.provider_used : provider, result ? result.model_used : model, result ? result.input_tokens : 0, result ? result.output_tokens : 0),
-        latency_ms: result ? result.latency_ms : 0, status: logStatus, error_code: !result ? lastError : null,
-      });
-    } catch (logErr) { console.error('Usage log failed:', logErr.message); }
-
+    // The real reason travels back too, so callers can record why an
+    // advisor was lost instead of only that they were.
     if (!result)
-      return Response.json({ error: 'This advisor was temporarily unavailable.' }, { status: 503, headers: corsHeaders });
+      return Response.json({ error: 'This advisor was temporarily unavailable.', reason: lastError }, { status: 503, headers: corsHeaders });
 
     return Response.json(result, { headers: corsHeaders });
   } catch (error) {
