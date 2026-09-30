@@ -137,10 +137,25 @@ export function usageTotals(attempts) {
   return { input, output, cost: Math.round(cost * 10000) / 10000 };
 }
 
-// Tries the primary model retryCount+1 times, then the fallback model the
-// same number of times, and records every attempt — the usage row used to
-// keep only the last error of a call that failed outright, so a primary
-// failing and being rescued by the fallback was invisible.
+// Whether asking the same model again could plausibly succeed. A timeout or
+// a cut-off answer would just repeat (same prompt, same cap), and a 4xx
+// other than a rate limit is the provider rejecting the request itself —
+// retrying those only burns the time the fallback model needs to rescue
+// the advisor. A fresh sample can fix unparseable or incomplete JSON.
+function worthRetrying(entry) {
+  if (entry.outcome === 'timeout' || entry.truncated) return false;
+  if (entry.outcome === 'api_error') {
+    const s = entry.http_status;
+    return s === 408 || s === 409 || s === 429 || s >= 500;
+  }
+  if (entry.outcome === 'error') return !/not configured|Unknown provider/.test(entry.error || '');
+  return true;
+}
+
+// Tries the primary model up to retryCount+1 times (only retrying when that
+// could help), then the fallback model the same way, and records every
+// attempt — the usage row used to keep only the last error of a call that
+// failed outright, so a primary rescued by the fallback was invisible.
 export async function callWithFallback({
   provider, model, fbProvider, fbModel, systemPrompt, userPrompt,
   temperature, maxTokens, timeoutMs, retryCount, requiredFields, deadlineAt,
@@ -148,6 +163,7 @@ export async function callWithFallback({
   const attempts = [];
   let lastError = null;
 
+  // Returns the result, or null plus whether the same model is worth another try.
   const tryModel = async (p, m, isFallback) => {
     const where = `${p}/${m}${isFallback ? ' (fallback)' : ''}`;
     const entry = { n: attempts.length + 1, provider: p, model: m, fallback: isFallback, max_tokens: maxTokens };
@@ -155,8 +171,10 @@ export async function callWithFallback({
     const remaining = deadlineAt - Date.now();
     if (remaining < MIN_ATTEMPT_MS) {
       entry.outcome = 'skipped_deadline';
-      lastError = `${where}: not attempted, out of time`;
-      return null;
+      // The real failure stays the headline (error_code, the 503 reason, the
+      // provider-health alert); running out of time is noted after it.
+      lastError = lastError ? `${lastError}; ${where} not attempted, out of time` : `${where}: not attempted, out of time`;
+      return { result: null, retry: false };
     }
     const startTime = Date.now();
     try {
@@ -171,7 +189,7 @@ export async function callWithFallback({
       const { parsed, valid, reason, missing } = validateAndParse(raw.content, requiredFields);
       if (valid) {
         entry.outcome = 'ok';
-        return { response: parsed, provider_used: p, model_used: m, used_fallback: isFallback, latency_ms: entry.latency_ms, input_tokens: raw.inputTokens, output_tokens: raw.outputTokens };
+        return { result: { response: parsed, provider_used: p, model_used: m, used_fallback: isFallback, latency_ms: entry.latency_ms, input_tokens: raw.inputTokens, output_tokens: raw.outputTokens } };
       }
       entry.outcome = reason;
       if (missing) entry.missing_fields = missing;
@@ -189,18 +207,20 @@ export async function callWithFallback({
       lastError = `${where}: ` + (aborted ? `timed out after ${entry.latency_ms}ms` : e.message);
     }
     console.error(`Attempt ${entry.n} ${lastError}`);
+    return { result: null, retry: worthRetrying(entry) };
+  };
+
+  const runModel = async (p, m, isFallback) => {
+    for (let attempt = 0; attempt <= retryCount; attempt++) {
+      const { result, retry } = await tryModel(p, m, isFallback);
+      if (result) return result;
+      if (!retry) break;
+    }
     return null;
   };
 
-  let result = null;
-  for (let attempt = 0; attempt <= retryCount && !result; attempt++) {
-    result = await tryModel(provider, model, false);
-  }
-  if (!result && fbProvider && fbModel) {
-    for (let attempt = 0; attempt <= retryCount && !result; attempt++) {
-      result = await tryModel(fbProvider, fbModel, true);
-    }
-  }
+  let result = await runModel(provider, model, false);
+  if (!result && fbProvider && fbModel) result = await runModel(fbProvider, fbModel, true);
   return { result, attempts, lastError };
 }
 
