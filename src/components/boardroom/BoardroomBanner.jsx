@@ -98,10 +98,13 @@ export default function BoardroomBanner({
       >
         <defs>
           {CHAIRS.map((c) => (
+            // stop-color goes through style, not the stopColor attribute:
+            // var() inside an SVG presentation attribute isn't resolved by
+            // every engine, while inside style it always is.
             <radialGradient key={c.id} id={`chair-glow-${c.id}`} cx="50%" cy="45%" r="65%">
-              <stop offset="0%" stopColor="hsl(var(--brand))" stopOpacity="1" />
-              <stop offset="55%" stopColor="hsl(var(--brand))" stopOpacity="0.75" />
-              <stop offset="100%" stopColor="hsl(var(--brand))" stopOpacity="0" />
+              <stop offset="0%" style={{ stopColor: "hsl(var(--brand))" }} stopOpacity="1" />
+              <stop offset="55%" style={{ stopColor: "hsl(var(--brand))" }} stopOpacity="0.75" />
+              <stop offset="100%" style={{ stopColor: "hsl(var(--brand))" }} stopOpacity="0" />
             </radialGradient>
           ))}
         </defs>
@@ -116,11 +119,9 @@ export default function BoardroomBanner({
               height={c.h * 1.15}
               rx={c.rx}
               fill={`url(#chair-glow-${c.id})`}
-              // Below sm: the room stays a static, unlit photograph — narrow
-              // viewports can't reliably show a lit chair at legible size,
-              // so the name tag alone carries who's speaking (agreed call,
-              // see AdvisorSelectionRow's sibling banner usage in BoardDebate).
-              className="max-sm:!opacity-0"
+              // Lit at every width, phones included — hiding it below sm left
+              // the name tag lighting up with no glow under it, which read as
+              // the light being broken.
               style={{
                 mixBlendMode: blendMode,
                 opacity,
