@@ -6,24 +6,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import TurnstileWidget from "@/components/TurnstileWidget";
+import { useCaptcha } from "@/lib/turnstile";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+  const captcha = useCaptcha();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
     setLoading(true);
     try {
-      await base44.auth.resetPasswordRequest(email);
-    } catch {
-      // Always show success regardless
+      await base44.auth.resetPasswordRequest(email, captcha.token);
+      setSent(true);
+    } catch (err) {
+      // A rejected captcha means no email went out — say so and let them
+      // retry. Anything else still shows the neutral "if an account
+      // exists" message, so the form never reveals which emails have one.
+      if (err?.code === "captcha_failed") {
+        setError("We couldn't verify you're human. Please try again.");
+        captcha.reset();
+      } else {
+        setSent(true);
+      }
     } finally {
       setLoading(false);
-      setSent(true);
     }
-  }; 
+  };
 
   return (
     <AuthLayout
@@ -41,6 +54,11 @@ export default function ForgotPassword() {
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email address</Label>
             <div className="relative">
@@ -58,7 +76,8 @@ export default function ForgotPassword() {
               />
             </div>
           </div>
-          <Button type="submit" variant="primary" className="w-full h-12" disabled={loading}>
+          <TurnstileWidget key={captcha.widgetKey} onToken={captcha.setToken} />
+          <Button type="submit" variant="primary" className="w-full h-12" disabled={loading || !captcha.ready}>
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

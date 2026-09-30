@@ -7,22 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+import TurnstileWidget from "@/components/TurnstileWidget";
+import { useCaptcha } from "@/lib/turnstile";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const captcha = useCaptcha();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
+      await base44.auth.loginViaEmailPassword(email, password, captcha.token);
       window.location.href = "/";
     } catch (err) {
       setError(err.message || "Invalid email or password");
+      captcha.reset();
     } finally {
       setLoading(false);
     }
@@ -107,7 +111,8 @@ export default function Login() {
             />
           </div>
         </div>
-        <Button type="submit" variant="primary" className="w-full h-12" disabled={loading}>
+        <TurnstileWidget key={captcha.widgetKey} onToken={captcha.setToken} />
+        <Button type="submit" variant="primary" className="w-full h-12" disabled={loading || !captcha.ready}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

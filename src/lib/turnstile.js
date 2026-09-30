@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+
 // Cloudflare's published Turnstile test site keys — fixed, documented
 // values (https://developers.cloudflare.com/turnstile/troubleshooting/testing/),
 // never assigned to a real site. A live site key can never equal one of
@@ -20,4 +22,22 @@ export function assertLiveSiteKeyInProduction(siteKey) {
       "Turnstile misconfiguration: this production build has a Cloudflare test site key (or none at all) in VITE_TURNSTILE_SITE_KEY. Refusing to render rather than silently disabling bot protection."
     );
   }
+}
+
+const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+
+// Supabase Auth has captcha protection on, so password login, signup,
+// resend-code and forgot-password are all rejected without a Turnstile
+// token — not just the anonymous free meeting. Tokens are single-use:
+// call reset() after any request that sent one, which remounts the widget
+// (render it with key={widgetKey}) for a fresh token. Without a site key
+// (local dev before Turnstile is set up) there's nothing to wait for.
+export function useCaptcha() {
+  const [token, setToken] = useState(null);
+  const [widgetKey, setWidgetKey] = useState(0);
+  const reset = useCallback(() => {
+    setToken(null);
+    setWidgetKey((k) => k + 1);
+  }, []);
+  return { token, setToken, widgetKey, reset, ready: !SITE_KEY || !!token };
 }

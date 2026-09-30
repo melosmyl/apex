@@ -134,8 +134,15 @@ const auth = {
     return fetchProfile(user);
   },
 
-  async loginViaEmailPassword(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  // captchaToken: Supabase Auth has captcha protection on, so password
+  // login, signup, resend and recover all need a Turnstile token (see
+  // useCaptcha in lib/turnstile.js).
+  async loginViaEmailPassword(email, password, captchaToken) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken },
+    });
     if (error) throw error;
     return data;
   },
@@ -151,11 +158,11 @@ const auth = {
   // Signup verifies with a 6-digit code, but emailRedirectTo still decides
   // where any link in the confirmation email lands — without it Supabase
   // falls back to the dashboard Site URL.
-  async register({ email, password }) {
+  async register({ email, password, captchaToken }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${SITE_URL}/` },
+      options: { emailRedirectTo: `${SITE_URL}/`, captchaToken },
     });
     if (error) throw error;
     return { session: data.session };
@@ -171,11 +178,11 @@ const auth = {
     return { access_token: data.session?.access_token };
   },
 
-  async resendOtp(email) {
+  async resendOtp(email, captchaToken) {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: `${SITE_URL}/` },
+      options: { emailRedirectTo: `${SITE_URL}/`, captchaToken },
     });
     if (error) throw error;
   },
@@ -184,9 +191,10 @@ const auth = {
     // No-op: Supabase manages its own session/token storage internally.
   },
 
-  async resetPasswordRequest(email) {
+  async resetPasswordRequest(email, captchaToken) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${SITE_URL}/reset-password`,
+      captchaToken,
     });
     if (error) throw error;
   },

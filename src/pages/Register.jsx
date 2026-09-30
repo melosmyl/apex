@@ -9,6 +9,8 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
+import TurnstileWidget from "@/components/TurnstileWidget";
+import { useCaptcha } from "@/lib/turnstile";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -18,6 +20,9 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+  // One widget at a time: the signup form's, then (after reset) the
+  // code screen's, since Resend needs its own fresh token.
+  const captcha = useCaptcha();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +33,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const result = await base44.auth.register({ email, password });
+      const result = await base44.auth.register({ email, password, captchaToken: captcha.token });
       if (result?.session) {
         window.location.href = "/";
         return;
@@ -38,6 +43,7 @@ export default function Register() {
       setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
+      captcha.reset();
     }
   };
 
@@ -58,9 +64,15 @@ export default function Register() {
   };
 
   const handleResend = async () => {
+    if (!captcha.ready) return;
     setError("");
+    // Spend the token before the request goes out: Resend has no loading
+    // state, so a double-click would otherwise send the same single-use
+    // token twice and show a spurious captcha error.
+    const token = captcha.token;
+    captcha.reset();
     try {
-      await base44.auth.resendOtp(email);
+      await base44.auth.resendOtp(email, token);
       toast({
         title: "Code sent",
         description: "Check your email for the new code.",
@@ -120,10 +132,13 @@ export default function Register() {
         </Button>
         <p className="text-center text-sm text-muted-foreground mt-4">
           Didn't receive the code?{" "}
-          <button onClick={handleResend} className="text-primary font-medium hover:underline">
+          <button onClick={handleResend} disabled={!captcha.ready} className="text-primary font-medium hover:underline disabled:opacity-50 disabled:no-underline">
             Resend
           </button>
         </p>
+        <div className="mt-4">
+          <TurnstileWidget key={captcha.widgetKey} onToken={captcha.setToken} />
+        </div>
       </AuthLayout>
     );
   }
@@ -214,7 +229,8 @@ export default function Register() {
             />
           </div>
         </div>
-        <Button type="submit" variant="primary" className="w-full h-12" disabled={loading}>
+        <TurnstileWidget key={captcha.widgetKey} onToken={captcha.setToken} />
+        <Button type="submit" variant="primary" className="w-full h-12" disabled={loading || !captcha.ready}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

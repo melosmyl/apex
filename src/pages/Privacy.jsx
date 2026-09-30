@@ -69,7 +69,7 @@ export default function Privacy() {
       <section>
         <h2>Other services we use</h2>
         <ul>
-          <li><strong>Cloudflare Turnstile</strong> — checks that a real person, not a bot, is starting a free board meeting. It doesn't show puzzles or track you across other sites.</li>
+          <li><strong>Cloudflare Turnstile</strong> — checks that a real person, not a bot, is logging in, signing up, resetting a password or starting a free board meeting. It doesn't show puzzles or track you across other sites.</li>
           <li><strong>Resend</strong> — sends account and confirmation emails on our behalf, from an address at {PRODUCT_DOMAIN}.</li>
         </ul>
         <p>We don't use Google Analytics, advertising pixels, or any other third-party tracking. The only cookies/local storage we use are functional — keeping you signed in.</p>
