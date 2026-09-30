@@ -18,6 +18,7 @@ import {
 import { STATUS_CONFIG, APPROVAL_CONFIG, QUALITY_CONFIG, ASSUMPTIONS_CONFIG } from "@/lib/documents";
 import { regenerateDeliverable } from "@/lib/deliverables";
 import DocumentDownloadButton from "@/components/documents/DocumentDownloadButton";
+import { SITE_URL } from "@/lib/branding";
 
 export default function DocumentDetailDialog({
   doc, advisors, onClose, onRefresh, company
@@ -45,7 +46,7 @@ export default function DocumentDetailDialog({
       const token = crypto.randomUUID();
       await base44.entities.Document.update(doc.id, { share_token: token });
       await onRefresh();
-      copyToClipboard(`${window.location.origin}/share/document/${token}`, "Anyone with this link can view this document, no account needed.");
+      copyToClipboard(`${SITE_URL}/share/document/${token}`, "Anyone with this link can view this document, no account needed.");
     } finally { setSharingBusy(false); }
   };
 
@@ -193,7 +194,7 @@ export default function DocumentDetailDialog({
           </Button>
           {doc.share_token ? (
             <>
-              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(`${window.location.origin}/share/document/${doc.share_token}`, "Public link copied — anyone with it can view this document, no account needed.")}>
+              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(`${SITE_URL}/share/document/${doc.share_token}`, "Public link copied — anyone with it can view this document, no account needed.")}>
                 <Share2 className="w-3.5 h-3.5 mr-1" /> Copy Public Link
               </Button>
               <Button variant="ghost" size="sm" className="text-muted-foreground" disabled={sharingBusy} onClick={revokeSharing}>

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { SITE_URL } from '@/lib/branding';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -142,13 +143,20 @@ const auth = {
   async loginWithProvider(provider, redirectPath = '/') {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}${redirectPath}` },
+      options: { redirectTo: `${SITE_URL}${redirectPath}` },
     });
     if (error) throw error;
   },
 
+  // Signup verifies with a 6-digit code, but emailRedirectTo still decides
+  // where any link in the confirmation email lands — without it Supabase
+  // falls back to the dashboard Site URL.
   async register({ email, password }) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${SITE_URL}/` },
+    });
     if (error) throw error;
     return { session: data.session };
   },
@@ -164,7 +172,11 @@ const auth = {
   },
 
   async resendOtp(email) {
-    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${SITE_URL}/` },
+    });
     if (error) throw error;
   },
 
@@ -174,7 +186,7 @@ const auth = {
 
   async resetPasswordRequest(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${SITE_URL}/reset-password`,
     });
     if (error) throw error;
   },

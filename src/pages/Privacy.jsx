@@ -1,10 +1,10 @@
 import React from "react";
 import LegalLayout from "@/components/LegalLayout";
-import { PRODUCT_NAME, PRODUCT_DOMAIN } from "@/lib/branding";
+import { PRODUCT_NAME, PRODUCT_DOMAIN, SUPPORT_EMAIL } from "@/lib/branding";
 
 export default function Privacy() {
   return (
-    <LegalLayout title="Privacy Policy" updated="12 August 2026">
+    <LegalLayout title="Privacy Policy" updated="30 September 2026">
       <section>
         <h2>The short version</h2>
         <p>
@@ -115,7 +115,7 @@ export default function Privacy() {
         <p>
           You can ask us to delete your account and everything attached to it — company, meetings, decisions,
           tasks, notes, documents — at any time. There's no self-service delete button yet, so email{" "}
-          <a href="mailto:melody.m.p.j@icloud.com?subject=Delete my account">melody.m.p.j@icloud.com</a> from the
+          <a href={`mailto:${SUPPORT_EMAIL}?subject=Delete my account`}>{SUPPORT_EMAIL}</a> from the
           address on your account and we'll delete it by hand. You can also ask what data we hold about you, or
           ask us to correct anything that's wrong.
         </p>
@@ -142,7 +142,7 @@ export default function Privacy() {
 
       <section>
         <h2>Contact</h2>
-        <p>Questions about any of this: <a href="mailto:melody.m.p.j@icloud.com">melody.m.p.j@icloud.com</a>.</p>
+        <p>Questions about any of this: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</p>
       </section>
     </LegalLayout>
   );

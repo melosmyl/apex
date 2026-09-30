@@ -1,10 +1,10 @@
 import React from "react";
 import LegalLayout from "@/components/LegalLayout";
-import { PRODUCT_NAME } from "@/lib/branding";
+import { PRODUCT_NAME, SUPPORT_EMAIL } from "@/lib/branding";
 
 export default function Terms() {
   return (
-    <LegalLayout title="Terms of Service" updated="12 August 2026">
+    <LegalLayout title="Terms of Service" updated="30 September 2026">
       <section>
         <h2>What this is</h2>
         <p>
@@ -106,7 +106,7 @@ export default function Terms() {
 
       <section>
         <h2>Contact</h2>
-        <p>Questions about any of this: <a href="mailto:melody.m.p.j@icloud.com">melody.m.p.j@icloud.com</a>.</p>
+        <p>Questions about any of this: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</p>
       </section>
     </LegalLayout>
   );

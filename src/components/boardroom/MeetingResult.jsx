@@ -13,13 +13,14 @@ import PinnableText from "@/components/pins/PinnableText";
 import { usePin } from "@/components/pins/PinContext";
 import { base44 } from "@/api/base44Client";
 import { toast } from "@/components/ui/use-toast";
+import { SITE_URL } from "@/lib/branding";
 
 function ShareMeetingControl({ meetingId, initialToken, status }) {
   const [token, setToken] = useState(initialToken || null);
   const [busy, setBusy] = useState(false);
 
   const copy = (t) => {
-    const url = `${window.location.origin}/share/meeting/${t}`;
+    const url = `${SITE_URL}/share/meeting/${t}`;
     try { navigator.clipboard.writeText(url).catch(() => {}); } catch { /* clipboard unavailable */ }
     toast({ title: "Link copied", description: t === token && initialToken ? undefined : "Anyone with this link can view this meeting, no account needed." });
   };

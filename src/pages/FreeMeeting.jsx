@@ -9,6 +9,7 @@ import { generateOnboardingPlan, createCompanyFromOnboarding } from "@/lib/onboa
 import { QUESTIONS as PROFILE_QUESTIONS } from "@/components/onboarding/GuidedOnboarding";
 import BoardDebate from "@/components/boardroom/BoardDebate";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import { SITE_URL } from "@/lib/branding";
 
 function useFreeMeetingGate() {
   const check = async () => {
@@ -28,7 +29,10 @@ function ConversionCapture({ meetingId, companyId }) {
   const submit = async () => {
     if (!email.trim()) return;
     setState("sending");
-    const { error } = await supabase.auth.updateUser({ email: email.trim() });
+    const { error } = await supabase.auth.updateUser(
+      { email: email.trim() },
+      { emailRedirectTo: `${SITE_URL}/` },
+    );
     if (error) { setState("error"); return; }
     setState("sent");
   };

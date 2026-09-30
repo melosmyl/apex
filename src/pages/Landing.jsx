@@ -85,7 +85,7 @@ export default function Landing() {
         <div className="max-w-5xl mx-auto text-center rise-in">
           <Kicker>{PRODUCT_NAME}</Kicker>
           <h1 className="font-display text-[2.75rem] leading-[1.05] sm:text-7xl sm:leading-[0.98] lg:text-8xl lg:leading-[0.95] mt-5 mb-6 text-balance">
-            Nobody told you either.
+            Don't decide alone.
           </h1>
           <p className="text-lg sm:text-xl lg:text-2xl leading-relaxed text-foreground/75 mb-10 text-balance max-w-2xl mx-auto">
             A board of advisors who argue about your business.{" "}
