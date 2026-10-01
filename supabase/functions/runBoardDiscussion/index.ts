@@ -246,11 +246,11 @@ Deno.serve(async (req) => {
       required: ['message', 'message_type', 'confidence_score'],
     };
 
-    // Only the server-chosen AI advisors, named from their rows: the entries
-    // themselves are browser-editable.
+    // The server-chosen AI advisors plus the company's human advisors, all
+    // named from their rows: the entries themselves are browser-editable.
     const meetingAdvisorIds = new Set(meetingAdvisors.map(a => a.id));
     const convergenceInput = independentResponses
-      .filter(r => meetingAdvisorIds.has(r.advisor_id))
+      .filter(r => meetingAdvisorIds.has(r.advisor_id) || byId.get(r.advisor_id)?.type === 'human')
       .map(r => ({ advisor_name: byId.get(r.advisor_id).name, recommendation: String(r.recommendation || '').slice(0, 2000) }));
     const convergencePairs = await detectConvergence(convergenceInput);
 

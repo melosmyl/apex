@@ -295,7 +295,7 @@ Deno.serve(async (req) => {
 
     const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
       db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(20),
-      db.from('board_meetings').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(5),
+      db.from('board_meetings').select('*').eq('company_id', company_id).eq('created_by_id', user.id).eq('status', 'complete').order('created_at', { ascending: false }).limit(5),
       db.from('projects').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(10),
       db.from('advisors').select('*').eq('company_id', company_id).eq('created_by_id', user.id).limit(100),
       recallRelatedDecisions(db, company_id, user.id, question),
@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
       if (denied) return Response.json({ error: denied }, { status: 403, headers: corsHeaders });
     }
 
-    const contextPackage = buildContext(company, documents, decisions, (meetings || []).filter((m) => m.status === 'complete'), projects, commitments, progression, limits.max_context_size || 8000);
+    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
 
     // What the board is drawing on, recorded so the founder can see it later.
     const memoryContext = {
@@ -380,7 +380,7 @@ Deno.serve(async (req) => {
     if (!chairAdvisor) chairAdvisor = selectedAdvisors[0];
     // The last meeting that actually reached a resolution: an abandoned,
     // failed or superseded one never happened as far as the Chair knows.
-    const previousMeeting = (meetings || []).find((m) => m.status === 'complete') || null;
+    const previousMeeting = meetings?.[0] || null;
 
     const [independentResults, chairOpening] = await Promise.all([
       Promise.all(selectedAdvisors.map(advisor =>
