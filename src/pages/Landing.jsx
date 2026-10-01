@@ -75,7 +75,7 @@ export default function Landing() {
           scrolled-to in the footer, so it's found immediately. */}
       <Link
         to="/login"
-        className="fixed top-5 right-5 sm:top-6 sm:right-8 z-50 font-mono text-[11px] tracking-[0.2em] uppercase text-foreground/60 hover:text-foreground transition-colors"
+        className="absolute top-5 right-5 sm:top-6 sm:right-8 z-50 font-mono text-[11px] tracking-[0.2em] uppercase text-foreground/60 hover:text-foreground transition-colors"
       >
         Log in
       </Link>
