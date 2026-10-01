@@ -217,7 +217,19 @@ const auth = {
 const functions = {
   async invoke(name, body) {
     const { data, error } = await supabase.functions.invoke(name, { body });
-    if (error) throw error;
+    if (error) {
+      // supabase-js puts the raw Response on error.context; callers read the
+      // server's message from error.response.data.error (the Base44 shape).
+      const res = error.context;
+      if (res && typeof res.json === "function") {
+        try {
+          const payload = await res.json();
+          error.response = { status: res.status, data: payload };
+          if (payload?.error) error.message = payload.error;
+        } catch { /* not JSON — keep supabase-js's message */ }
+      }
+      throw error;
+    }
     return { data };
   },
 };

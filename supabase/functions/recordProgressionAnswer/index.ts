@@ -13,6 +13,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callAssistant } from '../_shared/assistantCalls.ts';
+import { requireNotAnonymous, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,6 +42,9 @@ Deno.serve(async (req) => {
     if (!company_id || !node_id || !(answer_text || '').trim())
       return Response.json({ error: 'company_id, node_id, and answer_text are required' }, { status: 400, headers: corsHeaders });
 
+    requireNotAnonymous(user);
+    requireMaxLength(answer_text, TEXT_LIMITS.progression_answer, 'Your answer');
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const db = createClient(supabaseUrl, serviceKey);
@@ -59,6 +63,7 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await db.from('progression_node_completions').select('id').eq('node_id', node_id).maybeSingle();
     if (existing) return Response.json({ affirmed: true, already_completed: true }, { headers: corsHeaders });
+    await checkUserLimit(db, user.id, 'progression_answer');
 
     let affirmed = false;
     try {
@@ -87,6 +92,8 @@ Deno.serve(async (req) => {
 
     return Response.json({ affirmed, already_completed: false }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('recordProgressionAnswer error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

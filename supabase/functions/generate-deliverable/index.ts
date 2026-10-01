@@ -3,6 +3,7 @@
 // Document entity with version control. Replaces the old markdown-only flow.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireOwnedCompany, requireOwnedRow, requireNotAnonymous, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 import { buildFinancialModelWorkbook, runExcelQualityChecks } from '../_shared/buildExcelModel.ts';
 import { buildPdfReport } from '../_shared/buildPdfReport.ts';
 import { buildDocxReport, runDocxQualityChecks } from '../_shared/buildDocxReport.ts';
@@ -120,12 +121,29 @@ Deno.serve(async (req) => {
 
     const { task_id, company_id, advisor_id, document_type, topic, revision_of, custom_instructions } = await req.json();
 
-    // For revisions, inherit document_type from the original if not provided
-    let resolvedDocType = document_type;
-    if (!resolvedDocType && revision_of) {
-      const { data: orig } = await db.from('documents').select('document_type').eq('id', revision_of).single();
-      resolvedDocType = orig?.document_type;
+    // Everything named in the request must belong to the caller and sit in
+    // the caller's company — the loads below use the service-role client.
+    requireNotAnonymous(user);
+    requireMaxLength(topic, TEXT_LIMITS.question, 'The topic');
+    requireMaxLength(custom_instructions, TEXT_LIMITS.question, 'The instructions');
+    await requireOwnedCompany(db, company_id, user.id);
+    const sameCompany = (row) => {
+      if (row.company_id !== company_id) throw new Error('Mismatched company');
+      return row;
+    };
+    let original = null;
+    try {
+      if (task_id) sameCompany(await requireOwnedRow(db, 'tasks', task_id, user.id, 'id, company_id, created_by_id'));
+      if (advisor_id) sameCompany(await requireOwnedRow(db, 'advisors', advisor_id, user.id, 'id, company_id, created_by_id'));
+      if (revision_of) original = sameCompany(await requireOwnedRow(db, 'documents', revision_of, user.id, 'id, company_id, created_by_id, document_type'));
+    } catch (e) {
+      if (e.message === 'Mismatched company') return Response.json({ error: 'Forbidden' }, { status: 403, headers: corsHeaders });
+      throw e;
     }
+    await checkUserLimit(db, user.id, 'deliverable');
+
+    // For revisions, inherit document_type from the original if not provided
+    let resolvedDocType = document_type || original?.document_type;
     if (!company_id || !resolvedDocType)
       return Response.json({ error: 'company_id and document_type are required' }, { status: 400, headers: corsHeaders });
 
@@ -134,9 +152,9 @@ Deno.serve(async (req) => {
       db.from('companies').select('*').eq('id', company_id).single().then((r) => r.data),
       task_id ? db.from('tasks').select('*').eq('id', task_id).single().then((r) => r.data) : Promise.resolve(null),
       advisor_id ? db.from('advisors').select('*').eq('id', advisor_id).single().then((r) => r.data) : Promise.resolve(null),
-      db.from('decisions').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
-      db.from('projects').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
-      db.from('documents').select('*').eq('company_id', company_id).eq('kind', 'knowledge').order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
+      db.from('decisions').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
+      db.from('projects').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
+      db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).eq('kind', 'knowledge').order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
     ]);
 
     if (!company) return Response.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
@@ -145,7 +163,7 @@ Deno.serve(async (req) => {
     // advisor on the company when the deliverable was not assigned to one.
     let specAdvisor = advisor;
     if (!specAdvisor) {
-      const { data: fallbackAdvisors } = await db.from('advisors').select('*').eq('company_id', company_id).neq('type', 'human').limit(1);
+      const { data: fallbackAdvisors } = await db.from('advisors').select('*').eq('company_id', company_id).eq('created_by_id', user.id).neq('type', 'human').limit(1);
       specAdvisor = fallbackAdvisors?.[0];
     }
     if (!specAdvisor)
@@ -324,6 +342,8 @@ Deno.serve(async (req) => {
       file_name: documentRecord.file_name,
     }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('generate-deliverable error:', error);
     return Response.json({ error: error.message || 'Document generation failed.' }, { status: 500, headers: corsHeaders });
   }

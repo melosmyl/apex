@@ -99,7 +99,9 @@ Deno.serve(async (req: Request) => {
       company_name: company?.name || null,
       participants: meeting.participants || [],
       created_at: meeting.created_at,
-      chair_opening: meeting.chair_opening || null,
+      // No chair_opening: it's built from the founder's private decision notes
+      // and task titles, which a public link shouldn't carry.
+      chair_opening: null,
       executive_summary: resolution.executive_summary || meeting.executive_summary || null,
       recommended_direction: resolution.recommended_direction || meeting.recommendation || null,
       reasoning: resolution.reasoning || null,

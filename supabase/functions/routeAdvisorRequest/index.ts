@@ -48,6 +48,27 @@ function buildUserPrompt(question, previousResponses) {
   return prompt;
 }
 
+const DEFAULT_MODEL = { openai: 'gpt-4o', anthropic: 'claude-sonnet-5' };
+// The models every library advisor and the cheap tier use. Admins approve
+// more by adding an active row to ai_model_configurations.
+const BUILT_IN_MODELS = ['openai:gpt-4o', 'openai:gpt-4o-mini', 'anthropic:claude-sonnet-5'];
+const MAX_OUTPUT_DEFAULT = 4000;
+const MAX_OUTPUT_BY_REQUEST_TYPE = { deliverable_spec: 16000 };
+
+function clamp(n, min, max, fallback) {
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+async function loadApprovedModels(db) {
+  const approved = new Set(BUILT_IN_MODELS);
+  try {
+    const { data } = await db.from('ai_model_configurations').select('provider, model_name').eq('is_active', true);
+    for (const row of data || []) approved.add(`${row.provider}:${row.model_name}`);
+  } catch { /* table unavailable — built-ins only */ }
+  return approved;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const startedAt = Date.now();
@@ -96,13 +117,27 @@ Deno.serve(async (req) => {
     const limits = limitsList?.[0] || { retry_count: 1, request_timeout_ms: 60000, max_output_length: 2000 };
     const timeoutMs = limits.request_timeout_ms || 60000;
     const retryCount = limits.retry_count ?? 1;
-    const temp = temperature ?? advisor.temperature ?? 0.7;
-    const maxLen = max_output_length ?? advisor.maximum_output_length ?? limits.max_output_length ?? 2000;
+    // Founders can edit their advisor rows directly, so the model, length and
+    // temperature on a row are requests, not instructions: only approved
+    // models run, and length and temperature are capped here.
+    const temp = clamp(Number(temperature ?? advisor.temperature ?? 0.7), 0, 1, 0.7);
+    const maxLen = clamp(Number(max_output_length ?? advisor.maximum_output_length ?? limits.max_output_length ?? 2000),
+      100, MAX_OUTPUT_BY_REQUEST_TYPE[request_type] ?? MAX_OUTPUT_DEFAULT, 2000);
 
+    const approved = await loadApprovedModels(db);
     let provider = advisor.default_provider || 'openai';
     let model = advisor.default_model || 'gpt-4o';
+    if (!approved.has(`${provider}:${model}`)) {
+      console.warn(`routeAdvisorRequest: ${provider}/${model} is not an approved model; using the default`);
+      provider = provider === 'anthropic' ? 'anthropic' : 'openai';
+      model = DEFAULT_MODEL[provider];
+    }
     let fbProvider = advisor.fallback_provider;
     let fbModel = advisor.fallback_model;
+    if (fbProvider && !approved.has(`${fbProvider}:${fbModel}`)) {
+      fbProvider = provider === 'openai' ? 'anthropic' : 'openai';
+      fbModel = DEFAULT_MODEL[fbProvider];
+    }
 
     if (model_tier === 'cheap') {
       const cheap = await resolveCheapTier(db);

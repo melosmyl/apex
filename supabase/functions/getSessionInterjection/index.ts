@@ -13,6 +13,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { interjectionBudgetSpent } from '../_shared/assistantCalls.ts';
+import { requireOwnedCompany, AccessError } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,7 +42,15 @@ Deno.serve(async (req) => {
     const db = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     const { company_id, is_away, streak_current, streak_best } = await req.json();
-    if (!company_id) return Response.json({ type: null }, { headers: corsHeaders });
+    if (!company_id || user.is_anonymous) return Response.json({ type: null }, { headers: corsHeaders });
+    // Only the company's owner sees (and uses up) its reminders. Quiet null
+    // otherwise: this runs on every page load.
+    try {
+      await requireOwnedCompany(db, company_id, user.id);
+    } catch (e) {
+      if (e instanceof AccessError) return Response.json({ type: null }, { headers: corsHeaders });
+      throw e;
+    }
 
     if (await interjectionBudgetSpent(db, user.id))
       return Response.json({ type: null, reason: 'budget_spent' }, { headers: corsHeaders });

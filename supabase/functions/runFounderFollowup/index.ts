@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireOwnedRow, requireMaxLength, accessErrorResponse, TEXT_LIMITS, MAX_FOLLOWUPS_PER_MEETING } from '../_shared/access.ts';
 
 // Ported from base44/functions/runFounderFollowup/entry.ts — that version
 // was never deployed (Base44 SDK, dead since the migration off Base44).
@@ -64,14 +65,17 @@ Deno.serve(async (req) => {
     if (!meeting_id || !founder_message?.trim())
       return Response.json({ error: 'meeting_id and founder_message are required' }, { status: 400, headers: corsHeaders });
 
-    const { data: meeting } = await db.from('board_meetings').select('*').eq('id', meeting_id).single();
-    if (!meeting) return Response.json({ error: 'Meeting not found' }, { status: 404, headers: corsHeaders });
+    requireMaxLength(founder_message, TEXT_LIMITS.founder_message, 'Your message');
+    const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
+    const followupsSoFar = (meeting.discussion_transcript || []).filter(e => e.advisor_name === 'Founder').length;
+    if (followupsSoFar >= MAX_FOLLOWUPS_PER_MEETING)
+      return Response.json({ error: `This meeting has reached its ${MAX_FOLLOWUPS_PER_MEETING} follow-up questions. Start a new meeting to keep going.` }, { status: 429, headers: corsHeaders });
 
     const independentResponses = meeting.independent_responses || [];
     if (!independentResponses.length)
       return Response.json({ error: 'No independent responses found' }, { status: 400, headers: corsHeaders });
 
-    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).limit(100);
+    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
     const meetingAdvisors = (advisors || []).filter(a =>
       independentResponses.some(r => r.advisor_id === a.id) && a.type !== 'human'
     );
@@ -157,6 +161,8 @@ Deno.serve(async (req) => {
       discussion_transcript: updatedTranscript,
     }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('runFounderFollowup error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

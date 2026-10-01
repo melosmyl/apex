@@ -12,6 +12,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { ROUTING_FALLBACK_TEXT } from '../_shared/assistantPersona.ts';
 import { callAssistant, containsAdvice } from '../_shared/assistantCalls.ts';
+import { checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -61,14 +62,18 @@ Deno.serve(async (req) => {
     const { data: note } = await db.from('notes').select('*').eq('id', note_id).single();
     if (!note) return Response.json({ error: 'Note not found' }, { status: 404, headers: corsHeaders });
     if (note.created_by_id !== user.id) return Response.json({ error: 'Unauthorized' }, { status: 403, headers: corsHeaders });
+    // Already processed: tagging again would only spend on the same answer.
+    if (note.category && note.signal_size) return Response.json({ note_id: note.id, already_processed: true }, { headers: corsHeaders });
+    await checkUserLimit(db, user.id, 'note_process');
+    const noteText = (note.raw_text || '').slice(0, TEXT_LIMITS.note);
 
     const [tagResult, classifyResult] = await Promise.all([
       callAssistant(supabaseUrl, serviceKey, {
-        user_question: `Tag this captured note for organisation:\n"${note.raw_text}"`,
+        user_question: `Tag this captured note for organisation:\n"${noteText}"`,
         output_schema: TAG_SCHEMA, request_type: 'assistant_tag', user_id: user.id, company_id: note.company_id,
       }).catch((e) => { console.error('tagNote failed:', e.message); return null; }),
       callAssistant(supabaseUrl, serviceKey, {
-        user_question: `Decide whether this captured note is small (an ordinary to-do or reminder) or strategic (the kind of question a board would debate):\n"${note.raw_text}"`,
+        user_question: `Decide whether this captured note is small (an ordinary to-do or reminder) or strategic (the kind of question a board would debate):\n"${noteText}"`,
         output_schema: CLASSIFY_SCHEMA, request_type: 'assistant_classify', user_id: user.id, company_id: note.company_id,
       }).catch((e) => { console.error('classifyNote failed:', e.message); return null; }),
     ]);
@@ -100,6 +105,8 @@ Deno.serve(async (req) => {
 
     return Response.json({ note_id, updated: Object.keys(updates) }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('processNote error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

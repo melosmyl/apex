@@ -10,6 +10,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { embedText } from '../_shared/embeddings.ts';
 import { callAssistant, containsAdvice, interjectionBudgetSpent } from '../_shared/assistantCalls.ts';
 import { INTERJECTION_FALLBACK_TEXT } from '../_shared/assistantPersona.ts';
+import { requireOwnedCompany, checkUserLimit, AccessError, TEXT_LIMITS } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,8 +40,19 @@ Deno.serve(async (req) => {
     const db = createClient(supabaseUrl, serviceKey);
 
     const { company_id, draft_text } = await req.json();
-    if (!company_id || !draft_text?.trim())
+    if (!company_id || !draft_text?.trim() || draft_text.length > TEXT_LIMITS.note)
       return Response.json({ matched: false }, { headers: corsHeaders });
+    // Anonymous visitors have no notes. Everyone else may only match their own
+    // company's notes. This endpoint answers quietly rather than with errors:
+    // it runs while the founder types.
+    if (user.is_anonymous) return Response.json({ matched: false }, { headers: corsHeaders });
+    try {
+      await requireOwnedCompany(db, company_id, user.id);
+      await checkUserLimit(db, user.id, 'note_relevance');
+    } catch (e) {
+      if (e instanceof AccessError) return Response.json({ matched: false, reason: e.status === 429 ? 'rate_limited' : 'forbidden' }, { headers: corsHeaders });
+      throw e;
+    }
 
     // Checked first and cheaply — a spent budget costs nothing to discover.
     if (await interjectionBudgetSpent(db, user.id))
@@ -49,7 +61,9 @@ Deno.serve(async (req) => {
     let matches;
     try {
       const embedding = await embedText(draft_text);
-      const { data, error } = await db.rpc('match_notes', {
+      // As the caller, not the service role: match_notes is security invoker,
+      // so notes RLS limits the match to the caller's own notes.
+      const { data, error } = await authClient.rpc('match_notes', {
         p_company_id: company_id,
         p_query_embedding: JSON.stringify(embedding),
         p_match_count: 1,

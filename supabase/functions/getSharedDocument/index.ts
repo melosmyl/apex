@@ -34,6 +34,16 @@ function deriveNativeFormat(doc: any): string | null {
   return doc.native_file_url ? 'docx' : null;
 }
 
+// Only files under the document's own company folder, in a company its
+// owner owns: the path columns are owner-editable and the service role can
+// sign anything in the bucket.
+// deno-lint-ignore no-explicit-any
+async function isOwnCompanyFile(db: any, doc: any, filePath: string): Promise<boolean> {
+  if (!doc.company_id || !filePath.startsWith(`${doc.company_id}/`)) return false;
+  const { data: company } = await db.from('companies').select('created_by_id').eq('id', doc.company_id).maybeSingle();
+  return !!company && company.created_by_id === doc.created_by_id;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -68,7 +78,7 @@ Deno.serve(async (req: Request) => {
     // handed to the browser, or a founder downloads a PDF labelled .xlsx.
     const usingNative = !!doc.native_file_url;
     const filePath = doc.native_file_url || doc.pdf_file_url;
-    if (filePath) {
+    if (filePath && await isOwnCompanyFile(db, doc, filePath)) {
       const filename = usingNative
         ? (doc.file_name || `${(doc.title || 'Document').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_')}.${nativeFormat || 'docx'}`)
         : `${(doc.title || 'Document').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_')}.pdf`;

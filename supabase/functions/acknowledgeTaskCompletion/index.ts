@@ -9,6 +9,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolveAdvisor } from '../_shared/advisorResolution.ts';
+import { requireOwnedRow, requireNotAnonymous, accessErrorResponse } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,13 +32,22 @@ Deno.serve(async (req) => {
     const { task_id } = await req.json();
     if (!task_id) return Response.json({ error: 'task_id is required' }, { status: 400, headers: corsHeaders });
 
-    const { data: task } = await db.from('tasks').select('*').eq('id', task_id).single();
-    if (!task) return Response.json({ error: 'Task not found' }, { status: 404, headers: corsHeaders });
+    requireNotAnonymous(user);
+    const task = await requireOwnedRow(db, 'tasks', task_id, user.id);
+    if (task.status !== 'done')
+      return Response.json({ error: 'The task is not marked done.' }, { status: 409, headers: corsHeaders });
+    // Already acknowledged: return what was said rather than paying for it again.
+    if (task.advisor_acknowledgment)
+      return Response.json({
+        advisor_acknowledgment: task.advisor_acknowledgment,
+        advisor_acknowledgment_by: task.advisor_acknowledgment_by,
+        advisor_acknowledgment_at: task.advisor_acknowledgment_at,
+      }, { headers: corsHeaders });
     if (!task.source_meeting_id)
       return Response.json({ error: 'This task has no source meeting — nothing to acknowledge on behalf of.' }, { status: 400, headers: corsHeaders });
 
-    const { data: meeting } = await db.from('board_meetings').select('question, participants').eq('id', task.source_meeting_id).single();
-    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', task.company_id).neq('type', 'human');
+    const { data: meeting } = await db.from('board_meetings').select('question, participants').eq('id', task.source_meeting_id).eq('company_id', task.company_id).eq('created_by_id', user.id).maybeSingle();
+    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', task.company_id).eq('created_by_id', user.id).neq('type', 'human');
     if (!advisors?.length) return Response.json({ error: 'No advisors available to speak' }, { status: 400, headers: corsHeaders });
 
     const speaker = resolveAdvisor(task.assigned_to, advisors, meeting?.participants);
@@ -78,6 +88,8 @@ Deno.serve(async (req) => {
       advisor_acknowledgment_at: now,
     }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('acknowledgeTaskCompletion error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

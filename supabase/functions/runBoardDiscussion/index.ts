@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireOwnedRow, accessErrorResponse } from '../_shared/access.ts';
 import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
@@ -170,14 +171,17 @@ Deno.serve(async (req) => {
     const { meeting_id } = await req.json();
     if (!meeting_id) return Response.json({ error: 'meeting_id is required' }, { status: 400, headers: corsHeaders });
 
-    const { data: meeting } = await db.from('board_meetings').select('*').eq('id', meeting_id).single();
-    if (!meeting) return Response.json({ error: 'Meeting not found' }, { status: 404, headers: corsHeaders });
+    const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
+    // Runs once, straight after Round 1. A failed run leaves the status at
+    // independent_complete, so a retry is still allowed.
+    if (meeting.status !== 'independent_complete')
+      return Response.json({ error: 'This meeting has already moved past the discussion.' }, { status: 409, headers: corsHeaders });
 
     const independentResponses = meeting.independent_responses || [];
     if (!independentResponses.length)
       return Response.json({ error: 'No independent responses found' }, { status: 400, headers: corsHeaders });
 
-    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).limit(100);
+    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
     const meetingAdvisors = (advisors || []).filter(a =>
       independentResponses.some(r => r.advisor_id === a.id) && a.type !== 'human'
     );
@@ -275,6 +279,8 @@ Deno.serve(async (req) => {
       convergence: finalConvergence.map(p => ({ advisors: p.names })),
     }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('runBoardDiscussion error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

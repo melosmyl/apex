@@ -26,18 +26,27 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const authClient = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_ANON_KEY'),
-      { global: { headers: { Authorization: req.headers.get('Authorization') } } }
-    );
-    const { data: { user }, error: authErr } = await authClient.auth.getUser();
-    if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+    // Backfill runs across a whole company, so only the backend (service-role
+    // bearer) may ask for it. Signed-in users may embed their own rows.
+    const bearer = (req.headers.get('Authorization') || '').replace('Bearer ', '');
+    const isService = bearer === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    let user = null;
+    if (!isService) {
+      const authClient = createClient(
+        Deno.env.get('SUPABASE_URL'),
+        Deno.env.get('SUPABASE_ANON_KEY'),
+        { global: { headers: { Authorization: req.headers.get('Authorization') } } }
+      );
+      const { data, error: authErr } = await authClient.auth.getUser();
+      if (authErr || !data?.user || data.user.is_anonymous) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+      user = data.user;
+    }
 
     const db = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
     const { note_id, backfill_company_id } = await req.json();
 
     if (backfill_company_id) {
+      if (!isService) return Response.json({ error: 'Forbidden' }, { status: 403, headers: corsHeaders });
       const { data: pending } = await db.from('notes')
         .select('id, raw_text, tags')
         .eq('company_id', backfill_company_id)
@@ -59,10 +68,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'note_id or backfill_company_id is required' }, { status: 400, headers: corsHeaders });
 
     const { data: note } = await db.from('notes')
-      .select('id, raw_text, tags')
+      .select('id, raw_text, tags, created_by_id')
       .eq('id', note_id).single();
     if (!note)
       return Response.json({ error: 'Note not found' }, { status: 404, headers: corsHeaders });
+    if (user && note.created_by_id !== user.id)
+      return Response.json({ error: 'Forbidden' }, { status: 403, headers: corsHeaders });
 
     return Response.json(await embedOne(db, note), { headers: corsHeaders });
   } catch (error) {

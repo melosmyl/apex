@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolveAdvisor } from '../_shared/advisorResolution.ts';
+import { requireOwnedRow, accessErrorResponse } from '../_shared/access.ts';
 
 // A priority_action's assigned_to is either a genuine self-assignment ("Founder"
 // — no advisor raised it, so there's no advisor to attribute it to or to
@@ -138,14 +139,17 @@ Deno.serve(async (req) => {
     const { meeting_id } = await req.json();
     if (!meeting_id) return Response.json({ error: 'meeting_id is required' }, { status: 400, headers: corsHeaders });
 
-    const { data: meeting } = await db.from('board_meetings').select('*').eq('id', meeting_id).single();
-    if (!meeting) return Response.json({ error: 'Meeting not found' }, { status: 404, headers: corsHeaders });
+    const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
+    // One resolution per meeting: a second run would replace it and insert
+    // its tasks again.
+    if (!['discussion_complete', 'challenge_complete', 'failed'].includes(meeting.status))
+      return Response.json({ error: meeting.status === 'complete' ? 'This meeting already has a resolution.' : 'The discussion has not finished yet.' }, { status: 409, headers: corsHeaders });
 
     const independentResponses = meeting.independent_responses || [];
     const challengeResponses = meeting.challenge_responses || [];
     const discussionTranscript = meeting.discussion_transcript || [];
 
-    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).limit(100);
+    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
     let chairAdvisor = (advisors || []).find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
     if (!chairAdvisor) chairAdvisor = (advisors || []).find(a => a.type !== 'human');
     if (!chairAdvisor) return Response.json({ error: 'No advisor available for chair synthesis' }, { status: 400, headers: corsHeaders });
@@ -315,6 +319,8 @@ Deno.serve(async (req) => {
       created_tasks: createdTasks,
     }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('runChairSynthesis error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     let prepared = 0;
 
     for (const company of companies || []) {
-      const commitments = await loadOpenCommitments(db, company.id);
+      const commitments = await loadOpenCommitments(db, company.id, company.created_by_id);
       const overdue = commitments.filter((c) => c.days_open >= OVERDUE_AFTER_DAYS);
 
       for (const commitment of overdue) {

@@ -91,6 +91,13 @@ function getAvailableFormats(doc: any): string[] {
   return formats;
 }
 
+// deno-lint-ignore no-explicit-any
+async function isOwnCompanyFile(db: any, doc: any, filePath: string): Promise<boolean> {
+  if (!doc.company_id || !filePath.startsWith(`${doc.company_id}/`)) return false;
+  const { data: company } = await db.from('companies').select('created_by_id').eq('id', doc.company_id).maybeSingle();
+  return !!company && company.created_by_id === doc.created_by_id;
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -147,6 +154,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
+    // The service role can sign any file in the bucket, and the document's
+    // owner can edit these path columns, so only sign files under the
+    // document's own company folder, in a company its owner owns.
+    if (!(await isOwnCompanyFile(db, doc, filePath))) {
+      return Response.json({ error: 'The file could not be retrieved from storage.' }, { status: 404, headers: corsHeaders });
+    }
+
     const { data: signed, error: signErr } = await db.storage
       .from(STORAGE_BUCKET)
       .createSignedUrl(filePath, SIGNED_URL_TTL_SECONDS, { download: filename });
@@ -154,7 +168,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return Response.json({ error: 'The file could not be retrieved from storage.' }, { status: 404, headers: corsHeaders });
     }
 
-    await db.from('document_download_logs').insert({
+    const { error: logErr } = await db.from('document_download_logs').insert({
+      created_by_id: user.id,
       document_id: doc.id,
       company_id: doc.company_id,
       user_id: user.id,
@@ -162,6 +177,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       version_number: doc.version_number || 1,
       filename,
     });
+    if (logErr) console.error('Download log failed:', logErr.message);
 
     return Response.json({
       download_url: signed.signedUrl,

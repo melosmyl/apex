@@ -8,6 +8,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { PRODUCT_NAME } from '../_shared/branding.ts';
+import { checkUserLimit, accessErrorResponse, AccessError, TEXT_LIMITS } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -122,7 +123,22 @@ Deno.serve(async (req) => {
     if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
 
     const { answers } = await req.json();
-    if (!answers) return Response.json({ error: 'answers is required' }, { status: 400, headers: corsHeaders });
+    if (!answers || typeof answers !== 'object') return Response.json({ error: 'answers is required' }, { status: 400, headers: corsHeaders });
+    // Everything in answers is pasted into the prompt, so bound it.
+    const entries = Object.entries(answers);
+    const totalLength = entries.reduce((n, [k, v]) => n + k.length + String(v ?? '').length, 0);
+    if (entries.length > 20 || entries.some(([k, v]) => k.length > 40 || String(v ?? '').length > TEXT_LIMITS.onboarding_answer) || totalLength > TEXT_LIMITS.onboarding_total)
+      return Response.json({ error: 'Those answers are too long.' }, { status: 400, headers: corsHeaders });
+
+    const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    if (user.is_anonymous) {
+      // A free-meeting visitor gets the plan once, plus one retry.
+      const { count } = await db.from('ai_usage_logs').select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id).eq('request_type', 'onboarding_plan');
+      if ((count ?? 0) >= 2) throw new AccessError(429, 'The free meeting has already been set up.');
+    } else {
+      await checkUserLimit(db, user.id, 'onboarding_plan');
+    }
 
     const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/routeAdvisorRequest`, {
       method: 'POST',
@@ -162,6 +178,8 @@ Deno.serve(async (req) => {
 
     return Response.json(data.response, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('generateOnboardingPlan error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

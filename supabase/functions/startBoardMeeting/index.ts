@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { embedText } from '../_shared/embeddings.ts';
 import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
+import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,11 +128,11 @@ async function recallRelatedDecisions(db, companyId, question) {
 // Tasks the founder actually finished since the last meeting — the raw
 // material for the Chair's opening. Distinct from open commitments (which are
 // what's still outstanding); this is what moved.
-async function loadRecentlyCompletedTasks(db, companyId, sinceIso) {
+async function loadRecentlyCompletedTasks(db, companyId, ownerId, sinceIso) {
   if (!sinceIso) return [];
   const { data } = await db.from('tasks')
     .select('title, source_meeting_id, updated_at')
-    .eq('company_id', companyId).eq('status', 'done')
+    .eq('company_id', companyId).eq('created_by_id', ownerId).eq('status', 'done')
     .gt('updated_at', sinceIso)
     .order('updated_at', { ascending: false }).limit(20);
   return data || [];
@@ -156,7 +157,7 @@ function templatedCompletedRecap(completedTasks) {
 // visible ("the board remembers"), never a chase.
 async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, meetingId, newQuestion, previousMeeting }) {
   if (!previousMeeting) return null; // first meeting ever — nothing to open with
-  const completedTasks = await loadRecentlyCompletedTasks(db, companyId, previousMeeting.created_at);
+  const completedTasks = await loadRecentlyCompletedTasks(db, companyId, userId, previousMeeting.created_at);
 
   let prompt = `You are opening this board meeting for ${company.name}, before the founder's actual question is addressed.\n\n`;
   prompt += `IMPORTANT: today's question is "${newQuestion}" — do NOT discuss, answer, or reference it. That is the rest of the board's job, not yours here. Your only job is a brief status check on what has happened since the last meeting.\n\n`;
@@ -251,16 +252,17 @@ Deno.serve(async (req) => {
     if (advisor_ids.length < minAdv)
       return Response.json({ error: `Select at least ${minAdv} advisors` }, { status: 400, headers: corsHeaders });
 
-    const { data: company } = await db.from('companies').select('*').eq('id', company_id).single();
-    if (!company) return Response.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
+    requireMaxLength(question, TEXT_LIMITS.question, 'The question');
+    const company = await requireOwnedCompany(db, company_id, user.id, '*');
+    if (!user.is_anonymous) await checkUserLimit(db, user.id, 'board_meeting');
 
     const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
-      db.from('documents').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(20),
-      db.from('board_meetings').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(5),
-      db.from('projects').select('*').eq('company_id', company_id).order('created_at', { ascending: false }).limit(10),
-      db.from('advisors').select('*').eq('company_id', company_id).limit(100),
+      db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(20),
+      db.from('board_meetings').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(5),
+      db.from('projects').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(10),
+      db.from('advisors').select('*').eq('company_id', company_id).eq('created_by_id', user.id).limit(100),
       recallRelatedDecisions(db, company_id, question),
-      loadOpenCommitments(db, company_id),
+      loadOpenCommitments(db, company_id, user.id),
       loadProgressionSummary(db, company_id),
     ]);
     const decisions = recalled.decisions;
@@ -268,6 +270,11 @@ Deno.serve(async (req) => {
     const selectedAdvisors = (advisors || []).filter(a => advisor_ids.includes(a.id) && a.type !== 'human');
     if (selectedAdvisors.length < minAdv)
       return Response.json({ error: 'Not enough AI advisors selected' }, { status: 400, headers: corsHeaders });
+    // The limit counts debaters; the Chair is extra (see Phase 1b).
+    const isChair = (a) => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair');
+    const maxAdv = limits.max_advisors_per_meeting || 5;
+    if (selectedAdvisors.filter(a => !isChair(a)).length > maxAdv)
+      return Response.json({ error: `Select at most ${maxAdv} advisors` }, { status: 400, headers: corsHeaders });
 
     const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
 
@@ -378,6 +385,8 @@ Deno.serve(async (req) => {
       chair_opening: chairOpening,
     }, { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('startBoardMeeting error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
