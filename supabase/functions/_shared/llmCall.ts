@@ -235,7 +235,7 @@ export async function insertUsageLog(db, row) {
     // A deploy can land before the migration that adds a newer column; keep
     // the row rather than losing it over the extra detail.
     if (error && (error.code === 'PGRST204' || error.code === '42703')) {
-      const { attempts: _a, model_substitution: _m, ...core } = row;
+      const { attempts: _a, model_substitution: _m, anonymous: _anon, ...core } = row;
       ({ error } = await db.from('ai_usage_logs').insert(core));
     }
     if (error) console.error('Usage log failed:', error.message);

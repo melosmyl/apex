@@ -215,11 +215,17 @@ Deno.serve(async (req) => {
     const limits = limitsList?.[0] || {};
     const maxRounds = limits.max_discussion_rounds || 3;
 
+    // Names and roles of the board's AI advisors come from their rows, not
+    // from the browser-editable entry; human perspectives are bounded.
+    const byId = new Map((advisors || []).map(a => [a.id, a]));
+    const clampScore = (n) => Math.max(0, Math.min(100, Number(n) || 0));
     let transcript = independentResponses.map(r => ({
-      round: 1, advisor_id: r.advisor_id, advisor_name: r.advisor_name, role: r.role,
+      round: 1, advisor_id: r.advisor_id,
+      advisor_name: String(byId.get(r.advisor_id)?.name ?? r.advisor_name ?? '').slice(0, 100),
+      role: String(byId.get(r.advisor_id)?.role ?? r.role ?? '').slice(0, 100),
       message: String(r.position || r.recommendation || '').slice(0, MAX_ENTRY_CHARS), message_type: 'initial',
       reply_to_advisor: null, changed_opinion: false, new_position: null,
-      new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: r.confidence_score || 0,
+      new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
       provider_used: r.provider_used, model_used: r.model_used,
       unavailable: r.unavailable || false,
     }));
@@ -248,7 +254,7 @@ Deno.serve(async (req) => {
       const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
         const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs);
         return callAdvisor(supabaseUrl, serviceKey, {
-          advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id,
+          advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
           system_instructions: null, company_context: null, meeting_context: meetingContext,
           user_question: meeting.question, previous_responses: [], output_schema: discussionSchema,
           temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,

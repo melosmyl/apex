@@ -1,6 +1,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS, MAX_FOLLOWUPS_PER_MEETING } from '../_shared/access.ts';
 
+// Five debaters plus the Chair (startBoardMeeting enforces the same).
+const MAX_ADVISORS_PER_MEETING_WITH_CHAIR = 6;
+
 // Ported from base44/functions/runFounderFollowup/entry.ts — that version
 // was never deployed (Base44 SDK, dead since the migration off Base44).
 // Logic kept as-is: append the founder's message to the transcript as one
@@ -15,7 +18,7 @@ const corsHeaders = {
 
 function buildFollowupContext(founderMessage, transcript, originalQuestion) {
   let context = `=== FOUNDER FOLLOW-UP ===\n\n`;
-  context += `Original board question: ${originalQuestion}\n\n`;
+  context += `Original board question: ${String(originalQuestion || '').slice(0, 4000)}\n\n`;
   context += `The founder has reviewed the board's discussion and resolution, and writes:\n`;
   context += `"${founderMessage}"\n\n`;
   context += `Your task: Respond directly to the founder's message. Address their concerns, answer their questions, provide additional insights, and if appropriate, revise your recommendation. Be honest and direct — if you disagree with the founder, say so respectfully. Do not simply agree to please them.\n\n`;
@@ -67,6 +70,9 @@ Deno.serve(async (req) => {
 
     requireMaxLength(founder_message, TEXT_LIMITS.founder_message, 'Your message');
     const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
+    // Follow-ups are for a board meeting that reached its resolution.
+    if (meeting.status !== 'complete' || (meeting.meeting_mode && meeting.meeting_mode !== 'board_debate'))
+      return Response.json({ error: 'Follow-up questions are for finished board meetings.' }, { status: 409, headers: corsHeaders });
     await checkUserLimit(db, user.id, 'followup');
     const followupsSoFar = (meeting.discussion_transcript || []).filter(e => e.advisor_name === 'Founder').length;
     if (followupsSoFar >= MAX_FOLLOWUPS_PER_MEETING)
@@ -79,11 +85,18 @@ Deno.serve(async (req) => {
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
     // Only the advisors the server chose when the meeting started, not the
     // browser-editable independent_responses.
+    // Meetings from before participant_advisor_ids existed match by name: at
+    // most one advisor per name, and never more than a meeting seats.
     const chosen = meeting.participant_advisor_ids?.length ? new Set(meeting.participant_advisor_ids) : null;
     const chosenNames = new Set(meeting.participants || []);
-    const meetingAdvisors = (advisors || []).filter(a =>
-      a.type !== 'human' && (chosen ? chosen.has(a.id) : chosenNames.has(a.name))
-    );
+    const seenNames = new Set();
+    const meetingAdvisors = (advisors || []).filter(a => {
+      if (a.type === 'human') return false;
+      if (chosen) return chosen.has(a.id);
+      if (!chosenNames.has(a.name) || seenNames.has(a.name)) return false;
+      seenNames.add(a.name);
+      return true;
+    }).slice(0, MAX_ADVISORS_PER_MEETING_WITH_CHAIR);
     if (!meetingAdvisors.length)
       return Response.json({ error: 'No AI advisors available for follow-up' }, { status: 400, headers: corsHeaders });
 
@@ -136,7 +149,7 @@ Deno.serve(async (req) => {
 
     const roundResults = await Promise.all(meetingAdvisors.map(advisor =>
       callAdvisor(supabaseUrl, serviceKey, {
-        advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id,
+        advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
         system_instructions: null, company_context: null, meeting_context: followupContext,
         user_question: meeting.question, previous_responses: [], output_schema: discussionSchema,
         temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,

@@ -54,8 +54,8 @@ Deno.serve(async (req) => {
     const speaker = resolveAdvisor(task.assigned_to, advisors, meeting?.participants);
     if (!speaker) return Response.json({ error: 'Could not resolve an advisor to speak' }, { status: 400, headers: corsHeaders });
 
-    let prompt = `The founder just marked this task as done: "${task.title}"\n`;
-    if (meeting?.question) prompt += `It came out of the board meeting where you discussed: "${meeting.question}"\n`;
+    let prompt = `The founder just marked this task as done: "${String(task.title).slice(0, 300)}"\n`;
+    if (meeting?.question) prompt += `It came out of the board meeting where you discussed: "${String(meeting.question).slice(0, 1000)}"\n`;
     prompt += `\nRespond briefly (1-2 sentences, occasionally 3 if it earns it) in your own voice, acknowledging that this is now done. Reference the specific task by what it actually was, and say why it mattered — what it unblocks, what it was standing in the way of, or what happens next now that it's done. Do not use generic praise like "great job" or "nice work" with no substance behind it — if you can't say something specific, say something short and factual instead ("Good — that clears the way for X.").`;
 
     const schema = { type: 'object', properties: { acknowledgment: { type: 'string' } }, required: ['acknowledgment'] };

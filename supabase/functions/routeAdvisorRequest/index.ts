@@ -41,7 +41,9 @@ function buildSystemPrompt(advisor, customInstructions, companyContext, meetingC
 }
 
 function buildUserPrompt(question, previousResponses) {
-  let prompt = `The founder asks the board: "${question}"\n\n`;
+  // A backstop: callers already bound what founders type, but nothing should
+  // reach a model unbounded. Generous enough for the longest internal prompts.
+  let prompt = `The founder asks the board: "${cap(question, 20000)}"\n\n`;
   if (previousResponses?.length) {
     prompt += `Other advisors have responded:\n`;
     previousResponses.forEach(r => {
@@ -78,7 +80,7 @@ Deno.serve(async (req) => {
     const db = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     const { advisor_id, advisor_override, company_id, meeting_id, system_instructions, company_context, meeting_context,
-      user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier } = await req.json();
+      user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier, anonymous } = await req.json();
 
     if ((!advisor_id && !advisor_override) || !user_question)
       return Response.json({ error: 'advisor_id (or advisor_override) and user_question are required' }, { status: 400, headers: corsHeaders });
@@ -160,6 +162,9 @@ Deno.serve(async (req) => {
       error_code: !result ? lastError : null,
       attempts,
       model_substitution: substitution,
+      // Tagged by the caller, which knows the session: the free-meeting
+      // ceiling sums these rows (free_meeting_spend_today).
+      anonymous: anonymous === true,
     });
 
     // The real reason travels back too, so callers can record why an

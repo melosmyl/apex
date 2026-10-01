@@ -86,16 +86,18 @@ export const TEXT_LIMITS = {
 export const MAX_FOLLOWUPS_PER_MEETING = 10;
 
 // Records the attempt first, then counts, so concurrent requests can't all
-// slip under the limit together, and a denied request still counts.
+// slip under the limit together, and a denied request still counts. Fails
+// closed: if the limiter can't record or count, the paid action doesn't run.
 export async function checkUserLimit(db: Db, userId: string, action: keyof typeof USER_LIMITS) {
   const { max, windowMinutes } = USER_LIMITS[action];
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
-  await db.from('user_rate_events').insert({ user_id: userId, action });
-  const { count, error } = await db.from('user_rate_events')
+  const { error: insertError } = await db.from('user_rate_events').insert({ user_id: userId, action });
+  const { count, error } = insertError ? { count: null, error: insertError } : await db.from('user_rate_events')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId).eq('action', action).gte('created_at', since);
-  // If the limiter itself is unavailable (e.g. migration not applied yet),
-  // don't take the feature down with it.
-  if (error) { console.error('checkUserLimit failed:', error.message); return; }
+  if (error) {
+    console.error('checkUserLimit failed:', error.message);
+    throw new AccessError(503, 'This is unavailable for a moment. Please try again shortly.');
+  }
   if ((count ?? 0) > max) throw new AccessError(429, 'You have reached the limit for this right now. Please try again later.');
 }

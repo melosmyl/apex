@@ -158,6 +158,7 @@ Deno.serve(async (req) => {
           temperature: 0.7, maximum_output_length: 3000,
         },
         user_id: user.id,
+        anonymous: !!user.is_anonymous,
         user_question: buildPrompt(answers),
         previous_responses: [],
         output_schema: RESPONSE_SCHEMA,

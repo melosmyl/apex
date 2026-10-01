@@ -7,37 +7,31 @@
 // than in-memory state, since edge functions have no shared memory across
 // invocations or regions.
 
-// The client's IP, preferring headers the platform sets itself over
-// X-Forwarded-For, whose leftmost entry a client can write. Which of these
-// Supabase's gateway provides is logged once per worker (names only, never
-// values) so it can be confirmed from the function logs.
+// The client's IP: the leftmost X-Forwarded-For entry, as before. Whether
+// the gateway's own headers are more trustworthy is unconfirmed, and picking
+// one that holds a gateway address would put every visitor in one bucket.
+// Once per worker, log (as booleans only, never values) whether those
+// headers exist and agree with X-Forwarded-For, so the function logs can
+// settle it.
 let ipSourceLogged = false;
 export function getClientIp(req: Request): string {
-  const platform = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip');
+  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   if (!ipSourceLogged) {
     ipSourceLogged = true;
-    const present = ['cf-connecting-ip', 'x-real-ip', 'x-forwarded-for'].filter((h) => req.headers.has(h));
-    console.log(`client IP headers present: ${present.join(', ') || 'none'}`);
+    const cf = req.headers.get('cf-connecting-ip'), real = req.headers.get('x-real-ip');
+    console.log(`client IP headers: xff=${!!forwarded} cf=${!!cf} cf_matches_xff=${!!cf && cf === forwarded} real=${!!real} real_matches_xff=${!!real && real === forwarded}`);
   }
-  if (platform) return platform.trim();
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return 'unknown';
+  return forwarded || req.headers.get('x-real-ip') || 'unknown';
 }
 
 // Keyed with IP_HASH_SECRET: a plain SHA-256 of an IPv4 address can be
 // reversed by hashing all four billion of them.
 export async function hashIp(ip: string): Promise<string> {
-  const data = new TextEncoder().encode(ip);
+  // Refuse rather than store a reversible hash.
   const secret = Deno.env.get('IP_HASH_SECRET');
-  let hashBuffer: ArrayBuffer;
-  if (secret) {
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    hashBuffer = await crypto.subtle.sign('HMAC', key, data);
-  } else {
-    console.error('IP_HASH_SECRET is not set; falling back to an unkeyed hash');
-    hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  }
+  if (!secret) throw new Error('IP_HASH_SECRET is not set');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const hashBuffer = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ip));
   return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 

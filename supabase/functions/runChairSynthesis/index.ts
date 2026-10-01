@@ -167,6 +167,19 @@ Deno.serve(async (req) => {
     claimedMeetingId = meeting.id;
     dbForRelease = db;
 
+    // A free-meeting visitor gets one resolution. Checked after the claim, so
+    // two parallel resolutions on different meetings see each other and both
+    // stop rather than both finishing.
+    if (user.is_anonymous) {
+      const { data: others } = await db.from('board_meetings').select('id')
+        .eq('created_by_id', user.id).neq('id', meeting.id).in('status', ['complete', 'synthesizing']).limit(1);
+      if (others?.length) {
+        await db.from('board_meetings').update({ status: meeting.status }).eq('id', meeting.id).eq('status', 'synthesizing');
+        claimedMeetingId = null;
+        return Response.json({ error: "You've already used your free board meeting." }, { status: 403, headers: corsHeaders });
+      }
+    }
+
     const independentResponses = meeting.independent_responses || [];
     const challengeResponses = meeting.challenge_responses || [];
     const discussionTranscript = meeting.discussion_transcript || [];
@@ -242,7 +255,7 @@ Deno.serve(async (req) => {
     }
 
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
-      advisor_id: chairAdvisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id,
+      advisor_id: chairAdvisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: CHAIR_INSTRUCTIONS, company_context: null, meeting_context: meetingContext,
       user_question: meeting.question, previous_responses: [],
       output_schema: resolutionSchema, temperature: 0.5, max_output_length: 4000,
@@ -297,8 +310,12 @@ Deno.serve(async (req) => {
       next_steps: priorityActions.map(a => a.title),
       assigned_tasks: priorityActions,
       discussion: discussionField,
-    }).eq('id', meeting.id).eq('status', 'synthesizing').select().single();
+    }).eq('id', meeting.id).eq('status', 'synthesizing').select().maybeSingle();
     claimedMeetingId = null;
+    // A free-meeting retry superseded this meeting while the Chair was
+    // writing: it doesn't get a resolution.
+    if (!updated)
+      return Response.json({ error: 'This meeting was replaced by a newer one.' }, { status: 409, headers: corsHeaders });
 
     // Commitments become real tasks automatically — linked back to this
     // meeting via source_meeting_id, which is what the accountability

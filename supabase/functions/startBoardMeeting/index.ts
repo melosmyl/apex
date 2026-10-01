@@ -163,7 +163,7 @@ function templatedCompletedRecap(completedTasks) {
 // avoids two voices nagging about the same thing. This opening now stays
 // pure recap and acknowledgment — the continuity differentiator made
 // visible ("the board remembers"), never a chase.
-async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, meetingId, newQuestion, previousMeeting }) {
+async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, anonymous, meetingId, newQuestion, previousMeeting }) {
   if (!previousMeeting) return null; // first meeting ever — nothing to open with
   const completedTasks = await loadRecentlyCompletedTasks(db, companyId, userId, previousMeeting.created_at);
 
@@ -193,7 +193,7 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, co
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
       body: JSON.stringify({
-        advisor_id: chairAdvisor.id, company_id: companyId, meeting_id: meetingId, user_id: userId,
+        advisor_id: chairAdvisor.id, company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
         system_instructions: chairAdvisor.system_instructions, company_context: null, meeting_context: null,
         user_question: prompt, previous_responses: [], output_schema: schema,
         temperature: 0.4, max_output_length: 500, request_type: 'chair_opening',
@@ -246,6 +246,7 @@ const CLAIM_REFUSALS = {
   already_used: "You've already used your free board meeting.",
   ip_limit: "Free board meetings from this network have reached today's limit. Create an account to start your own board now.",
   ceiling: "We've reached today's limit for free board meetings. Come back tomorrow, or create an account to start your own board now.",
+  busy: 'Your board is still working on your meeting. Please wait for it to finish.',
 };
 
 async function claimFreeMeeting(db, userId, attemptId) {
@@ -377,12 +378,14 @@ Deno.serve(async (req) => {
     // resolves the Chair for the final resolution.
     let chairAdvisor = (advisors || []).find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
     if (!chairAdvisor) chairAdvisor = selectedAdvisors[0];
-    const previousMeeting = meetings?.[0] || null;
+    // The last meeting that actually reached a resolution: an abandoned,
+    // failed or superseded one never happened as far as the Chair knows.
+    const previousMeeting = (meetings || []).find((m) => m.status === 'complete') || null;
 
     const [independentResults, chairOpening] = await Promise.all([
       Promise.all(selectedAdvisors.map(advisor =>
         callAdvisor(supabaseUrl, serviceKey, {
-          advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id,
+          advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
           system_instructions: advisor.system_instructions, company_context: contextPackage,
           user_question: question, previous_responses: [], output_schema: independentSchema,
           temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,
@@ -390,7 +393,7 @@ Deno.serve(async (req) => {
         }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
       )),
       buildChairOpening({
-        supabaseUrl, serviceKey, db, chairAdvisor, company, companyId: company_id, userId: user.id,
+        supabaseUrl, serviceKey, db, chairAdvisor, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
         meetingId: meeting.id, newQuestion: question, previousMeeting,
       }),
     ]);

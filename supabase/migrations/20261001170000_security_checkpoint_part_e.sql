@@ -36,6 +36,13 @@ begin
     if new.status is distinct from 'preparing' and new.status is distinct from 'complete' then
       raise exception 'Meetings are started by the server' using errcode = 'insufficient_privilege';
     end if;
+    if char_length(coalesce(new.question, '')) > 4000 then
+      raise exception 'The question is too long' using errcode = 'check_violation';
+    end if;
+    if jsonb_array_length(coalesce(new.participants, '[]'::jsonb)) > 12 then
+      raise exception 'Too many participants' using errcode = 'check_violation';
+    end if;
+    new.created_at := now();
     new.independent_responses := '[]'::jsonb;
     new.challenge_responses := '[]'::jsonb;
     new.discussion_transcript := '[]'::jsonb;
@@ -81,30 +88,31 @@ create trigger anonymous_cap_meetings_live after insert on public.board_meetings
   execute function public.enforce_anonymous_caps('1', 't.status not in (''failed'', ''superseded'')');
 
 -- ---------------------------------------------------------------------
--- 4. Free-meeting spend: anonymous sessions only (a visitor who signs up
---    keeps their user id, and their paid use shouldn't close the free door),
---    counted from when their attempt started, plus a reserve for every
---    meeting claimed in the last 30 minutes, finished or not.
+-- 4. Free-meeting spend, tagged when it happens: every model call made for
+--    an anonymous session is logged with anonymous = true (routeAdvisorRequest
+--    records what its caller tells it; only the server calls it). Today's
+--    free spend is the sum of those rows, plus a reserve for each meeting
+--    claimed in the last 30 minutes that hasn't yet logged that much itself.
+--    A visitor who later signs up keeps their earlier rows counted.
 -- ---------------------------------------------------------------------
+alter table public.ai_usage_logs add column if not exists anonymous boolean not null default false;
+comment on column public.ai_usage_logs.anonymous is
+  'The call was made for an anonymous (free-meeting) session. free_meeting_spend_today sums these.';
+
 create or replace function public.free_meeting_spend_today() returns numeric
 language sql stable security definer set search_path = public, pg_temp as $$
-  with free_users as (
-    select a.user_id, min(a.started_at) as since
-    from public.free_meeting_attempts a
-    join auth.users u on u.id = a.user_id and u.is_anonymous
-    where a.started_at >= date_trunc('day', now()) - interval '1 day'
-    group by a.user_id
-  ),
-  spent as (
-    select coalesce(sum(l.estimated_cost), 0) as amount
-    from public.ai_usage_logs l
-    join free_users f on f.user_id = l.user_id
-    where l.created_at >= greatest(date_trunc('day', now()), f.since)
+  with spent as (
+    select coalesce(sum(estimated_cost), 0) as amount
+    from public.ai_usage_logs
+    where anonymous and created_at >= date_trunc('day', now())
   ),
   in_flight as (
-    select count(*) * 0.75 as amount
-    from public.free_meeting_attempts
-    where claimed_at >= now() - interval '30 minutes'
+    select coalesce(sum(greatest(0, 0.75 - coalesce((
+      select sum(l.estimated_cost) from public.ai_usage_logs l
+      where l.user_id = a.user_id and l.anonymous and l.created_at >= a.claimed_at
+    ), 0))), 0) as amount
+    from public.free_meeting_attempts a
+    where a.claimed_at >= now() - interval '30 minutes'
   )
   select spent.amount + in_flight.amount from spent, in_flight;
 $$;
@@ -135,6 +143,10 @@ begin
   if exists (select 1 from public.board_meetings where created_by_id = p_user_id and status = 'complete') then
     return 'already_used';
   end if;
+  -- A meeting mid-discussion or mid-resolution isn't superseded under it.
+  if exists (select 1 from public.board_meetings where created_by_id = p_user_id and status in ('discussing', 'synthesizing')) then
+    return 'busy';
+  end if;
 
   if a.claimed_at is null then
     select count(*) into ip_used from public.free_meeting_attempts
@@ -145,7 +157,7 @@ begin
   if public.free_meeting_spend_today() >= p_ceiling then return 'ceiling'; end if;
 
   update public.board_meetings set status = 'superseded'
-  where created_by_id = p_user_id and status not in ('complete', 'failed', 'superseded');
+  where created_by_id = p_user_id and status not in ('complete', 'superseded');
   update public.free_meeting_attempts set claimed_at = coalesce(claimed_at, now()) where id = a.id;
   return 'ok';
 end;
