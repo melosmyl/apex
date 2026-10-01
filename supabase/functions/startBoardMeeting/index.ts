@@ -225,6 +225,35 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
   return data;
 }
 
+// The free meeting, enforced here rather than trusted to the browser: an
+// anonymous caller needs an attempt freeMeetingGate issued to this session,
+// gets one finished meeting, and is refused once today's free-meeting spend
+// reaches the ceiling. A meeting that never finished can be retried; it's
+// marked failed so the one-live-meeting cap (database trigger) allows it.
+// Returns an error message, or null when the meeting may start.
+async function claimFreeMeeting(db, userId, attemptId) {
+  if (!attemptId) return 'The free meeting needs to be started from the free meeting page.';
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const { data: attempt } = await db.from('free_meeting_attempts').select('id')
+    .eq('id', attemptId).eq('user_id', userId).is('blocked_reason', null).eq('completed', false)
+    .gte('started_at', since).maybeSingle();
+  if (!attempt) return 'This free meeting has expired. Please start again from the free meeting page.';
+
+  const { data: meetings } = await db.from('board_meetings').select('id, status').eq('created_by_id', userId);
+  if ((meetings || []).some((m) => m.status === 'complete')) return "You've already used your free board meeting.";
+
+  const { data: limitsRows } = await db.from('system_limits').select('free_meeting_daily_cost_ceiling_usd').order('created_at', { ascending: false }).limit(1);
+  const ceiling = Number(limitsRows?.[0]?.free_meeting_daily_cost_ceiling_usd ?? 12.70);
+  const { data: spent, error: spendErr } = await db.rpc('free_meeting_spend_today');
+  if (spendErr) throw spendErr;
+  if (Number(spent) >= ceiling) return "We've reached today's limit for free board meetings. Come back tomorrow, or create an account to start your own board now.";
+
+  const unfinished = (meetings || []).filter((m) => m.status !== 'failed').map((m) => m.id);
+  if (unfinished.length) await db.from('board_meetings').update({ status: 'failed' }).in('id', unfinished);
+  await db.from('free_meeting_attempts').update({ claimed_at: new Date().toISOString() }).eq('id', attempt.id);
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -241,7 +270,7 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const db = createClient(supabaseUrl, serviceKey);
 
-    const { company_id, question, advisor_ids } = await req.json();
+    const { company_id, question, advisor_ids, attempt_id } = await req.json();
     if (!company_id || !question?.trim() || !advisor_ids?.length)
       return Response.json({ error: 'company_id, question and advisor_ids are required' }, { status: 400, headers: corsHeaders });
 
@@ -254,7 +283,12 @@ Deno.serve(async (req) => {
 
     requireMaxLength(question, TEXT_LIMITS.question, 'The question');
     const company = await requireOwnedCompany(db, company_id, user.id, '*');
-    if (!user.is_anonymous) await checkUserLimit(db, user.id, 'board_meeting');
+    if (user.is_anonymous) {
+      const denied = await claimFreeMeeting(db, user.id, attempt_id);
+      if (denied) return Response.json({ error: denied }, { status: 403, headers: corsHeaders });
+    } else {
+      await checkUserLimit(db, user.id, 'board_meeting');
+    }
 
     const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
       db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(20),

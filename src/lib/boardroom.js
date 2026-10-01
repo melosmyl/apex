@@ -34,10 +34,11 @@ export function absenteesByRound(transcript = []) {
   return result;
 }
 
-export async function startMeeting({ companyId, question, advisorIds }) {
+export async function startMeeting({ companyId, question, advisorIds, freeAttemptId }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
       company_id: companyId, question, advisor_ids: advisorIds,
+      ...(freeAttemptId ? { attempt_id: freeAttemptId } : {}),
     });
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;

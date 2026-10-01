@@ -45,7 +45,7 @@ const PHASE_MESSAGES = {
   resolution: "The Chair is preparing the resolution",
 };
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart, onResult, routeFromNoteId }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart, onResult, routeFromNoteId, freeAttemptId }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -161,7 +161,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setResolutionStartedAt(null); setChairOpening(null);
     setSeatAssignment(assignChairs(selectedAiAdvisors));
     try {
-      const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id) });
+      const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId });
       setPendingMeetingId(phase1.meeting_id);
       setLiveTranscript(toRoundOneMessages(phase1.independent_responses));
       setChairOpening(phase1.chair_opening || null);

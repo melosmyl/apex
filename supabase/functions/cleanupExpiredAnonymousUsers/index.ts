@@ -24,6 +24,30 @@ const corsHeaders = {
 
 const EXPIRY_DAYS = 30;
 
+// Removes an expired anonymous visitor's files and rows. Returns a reason
+// if anything failed, so the caller leaves the account for the next run.
+// deno-lint-ignore no-explicit-any
+async function purgeAnonymousUser(db: any, userId: string): Promise<string | null> {
+  const { data: companies, error: listErr } = await db.from('companies').select('id').eq('created_by_id', userId);
+  if (listErr) return `listing companies: ${listErr.message}`;
+
+  for (const { id } of companies || []) {
+    // Generated documents live under '<company_id>/' in the documents bucket.
+    const { data: files, error: filesErr } = await db.storage.from('documents').list(id, { limit: 1000 });
+    if (filesErr) return `listing files: ${filesErr.message}`;
+    if (files?.length) {
+      const { error: rmErr } = await db.storage.from('documents').remove(files.map((f: { name: string }) => `${id}/${f.name}`));
+      if (rmErr) return `removing files: ${rmErr.message}`;
+    }
+  }
+
+  for (const table of ['board_meetings', 'advisors', 'companies']) {
+    const { error } = await db.from(table).delete().eq('created_by_id', userId);
+    if (error) return `deleting ${table}: ${error.message}`;
+  }
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -53,13 +77,15 @@ Deno.serve(async (req: Request) => {
         if (!u.is_anonymous) continue;
         if (new Date(u.created_at) > cutoff) continue;
 
-        // Deliberately explicit rather than relying on FK cascade — this is
-        // the one place that's supposed to remove this data, so it should
-        // say so, not assume.
-        await db.from('board_meetings').delete().eq('created_by_id', u.id);
-        await db.from('advisors').delete().eq('created_by_id', u.id);
-        await db.from('companies').delete().eq('created_by_id', u.id);
-
+        // Explicit, and every step checked: when a delete failed silently
+        // before, the account delete behind it failed too and the visitor's
+        // data stayed. Child rows (notes, reminders, progression, events)
+        // cascade from the company and the account (security Part C).
+        const failed = await purgeAnonymousUser(db, u.id);
+        if (failed) {
+          console.error(`Skipped anonymous user ${u.id}: ${failed}`);
+          continue;
+        }
         const { error: delErr } = await db.auth.admin.deleteUser(u.id);
         if (!delErr) deleted++;
         else console.error(`Failed to delete anonymous user ${u.id}:`, delErr.message);

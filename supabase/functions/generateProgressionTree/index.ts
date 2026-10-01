@@ -140,6 +140,9 @@ Deno.serve(async (req) => {
 
     const { company_id } = await req.json();
     if (!company_id) return Response.json({ error: 'company_id is required' }, { status: 400, headers: corsHeaders });
+    // Free-meeting visitors never see the progression tree; building one only
+    // spends on model calls and leaves rows behind for the 30-day cleanup.
+    if (user.is_anonymous) return Response.json({ skipped: 'anonymous' }, { headers: corsHeaders });
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');

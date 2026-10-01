@@ -196,7 +196,7 @@ export default function FreeMeeting() {
 
         {phase === "debate" && company && advisors && (
           <div className="space-y-8">
-            <BoardDebate company={company} companyId={company.id} advisors={advisors} initialQuestion={question} autoStart onResult={handleResult} />
+            <BoardDebate company={company} companyId={company.id} advisors={advisors} initialQuestion={question} autoStart onResult={handleResult} freeAttemptId={attemptId} />
             {resultReady && <ConversionCapture meetingId={meetingIdForConversion} companyId={company.id} />}
           </div>
         )}
