@@ -58,4 +58,49 @@ select 'anthropic', 'claude-sonnet-5', 'Claude Sonnet 5', 'advisor', true, true,
   'Default Anthropic model for advisors and the Chair.'
 where not exists (select 1 from public.ai_model_configurations where provider = 'anthropic' and model_name = 'claude-sonnet-5');
 
+-- Each library advisor's own default model (and backup), the first choice
+-- when an advisor row asks for a model the registry hasn't approved. Seeded
+-- from src/lib/advisorLibrary.js; H4 makes these editable in Admin.
+create table if not exists public.advisor_model_defaults (
+  library_key text primary key,
+  provider text not null,
+  model_name text not null,
+  fallback_provider text,
+  fallback_model text,
+  updated_at timestamptz not null default now()
+);
+alter table public.advisor_model_defaults enable row level security;
+revoke all on public.advisor_model_defaults from anon, authenticated;
+
+insert into public.advisor_model_defaults (library_key, provider, model_name, fallback_provider, fallback_model) values
+  ('visionary', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('operator', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('creative_director', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('investor', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('customer_advocate', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('contrarian', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('chair', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('cfo', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('marketing_director', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('product_strategist', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('legal_advisor', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('scientist', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('supply_chain', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('people_culture', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('innovation_director', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('risk_analyst', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('capital_allocator', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('ai_expert', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('elon_musk', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('warren_buffett', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o'),
+  ('jeff_bezos', 'openai', 'gpt-4o', 'anthropic', 'claude-sonnet-5'),
+  ('rick_rubin', 'anthropic', 'claude-sonnet-5', 'openai', 'gpt-4o')
+on conflict (library_key) do nothing;
+
+-- When a call runs a different model from the one the advisor row asked
+-- for, what was asked for and why it was swapped. Null when nothing was.
+alter table public.ai_usage_logs add column if not exists model_substitution text;
+comment on column public.ai_usage_logs.model_substitution is
+  'Set when the advisor row asked for a model the registry has not approved: requested model, model used, and which default replaced it.';
+
 notify pgrst, 'reload schema';

@@ -52,24 +52,67 @@ export async function loadModelRegistry(db: Db): Promise<ModelRegistry> {
   return build(UNREADABLE_REGISTRY_FALLBACK.map((m) => ({ provider: m.provider, model_name: m.model, is_provider_default: true })));
 }
 
-// The primary and fallback a call may actually use, given what the advisor
-// row asks for. An unapproved primary becomes its provider's default (or any
-// provider's default); an unapproved fallback becomes the default of a
-// different provider from the primary, or none.
-export function resolveApprovedModels(registry: ModelRegistry, requested: ModelRef, requestedFallback: Partial<ModelRef>) {
-  let primary = requested;
-  if (!registry.isApproved(primary.provider, primary.model)) {
-    const replacement = registry.defaultFor(primary.provider) ?? registry.anyDefault();
-    console.warn(`Model ${primary.provider}/${primary.model} is not approved; using ${replacement?.provider}/${replacement?.model}`);
-    if (replacement) primary = replacement;
+// An advisor's own default model and backup, from advisor_model_defaults,
+// keyed by library_key. Custom advisors have none.
+export type AdvisorDefault = { primary: ModelRef; fallback: ModelRef | null } | null;
+
+export async function loadAdvisorDefault(db: Db, libraryKey: string | null | undefined): Promise<AdvisorDefault> {
+  if (!libraryKey) return null;
+  try {
+    const { data } = await db.from('advisor_model_defaults')
+      .select('provider, model_name, fallback_provider, fallback_model').eq('library_key', libraryKey).maybeSingle();
+    if (!data) return null;
+    return {
+      primary: { provider: data.provider, model: data.model_name },
+      fallback: data.fallback_provider && data.fallback_model ? { provider: data.fallback_provider, model: data.fallback_model } : null,
+    };
+  } catch {
+    return null;
   }
-  let fallback: ModelRef | null = null;
-  if (requestedFallback.provider && requestedFallback.model) {
-    fallback = { provider: requestedFallback.provider, model: requestedFallback.model };
-    if (!registry.isApproved(fallback.provider, fallback.model)) {
-      const other = ['openai', 'anthropic'].find((p) => p !== primary.provider && registry.defaultFor(p));
-      fallback = other ? registry.defaultFor(other) : null;
+}
+
+// The primary and fallback a call may actually use, given what the advisor
+// row asks for. An unapproved primary becomes, in order: the advisor's own
+// default, its provider's default, any provider's default. An unapproved
+// fallback becomes the advisor's own backup, else the default of a
+// different provider from the primary, else none. Every swap is described
+// in `substitution` so the caller can log it.
+export function resolveApprovedModels(
+  registry: ModelRegistry,
+  requested: ModelRef,
+  requestedFallback: Partial<ModelRef>,
+  advisorDefault: AdvisorDefault = null,
+) {
+  const notes: string[] = [];
+  const approved = (m: ModelRef | null | undefined): boolean => !!m && registry.isApproved(m.provider, m.model);
+
+  let primary = requested;
+  if (!approved(primary)) {
+    const providerDefault = registry.defaultFor(primary.provider);
+    const [replacement, source]: [ModelRef | null, string] = approved(advisorDefault?.primary) ? [advisorDefault!.primary, "advisor's default"]
+      : approved(providerDefault) ? [providerDefault, 'provider default']
+      : [registry.anyDefault(), 'registry default'];
+    if (replacement) {
+      notes.push(`${primary.provider}/${primary.model} -> ${replacement.provider}/${replacement.model} (${source})`);
+      primary = replacement;
     }
   }
-  return { primary, fallback };
+
+  let fallback: ModelRef | null = null;
+  if (requestedFallback.provider && requestedFallback.model) {
+    const asked = { provider: requestedFallback.provider, model: requestedFallback.model };
+    if (approved(asked)) {
+      fallback = asked;
+    } else {
+      const other = ['openai', 'anthropic'].find((p) => p !== primary.provider && registry.defaultFor(p));
+      const [replacement, source]: [ModelRef | null, string] = approved(advisorDefault?.fallback) ? [advisorDefault!.fallback, "advisor's backup"]
+        : other ? [registry.defaultFor(other), 'other provider default'] : [null, 'none'];
+      fallback = replacement;
+      notes.push(`fallback ${asked.provider}/${asked.model} -> ${replacement ? `${replacement.provider}/${replacement.model}` : 'none'} (${source})`);
+    }
+  }
+
+  const substitution = notes.length ? notes.join('; ') : null;
+  if (substitution) console.warn(`Model substitution: ${substitution}`);
+  return { primary, fallback, substitution };
 }

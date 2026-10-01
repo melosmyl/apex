@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { loadModelRegistry, resolveApprovedModels } from '../_shared/modelRegistry.ts';
+import { loadModelRegistry, loadAdvisorDefault, resolveApprovedModels } from '../_shared/modelRegistry.ts';
 import { callWithFallback, usageTotals, insertUsageLog, CALL_DEADLINE_MS } from '../_shared/llmCall.ts';
 
 const corsHeaders = {
@@ -112,10 +112,11 @@ Deno.serve(async (req) => {
     const maxLen = clamp(Number(max_output_length ?? advisor.maximum_output_length ?? limits.max_output_length ?? 2000),
       100, MAX_OUTPUT_BY_REQUEST_TYPE[request_type] ?? MAX_OUTPUT_DEFAULT, 2000);
 
-    const registry = await loadModelRegistry(db);
-    const { primary, fallback } = resolveApprovedModels(registry,
+    const [registry, advisorDefault] = await Promise.all([loadModelRegistry(db), loadAdvisorDefault(db, advisor.library_key)]);
+    const { primary, fallback, substitution } = resolveApprovedModels(registry,
       { provider: advisor.default_provider || 'openai', model: advisor.default_model || 'gpt-4o' },
-      { provider: advisor.fallback_provider, model: advisor.fallback_model });
+      { provider: advisor.fallback_provider, model: advisor.fallback_model },
+      advisorDefault);
     let provider = primary.provider;
     let model = primary.model;
     let fbProvider = fallback?.provider;
@@ -153,6 +154,7 @@ Deno.serve(async (req) => {
       status: result ? (result.used_fallback ? 'fallback_used' : 'success') : 'error',
       error_code: !result ? lastError : null,
       attempts,
+      model_substitution: substitution,
     });
 
     // The real reason travels back too, so callers can record why an

@@ -232,9 +232,11 @@ export async function callWithFallback({
 export async function insertUsageLog(db, row) {
   try {
     let { error } = await db.from('ai_usage_logs').insert(row);
-    if (error && 'attempts' in row && (error.code === 'PGRST204' || error.code === '42703' || /attempts/.test(error.message || ''))) {
-      const { attempts: _dropped, ...withoutAttempts } = row;
-      ({ error } = await db.from('ai_usage_logs').insert(withoutAttempts));
+    // A deploy can land before the migration that adds a newer column; keep
+    // the row rather than losing it over the extra detail.
+    if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+      const { attempts: _a, model_substitution: _m, ...core } = row;
+      ({ error } = await db.from('ai_usage_logs').insert(core));
     }
     if (error) console.error('Usage log failed:', error.message);
   } catch (e) { console.error('Usage log failed:', e.message); }

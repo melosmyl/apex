@@ -56,3 +56,19 @@ Deno.test('an unreadable registry falls back to the long-standing models only', 
   assertEquals(r.isApproved('anthropic', 'claude-sonnet-5'), true);
   assertEquals(r.isApproved('anthropic', 'claude-fable-5-1'), false);
 });
+
+Deno.test("an unapproved model becomes the advisor's own default, and the swap is described", async () => {
+  const r = await loadModelRegistry(fakeDb(ROWS));
+  const advisorDefault = { primary: { provider: 'anthropic', model: 'claude-sonnet-5' }, fallback: { provider: 'openai', model: 'gpt-4o' } };
+  const { primary, fallback, substitution } = resolveApprovedModels(r,
+    { provider: 'openai', model: 'o9-ultra-expensive' }, { provider: 'openai', model: 'gpt-9' }, advisorDefault);
+  assertEquals(primary, { provider: 'anthropic', model: 'claude-sonnet-5' });
+  assertEquals(fallback, { provider: 'openai', model: 'gpt-4o' });
+  assertEquals(substitution, "openai/o9-ultra-expensive -> anthropic/claude-sonnet-5 (advisor's default); fallback openai/gpt-9 -> openai/gpt-4o (advisor's backup)");
+});
+
+Deno.test('no substitution note when nothing was swapped', async () => {
+  const r = await loadModelRegistry(fakeDb(ROWS));
+  const { substitution } = resolveApprovedModels(r, { provider: 'openai', model: 'gpt-4o' }, { provider: 'anthropic', model: 'claude-sonnet-5' });
+  assertEquals(substitution, null);
+});
