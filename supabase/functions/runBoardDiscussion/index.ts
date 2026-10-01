@@ -246,7 +246,13 @@ Deno.serve(async (req) => {
       required: ['message', 'message_type', 'confidence_score'],
     };
 
-    const convergencePairs = await detectConvergence(independentResponses);
+    // Only the server-chosen AI advisors, named from their rows: the entries
+    // themselves are browser-editable.
+    const meetingAdvisorIds = new Set(meetingAdvisors.map(a => a.id));
+    const convergenceInput = independentResponses
+      .filter(r => meetingAdvisorIds.has(r.advisor_id))
+      .map(r => ({ advisor_name: byId.get(r.advisor_id).name, recommendation: String(r.recommendation || '').slice(0, 2000) }));
+    const convergencePairs = await detectConvergence(convergenceInput);
 
     for (let round = 2; round <= maxRounds; round++) {
       const isLastRound = round === maxRounds;

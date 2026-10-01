@@ -102,7 +102,8 @@ function ensureConvergenceNamed(resolution, convergence, independentResponses) {
   console.error('Chair resolution did not name convergence explicitly for:', unnamed.map(p => p.advisors.join(' & ')).join(', '), '— appending deterministic fallback.');
   const fallbackLines = unnamed.map(pair => {
     const [first, ...rest] = pair.advisors;
-    const shared = independentResponses.find(r => r.advisor_name === first)?.recommendation;
+    const sharedFull = independentResponses.find(r => r.advisor_name === first)?.recommendation;
+    const shared = sharedFull ? String(sharedFull).slice(0, 500) : null;
     const names = rest.length ? `${pair.advisors.slice(0, -1).join(', ')} and ${pair.advisors[pair.advisors.length - 1]}` : first;
     return shared
       ? `${names} independently reached the same recommendation: ${shared}`
@@ -242,7 +243,7 @@ Deno.serve(async (req) => {
       meetingContext = `=== FULL BOARD DISCUSSION TRANSCRIPT ===\nQuestion: ${meeting.question}\n\n${formatTranscriptForChair(discussionTranscript)}`;
     } else {
       meetingContext = `Independent advisor responses:\n${independentResponses.map(r =>
-        `- ${r.advisor_name} (${r.role}): Position: ${r.position}. Recommendation: ${r.recommendation}. Key arguments: ${(r.key_arguments || []).join('; ')}. Risks: ${(r.risks || []).join('; ')}. Confidence: ${r.confidence_score}%`
+        `- ${String(r.advisor_name).slice(0, 100)} (${String(r.role).slice(0, 100)}): Position: ${String(r.position).slice(0, 4000)}. Recommendation: ${String(r.recommendation).slice(0, 2000)}. Key arguments: ${(r.key_arguments || []).slice(0, 10).map(x => String(x).slice(0, 500)).join('; ')}. Risks: ${(r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)).join('; ')}. Confidence: ${Number(r.confidence_score) || 0}%`
       ).join('\n\n')}\n\nChallenge round:\n${challengeResponses.map(r =>
         `- ${r.advisor_name} challenged ${r.challenged_advisor}: ${r.point_challenged}. Reason: ${r.reason}. Revised position: ${r.revised_position}. Confidence: ${r.confidence_score}%`
       ).join('\n')}`;
@@ -251,7 +252,7 @@ Deno.serve(async (req) => {
     const convergence = meeting.convergence || [];
     if (convergence.length) {
       meetingContext += `\n\n=== CONVERGED ADVISORS ===\nThese advisors' recommendations genuinely converged during this discussion — present each group's shared recommendation once, attributed to all named, per the CONVERGENCE instruction:\n`;
-      convergence.forEach(c => { meetingContext += `- ${(c.advisors || []).join(' and ')} converged on essentially the same recommendation.\n`; });
+      convergence.forEach(c => { meetingContext += `- ${(c.advisors || []).map(n => String(n).slice(0, 100)).join(' and ')} converged on essentially the same recommendation.\n`; });
     }
 
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
@@ -300,7 +301,7 @@ Deno.serve(async (req) => {
           ...challengeResponses.map(r => ({ advisor: r.advisor_name, role: 'Challenge', message: r.revised_position, stance: 'challenges' })),
         ];
 
-    const { data: updated } = await db.from('board_meetings').update({
+    const { data: updated, error: saveErr } = await db.from('board_meetings').update({
       status: 'complete', board_resolution: resolution,
       executive_summary: resolution.executive_summary,
       recommendation: resolution.recommended_direction,
@@ -311,6 +312,9 @@ Deno.serve(async (req) => {
       assigned_tasks: priorityActions,
       discussion: discussionField,
     }).eq('id', meeting.id).eq('status', 'synthesizing').select().maybeSingle();
+    // A failed write is an error (the catch marks the meeting failed), not a
+    // replaced meeting.
+    if (saveErr) throw saveErr;
     claimedMeetingId = null;
     // A free-meeting retry superseded this meeting while the Chair was
     // writing: it doesn't get a resolution.

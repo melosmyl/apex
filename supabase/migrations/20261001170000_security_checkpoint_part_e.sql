@@ -144,7 +144,10 @@ begin
     return 'already_used';
   end if;
   -- A meeting mid-discussion or mid-resolution isn't superseded under it.
-  if exists (select 1 from public.board_meetings where created_by_id = p_user_id and status in ('discussing', 'synthesizing')) then
+  -- (A step that died more than 10 minutes ago — the functions' own stale
+  -- window — no longer blocks a retry; it's superseded below.)
+  if exists (select 1 from public.board_meetings where created_by_id = p_user_id
+             and status in ('discussing', 'synthesizing') and updated_at > now() - interval '10 minutes') then
     return 'busy';
   end if;
 
@@ -158,7 +161,8 @@ begin
 
   update public.board_meetings set status = 'superseded'
   where created_by_id = p_user_id and status not in ('complete', 'superseded');
-  update public.free_meeting_attempts set claimed_at = coalesce(claimed_at, now()) where id = a.id;
+  -- Each claim restarts the in-flight reserve for the meeting it starts.
+  update public.free_meeting_attempts set claimed_at = now() where id = a.id;
   return 'ok';
 end;
 $$;

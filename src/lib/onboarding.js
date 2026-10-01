@@ -5,9 +5,9 @@ import { buildAdvisorRecord, recommendAdvisorsHeuristic, getJourney } from "@/li
 
 const VALID_KEYS = ADVISOR_LIBRARY.map((a) => a.key);
 
-export async function generateOnboardingPlan(answers) {
+export async function generateOnboardingPlan(answers, freeAttemptId) {
   try {
-    const { data: plan } = await base44.functions.invoke("generateOnboardingPlan", { answers });
+    const { data: plan } = await base44.functions.invoke("generateOnboardingPlan", { answers, ...(freeAttemptId ? { attempt_id: freeAttemptId } : {}) });
 
     // Validate advisor keys — filter out invalid ones
     if (plan.recommended_advisors) {

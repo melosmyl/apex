@@ -109,19 +109,20 @@ export default function FreeMeeting() {
       // A visitor retrying after a failed meeting already has their board
       // (one company per free session): reuse it rather than set up again.
       const { data: { user: me } } = await supabase.auth.getUser();
+      if (!me) throw new Error("Your session has ended. Please refresh the page and start again.");
       const { data: existingCompany } = await supabase.from("companies").select("*")
         .eq("created_by_id", me.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (existingCompany) {
         const { data: existingAdvisors } = await supabase.from("advisors").select("*").eq("company_id", existingCompany.id);
         if ((existingAdvisors || []).filter((a) => a.type !== "human").length < 3) {
-          throw new Error("Your board didn't finish setting up. Please refresh the page and start again.");
+          throw new Error("Your board didn't finish setting up. Please start again in a new private window.");
         }
         setCompany(existingCompany);
         setAdvisors(existingAdvisors);
         setPhase("debate");
         return;
       }
-      const plan = await generateOnboardingPlan(answers);
+      const plan = await generateOnboardingPlan(answers, gateResult.attempt_id);
       const { company: newCompany, advisors: newAdvisors } = await createCompanyFromOnboarding(answers, plan);
       setCompany(newCompany);
       setAdvisors(newAdvisors);

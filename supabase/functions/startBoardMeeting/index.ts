@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
       if (denied) return Response.json({ error: denied }, { status: 403, headers: corsHeaders });
     }
 
-    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
+    const contextPackage = buildContext(company, documents, decisions, (meetings || []).filter((m) => m.status === 'complete'), projects, commitments, progression, limits.max_context_size || 8000);
 
     // What the board is drawing on, recorded so the founder can see it later.
     const memoryContext = {

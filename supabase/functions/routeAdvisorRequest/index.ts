@@ -33,8 +33,9 @@ const capList = (list) => (Array.isArray(list) ? list : []).slice(0, 12).map((x)
 function buildSystemPrompt(advisor, customInstructions, companyContext, meetingContext, outputSchema) {
   const instructions = cap(customInstructions || advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`, 6000);
   let prompt = `You are ${cap(advisor.name, 100)}, ${cap(advisor.role, 100)}.\n\n${instructions}\n\nDecision style: ${cap(advisor.decision_style || 'Analytical', 300)}.\nCommunication style: ${cap(advisor.communication_style || 'Direct and professional', 300)}.\nStrengths: ${capList(advisor.strengths).join(', ')}.\nBlind spots: ${capList(advisor.blind_spots || advisor.weaknesses).join(', ')}.\n\n`;
-  if (companyContext) prompt += `Company Context:\n${companyContext}\n\n`;
-  if (meetingContext) prompt += `Meeting Context:\n${meetingContext}\n\n`;
+  // Backstops, well above what any caller builds today.
+  if (companyContext) prompt += `Company Context:\n${cap(companyContext, 40000)}\n\n`;
+  if (meetingContext) prompt += `Meeting Context:\n${cap(meetingContext, 150000)}\n\n`;
   prompt += `You must respond with ONLY valid JSON. Do not include any text outside the JSON object.`;
   if (outputSchema) prompt += `\n\nJSON structure:\n${JSON.stringify(outputSchema, null, 2)}`;
   return prompt;

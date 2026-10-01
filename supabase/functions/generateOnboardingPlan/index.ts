@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await authClient.auth.getUser();
     if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
 
-    const { answers } = await req.json();
+    const { answers, attempt_id } = await req.json();
     if (!answers || typeof answers !== 'object') return Response.json({ error: 'answers is required' }, { status: 400, headers: corsHeaders });
     // Everything in answers is pasted into the prompt, so bound it.
     const entries = Object.entries(answers);
@@ -134,6 +134,16 @@ Deno.serve(async (req) => {
     // Counted before the model call (not from the usage log, which is only
     // written afterwards), so parallel requests can't all slip under it.
     await checkUserLimit(db, user.id, user.is_anonymous ? 'onboarding_plan_anon' : 'onboarding_plan');
+    // A free-meeting visitor gets a plan only with the attempt the gate issued
+    // to this session, so plan spend can't run ahead of the gate's checks.
+    if (user.is_anonymous) {
+      const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const { data: attempt } = attempt_id
+        ? await db.from('free_meeting_attempts').select('id').eq('id', attempt_id).eq('user_id', user.id)
+          .is('blocked_reason', null).eq('completed', false).gte('started_at', since).maybeSingle()
+        : { data: null };
+      if (!attempt) return Response.json({ error: 'The free meeting needs to be started from the free meeting page.' }, { status: 403, headers: corsHeaders });
+    }
 
     const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/routeAdvisorRequest`, {
       method: 'POST',
