@@ -10,6 +10,7 @@ import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 import TurnstileWidget from "@/components/TurnstileWidget";
+import LegalConsentLine from "@/components/LegalConsentLine";
 import { useCaptcha, CAPTCHA_RETRY_MESSAGE } from "@/lib/turnstile";
 
 export default function Register() {
@@ -249,6 +250,7 @@ export default function Register() {
             "Create account"
           )}
         </Button>
+        <LegalConsentLine action="creating an account or continuing with Google" />
       </form>
     </AuthLayout>
   );

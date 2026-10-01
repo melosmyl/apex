@@ -8,6 +8,7 @@ import { supabase, base44 } from "@/api/base44Client";
 import { generateOnboardingPlan, createCompanyFromOnboarding } from "@/lib/onboarding";
 import { QUESTIONS as PROFILE_QUESTIONS } from "@/components/onboarding/GuidedOnboarding";
 import BoardDebate from "@/components/boardroom/BoardDebate";
+import LegalConsentLine from "@/components/LegalConsentLine";
 import TurnstileWidget from "@/components/TurnstileWidget";
 import { useCaptcha, CAPTCHA_RETRY_MESSAGE } from "@/lib/turnstile";
 import { SITE_URL } from "@/lib/branding";
@@ -57,6 +58,7 @@ function ConversionCapture({ meetingId, companyId }) {
           {state === "sending" ? "Sending…" : "Keep this board"}
         </Button>
       </div>
+      <LegalConsentLine action="keeping this board" className="mt-3 sm:text-left" />
       {state === "error" && <p className="text-sm text-destructive mt-2">Something went wrong. Please try again.</p>}
     </div>
   );
