@@ -311,4 +311,21 @@
   .btn-outline-secondary[data-force-state="active"] .btn-metal-label {
     transform: translateY(1px);
   }
+
+  /* Landing: the cream hero fades into the top of the room photograph
+     instead of meeting it at a hard edge. The colour is the page's own
+     --background token rather than a hex, so the fade starts exactly on the
+     page colour (an eyedropped #e6e2db sat a few shades lighter and left a
+     faint band) and follows the theme. */
+  .hero-photo {
+    position: relative;
+  }
+  .hero-photo::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 40%;
+    background: linear-gradient(to bottom, hsl(var(--background)) 0%, hsl(var(--background) / 0) 100%);
+    pointer-events: none;
+  }
 }

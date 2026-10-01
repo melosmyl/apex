@@ -105,7 +105,7 @@ export default function Landing() {
           Desaturated hard in the file itself (near-greyscale, lamps keep a
           little warmth) rather than via a CSS filter, since a flat
           `grayscale` class would kill the lamp glow along with the rest. */}
-      <div className="w-full">
+      <div className="w-full hero-photo">
         <img
           src={officeImage}
           alt=""
