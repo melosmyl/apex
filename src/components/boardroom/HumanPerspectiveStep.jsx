@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { ArrowRight, Mic } from "lucide-react";
-import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useSpeechRecognition, DICTATION_NOTICE } from "@/hooks/useSpeechRecognition";
 
 function HumanPerspectiveRow({ advisor, question, onChange }) {
   const [position, setPosition] = useState("");
@@ -46,6 +46,7 @@ function HumanPerspectiveRow({ advisor, question, onChange }) {
         placeholder={`${advisor.name}'s position on this question…`}
         className="text-sm resize-none bg-background"
       />
+      {isListening && <p className="text-xs text-muted-foreground mt-2">{DICTATION_NOTICE}</p>}
     </div>
   );
 }

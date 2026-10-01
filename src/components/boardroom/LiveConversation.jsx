@@ -94,7 +94,7 @@ export default function LiveConversation({ company, companyId, advisors }) {
           <div>
             <p className="text-sm font-medium mb-1">Voice privacy</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Your audio is processed by your browser to create the conversation and transcript. Raw audio is not stored. The transcript is saved to your meeting records.
+              Your browser's speech service turns what you say into text. Depending on your browser, that service may send your audio to the browser's maker (Google for Chrome, Microsoft for Edge, Apple for Safari). We don't receive or store your audio. The transcript is saved to your meeting records.
             </p>
           </div>
         </div>

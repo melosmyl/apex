@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Mic, MicOff } from "lucide-react";
-import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useSpeechRecognition, DICTATION_NOTICE } from "@/hooks/useSpeechRecognition";
 
 export default function FounderReplyBox({ onSubmit }) {
   const [message, setMessage] = useState("");
@@ -49,6 +49,7 @@ export default function FounderReplyBox({ onSubmit }) {
           </button>
         )}
       </div>
+      {isListening && <p className="text-xs text-muted-foreground mt-2">{DICTATION_NOTICE}</p>}
       {error && <p className="text-sm text-destructive mt-2">{error}</p>}
       <div className="flex justify-end mt-2">
         <Button onClick={submit} disabled={!message.trim() || sending} variant="primary" className="px-5">

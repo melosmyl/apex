@@ -5,6 +5,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
  * Returns isListening, supported, start, stop, toggle.
  * Pass onTranscript to receive the accumulated transcript in real-time.
  */
+// What actually happens to dictated audio. Browser speech recognition is
+// usually a cloud service run by the browser's maker, not on-device.
+export const DICTATION_NOTICE =
+  "Speech-to-text is done by your browser's own speech service, which may send your audio to the browser's maker (Google for Chrome, Microsoft for Edge, Apple for Safari) to turn it into text. We don't receive or store your audio, only the text you send.";
+
 export function useSpeechRecognition({ onTranscript } = {}) {
   const [isListening, setIsListening] = useState(false);
   const [supported, setSupported] = useState(false);
