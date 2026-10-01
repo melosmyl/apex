@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { loadModelRegistry, resolveApprovedModels } from '../_shared/modelRegistry.ts';
 import { callWithFallback, usageTotals, insertUsageLog, CALL_DEADLINE_MS } from '../_shared/llmCall.ts';
 
 const corsHeaders = {
@@ -48,25 +49,12 @@ function buildUserPrompt(question, previousResponses) {
   return prompt;
 }
 
-const DEFAULT_MODEL = { openai: 'gpt-4o', anthropic: 'claude-sonnet-5' };
-// The models every library advisor and the cheap tier use. Admins approve
-// more by adding an active row to ai_model_configurations.
-const BUILT_IN_MODELS = ['openai:gpt-4o', 'openai:gpt-4o-mini', 'anthropic:claude-sonnet-5'];
 const MAX_OUTPUT_DEFAULT = 4000;
 const MAX_OUTPUT_BY_REQUEST_TYPE = { deliverable_spec: 16000 };
 
 function clamp(n, min, max, fallback) {
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));
-}
-
-async function loadApprovedModels(db) {
-  const approved = new Set(BUILT_IN_MODELS);
-  try {
-    const { data } = await db.from('ai_model_configurations').select('provider, model_name').eq('is_active', true);
-    for (const row of data || []) approved.add(`${row.provider}:${row.model_name}`);
-  } catch { /* table unavailable — built-ins only */ }
-  return approved;
 }
 
 Deno.serve(async (req) => {
@@ -124,20 +112,14 @@ Deno.serve(async (req) => {
     const maxLen = clamp(Number(max_output_length ?? advisor.maximum_output_length ?? limits.max_output_length ?? 2000),
       100, MAX_OUTPUT_BY_REQUEST_TYPE[request_type] ?? MAX_OUTPUT_DEFAULT, 2000);
 
-    const approved = await loadApprovedModels(db);
-    let provider = advisor.default_provider || 'openai';
-    let model = advisor.default_model || 'gpt-4o';
-    if (!approved.has(`${provider}:${model}`)) {
-      console.warn(`routeAdvisorRequest: ${provider}/${model} is not an approved model; using the default`);
-      provider = provider === 'anthropic' ? 'anthropic' : 'openai';
-      model = DEFAULT_MODEL[provider];
-    }
-    let fbProvider = advisor.fallback_provider;
-    let fbModel = advisor.fallback_model;
-    if (fbProvider && !approved.has(`${fbProvider}:${fbModel}`)) {
-      fbProvider = provider === 'openai' ? 'anthropic' : 'openai';
-      fbModel = DEFAULT_MODEL[fbProvider];
-    }
+    const registry = await loadModelRegistry(db);
+    const { primary, fallback } = resolveApprovedModels(registry,
+      { provider: advisor.default_provider || 'openai', model: advisor.default_model || 'gpt-4o' },
+      { provider: advisor.fallback_provider, model: advisor.fallback_model });
+    let provider = primary.provider;
+    let model = primary.model;
+    let fbProvider = fallback?.provider;
+    let fbModel = fallback?.model;
 
     if (model_tier === 'cheap') {
       const cheap = await resolveCheapTier(db);
@@ -148,14 +130,6 @@ Deno.serve(async (req) => {
       provider = cheap.provider;
       model = cheap.model;
     }
-
-    try {
-      const { data: configs } = await db.from('ai_model_configurations').select('*').eq('provider', provider).eq('model_name', model).order('created_at', { ascending: false }).limit(1);
-      if (configs?.length && configs[0].is_active === false) {
-        provider = fbProvider || provider;
-        model = fbModel || model;
-      }
-    } catch { /* table may be empty — proceed with defaults */ }
 
     const systemPrompt = buildSystemPrompt(advisor, system_instructions, company_context, meeting_context, output_schema);
     const userPrompt = buildUserPrompt(user_question, previous_responses);
