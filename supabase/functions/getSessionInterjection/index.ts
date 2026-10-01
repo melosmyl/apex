@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: chases } = await db.from('assistant_chases')
-      .select('id, task_id, chase_text').eq('company_id', company_id).is('shown_at', null)
+      .select('id, task_id, chase_text').eq('company_id', company_id).eq('created_by_id', user.id).is('shown_at', null)
       .order('generated_at', { ascending: true }).limit(1);
 
     if (chases?.length) {

@@ -5,6 +5,7 @@ import { Sparkles, X, Plus, ArrowRight, Landmark, CheckSquare, Target, Check } f
 import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
 import { getJourney, STAGE_LABELS } from "@/lib/companyJourney";
 import { createCompanyFromOnboarding } from "@/lib/onboarding";
+import { MAX_DEBATERS } from "@/lib/boardroom";
 
 export default function OnboardingReview({ answers, plan, onComplete, onBack }) {
   const [advisors, setAdvisors] = useState(plan.recommended_advisors || []);
@@ -18,8 +19,11 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
     setAdvisors((prev) => prev.filter((a) => a.key !== key));
   };
 
+  const debaterCount = advisors.filter((a) => a.key !== "chair").length;
   const addAdvisor = (libAdvisor) => {
     if (advisors.some((a) => a.key === libAdvisor.key)) return;
+    // A meeting seats the Chair plus at most MAX_DEBATERS others.
+    if (libAdvisor.key !== "chair" && debaterCount >= MAX_DEBATERS) return;
     setAdvisors((prev) => [...prev, {
       key: libAdvisor.key,
       name: libAdvisor.name,
@@ -28,7 +32,8 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
     }]);
   };
 
-  const availableToAdd = ADVISOR_LIBRARY.filter((a) => !advisors.some((rec) => rec.key === a.key));
+  const availableToAdd = ADVISOR_LIBRARY.filter((a) => !advisors.some((rec) => rec.key === a.key))
+    .filter((a) => a.key === "chair" || debaterCount < MAX_DEBATERS);
 
   const handleBegin = async () => {
     setCreating(true);

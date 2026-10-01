@@ -104,6 +104,16 @@ export default function FreeMeeting() {
       setAttemptId(gateResult.attempt_id);
 
       setPhase("assembling");
+      // A visitor retrying after a failed meeting already has their board
+      // (one company per free session): reuse it rather than set up again.
+      const { data: existingCompany } = await supabase.from("companies").select("*").limit(1).maybeSingle();
+      if (existingCompany) {
+        const { data: existingAdvisors } = await supabase.from("advisors").select("*").eq("company_id", existingCompany.id);
+        setCompany(existingCompany);
+        setAdvisors(existingAdvisors || []);
+        setPhase("debate");
+        return;
+      }
       const plan = await generateOnboardingPlan(answers);
       const { company: newCompany, advisors: newAdvisors } = await createCompanyFromOnboarding(answers, plan);
       setCompany(newCompany);

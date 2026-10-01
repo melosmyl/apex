@@ -34,6 +34,10 @@ export default function ProgressionTree({ companyId, country }) {
         const trees = await base44.entities.ProgressionTree.filter({ company_id: companyId });
         currentTree = trees[0];
         if (currentTree) break;
+        // No tree yet: ask for one. It's skipped while a free-meeting visitor is
+        // anonymous, so a visitor who later signs up gets theirs here. Safe to
+        // repeat; the server returns the existing tree if there is one.
+        if (attempt === 0) base44.functions.invoke("generateProgressionTree", { company_id: companyId }).catch(() => {});
         await sleep(3000);
       }
       if (cancelled) return;

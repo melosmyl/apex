@@ -72,3 +72,15 @@ Deno.test('no substitution note when nothing was swapped', async () => {
   const { substitution } = resolveApprovedModels(r, { provider: 'openai', model: 'gpt-4o' }, { provider: 'anthropic', model: 'claude-sonnet-5' });
   assertEquals(substitution, null);
 });
+
+Deno.test('a registry with no default never lets an unapproved model through', async () => {
+  const r = await loadModelRegistry(fakeDb([{ provider: 'openai', model_name: 'gpt-4o-mini', is_provider_default: false, purpose: 'cheap_tier' }]));
+  const { primary } = resolveApprovedModels(r, { provider: 'openai', model: 'o1-pro' }, {});
+  assertEquals(primary, { provider: 'openai', model: 'gpt-4o' });
+});
+
+Deno.test('a model registered for another purpose is not selectable by advisor rows', async () => {
+  const r = await loadModelRegistry(fakeDb([...ROWS, { provider: 'anthropic', model_name: 'claude-opus-5-5', is_provider_default: false, purpose: 'chair' }]));
+  assertEquals(r.isApproved('anthropic', 'claude-opus-5-5'), false);
+  assertEquals(r.isApproved('anthropic', 'claude-sonnet-5'), true);
+});

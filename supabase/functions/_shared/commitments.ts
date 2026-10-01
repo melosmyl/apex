@@ -9,9 +9,10 @@ export const OVERDUE_AFTER_DAYS = 14;
 // carries this company_id isn't trusted to belong to it (see _shared/access.ts).
 export async function loadOpenCommitments(db, companyId, ownerId) {
   const { data, error } = await db.from('tasks')
-    .select('id, title, status, created_at, board_meetings!inner(question)')
+    .select('id, title, status, created_at, board_meetings!inner(question, created_by_id)')
     .eq('company_id', companyId)
     .eq('created_by_id', ownerId)
+    .eq('board_meetings.created_by_id', ownerId)
     .not('source_meeting_id', 'is', null)
     .neq('status', 'done')
     .order('created_at', { ascending: true })

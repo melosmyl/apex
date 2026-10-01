@@ -5,6 +5,10 @@ import { CHAIR_SEAT_ORDER } from "@/components/boardroom/BoardroomBanner";
 // so an advisor never jumps seats mid-discussion. Fills centre-out
 // (CHAIR_SEAT_ORDER already carries that priority) so 3 advisors sit at
 // the head of the table and 6 fan evenly down both sides.
+// Advisors who debate in one meeting, besides the Chair. Matches
+// system_limits.max_advisors_per_meeting, which startBoardMeeting enforces.
+export const MAX_DEBATERS = 5;
+
 export function assignChairs(advisors = []) {
   const assignment = {};
   advisors.forEach((a, i) => {

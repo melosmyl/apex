@@ -16,7 +16,7 @@
 //                real cost from ai_usage_logs and closes out the attempt.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { checkRateLimit, getClientIp, hashIp } from '../_shared/rateLimit.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,23 +29,6 @@ const IP_LIMIT_MESSAGE = "Free board meetings from this network have reached tod
 // Free meetings started per IP address per UTC day. Offices and mobile
 // networks share an IP, so this is set above one.
 const MEETINGS_PER_IP_PER_DAY = 3;
-
-// Keyed with a secret: a plain SHA-256 of an IPv4 address can be reversed by
-// hashing all four billion of them.
-async function hashIp(req: Request): Promise<string> {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown';
-  const data = new TextEncoder().encode(ip);
-  const secret = Deno.env.get('IP_HASH_SECRET');
-  let hashBuffer: ArrayBuffer;
-  if (secret) {
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    hashBuffer = await crypto.subtle.sign('HMAC', key, data);
-  } else {
-    console.error('IP_HASH_SECRET is not set; falling back to an unkeyed hash');
-    hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  }
-  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -97,7 +80,7 @@ Deno.serve(async (req: Request) => {
       return Response.json({ eligible: false, reason: 'rate_limited', message: 'Too many attempts. Try again later.' }, { headers: corsHeaders });
     }
 
-    const ipHash = await hashIp(req);
+    const ipHash = await hashIp(getClientIp(req));
 
     // Backstop against a returning anonymous session — RLS already blocks
     // a second meeting insert, but checking here means a blocked visitor
@@ -117,8 +100,11 @@ Deno.serve(async (req: Request) => {
       .gte('started_at', dayStart.toISOString()).order('started_at', { ascending: false }).limit(1).maybeSingle();
 
     if (!ownAttempt) {
+      // Every attempt handed out today counts, not just the ones already
+      // started, so many sessions can't collect attempts before using any.
+      // startBoardMeeting re-checks started meetings under a lock.
       const { count: usedFromIp } = await db.from('free_meeting_attempts').select('id', { count: 'exact', head: true })
-        .eq('ip_hash', ipHash).not('claimed_at', 'is', null).gte('started_at', dayStart.toISOString());
+        .eq('ip_hash', ipHash).is('blocked_reason', null).gte('started_at', dayStart.toISOString());
       if ((usedFromIp ?? 0) >= MEETINGS_PER_IP_PER_DAY) {
         await db.from('free_meeting_attempts').insert({ ip_hash: ipHash, user_id: user.id, completed: false, blocked_reason: 'ip_limit' });
         return Response.json({ eligible: false, reason: 'ip_limit', message: IP_LIMIT_MESSAGE }, { headers: corsHeaders });

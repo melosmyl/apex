@@ -102,11 +102,11 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
 // than merely the most recent ones. Falls back to recency when the question
 // cannot be embedded or nothing clears the similarity floor, so a board meeting
 // never fails because memory is unavailable.
-async function recallRelatedDecisions(db, companyId, question) {
+async function recallRelatedDecisions(db, companyId, ownerId, question) {
   let recencyFallback = [];
   try {
     const { data } = await db.from('decisions').select('*')
-      .eq('company_id', companyId).order('created_at', { ascending: false }).limit(10);
+      .eq('company_id', companyId).eq('created_by_id', ownerId).order('created_at', { ascending: false }).limit(10);
     recencyFallback = data || [];
   } catch { /* fall through with an empty list */ }
 
@@ -118,7 +118,15 @@ async function recallRelatedDecisions(db, companyId, question) {
       p_match_count: 5,
     });
     if (error) throw new Error(error.message);
-    if (matches?.length) return { decisions: matches, retrieval: 'relevance' };
+    // match_decisions searches by company only; keep the owner's own rows.
+    const ownIds = new Set();
+    if (matches?.length) {
+      const { data: owned } = await db.from('decisions').select('id')
+        .in('id', matches.map((m) => m.id)).eq('created_by_id', ownerId);
+      for (const o of owned || []) ownIds.add(o.id);
+      const mine = matches.filter((m) => ownIds.has(m.id));
+      if (mine.length) return { decisions: mine, retrieval: 'relevance' };
+    }
   } catch (e) {
     console.error('Relevance recall failed, falling back to recency:', e.message);
   }
@@ -227,31 +235,28 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 
 // The free meeting, enforced here rather than trusted to the browser: an
 // anonymous caller needs an attempt freeMeetingGate issued to this session,
-// gets one finished meeting, and is refused once today's free-meeting spend
-// reaches the ceiling. A meeting that never finished can be retried; it's
-// marked failed so the one-live-meeting cap (database trigger) allows it.
-// Returns an error message, or null when the meeting may start.
+// gets one finished meeting, is held to the per-network daily limit, and is
+// refused once today's free-meeting spend reaches the ceiling. The checks and
+// the claim happen in one locked database step (claim_free_meeting), so
+// parallel requests can't all slip through. A retry supersedes the session's
+// unfinished meetings. Returns an error message, or null to go ahead.
+const FREE_MEETINGS_PER_IP_PER_DAY = 3;
+const CLAIM_REFUSALS = {
+  expired: 'This free meeting has expired. Please start again from the free meeting page.',
+  already_used: "You've already used your free board meeting.",
+  ip_limit: "Free board meetings from this network have reached today's limit. Create an account to start your own board now.",
+  ceiling: "We've reached today's limit for free board meetings. Come back tomorrow, or create an account to start your own board now.",
+};
+
 async function claimFreeMeeting(db, userId, attemptId) {
   if (!attemptId) return 'The free meeting needs to be started from the free meeting page.';
-  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const { data: attempt } = await db.from('free_meeting_attempts').select('id')
-    .eq('id', attemptId).eq('user_id', userId).is('blocked_reason', null).eq('completed', false)
-    .gte('started_at', since).maybeSingle();
-  if (!attempt) return 'This free meeting has expired. Please start again from the free meeting page.';
-
-  const { data: meetings } = await db.from('board_meetings').select('id, status').eq('created_by_id', userId);
-  if ((meetings || []).some((m) => m.status === 'complete')) return "You've already used your free board meeting.";
-
   const { data: limitsRows } = await db.from('system_limits').select('free_meeting_daily_cost_ceiling_usd').order('created_at', { ascending: false }).limit(1);
   const ceiling = Number(limitsRows?.[0]?.free_meeting_daily_cost_ceiling_usd ?? 12.70);
-  const { data: spent, error: spendErr } = await db.rpc('free_meeting_spend_today');
-  if (spendErr) throw spendErr;
-  if (Number(spent) >= ceiling) return "We've reached today's limit for free board meetings. Come back tomorrow, or create an account to start your own board now.";
-
-  const unfinished = (meetings || []).filter((m) => m.status !== 'failed').map((m) => m.id);
-  if (unfinished.length) await db.from('board_meetings').update({ status: 'failed' }).in('id', unfinished);
-  await db.from('free_meeting_attempts').update({ claimed_at: new Date().toISOString() }).eq('id', attempt.id);
-  return null;
+  const { data: outcome, error } = await db.rpc('claim_free_meeting', {
+    p_attempt_id: attemptId, p_user_id: userId, p_ceiling: ceiling, p_ip_limit: FREE_MEETINGS_PER_IP_PER_DAY,
+  });
+  if (error) throw error;
+  return outcome === 'ok' ? null : (CLAIM_REFUSALS[outcome] || CLAIM_REFUSALS.expired);
 }
 
 Deno.serve(async (req) => {
@@ -283,19 +288,16 @@ Deno.serve(async (req) => {
 
     requireMaxLength(question, TEXT_LIMITS.question, 'The question');
     const company = await requireOwnedCompany(db, company_id, user.id, '*');
-    if (user.is_anonymous) {
-      const denied = await claimFreeMeeting(db, user.id, attempt_id);
-      if (denied) return Response.json({ error: denied }, { status: 403, headers: corsHeaders });
-    } else {
-      await checkUserLimit(db, user.id, 'board_meeting');
-    }
+    if (user.is_anonymous && !attempt_id)
+      return Response.json({ error: 'The free meeting needs to be started from the free meeting page.' }, { status: 403, headers: corsHeaders });
+    if (!user.is_anonymous) await checkUserLimit(db, user.id, 'board_meeting');
 
     const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
       db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(20),
       db.from('board_meetings').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(5),
       db.from('projects').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(10),
       db.from('advisors').select('*').eq('company_id', company_id).eq('created_by_id', user.id).limit(100),
-      recallRelatedDecisions(db, company_id, question),
+      recallRelatedDecisions(db, company_id, user.id, question),
       loadOpenCommitments(db, company_id, user.id),
       loadProgressionSummary(db, company_id),
     ]);
@@ -304,11 +306,19 @@ Deno.serve(async (req) => {
     const selectedAdvisors = (advisors || []).filter(a => advisor_ids.includes(a.id) && a.type !== 'human');
     if (selectedAdvisors.length < minAdv)
       return Response.json({ error: 'Not enough AI advisors selected' }, { status: 400, headers: corsHeaders });
-    // The limit counts debaters; the Chair is extra (see Phase 1b).
-    const isChair = (a) => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair');
+    // The limit counts debaters; one Chair is extra (see Phase 1b). Only one
+    // advisor can be the Chair, however many rows claim the title.
     const maxAdv = limits.max_advisors_per_meeting || 5;
-    if (selectedAdvisors.filter(a => !isChair(a)).length > maxAdv)
+    const chairAllowance = selectedAdvisors.some(a => a.library_key === 'chair') ? 1 : 0;
+    if (selectedAdvisors.length - chairAllowance > maxAdv)
       return Response.json({ error: `Select at most ${maxAdv} advisors` }, { status: 400, headers: corsHeaders });
+
+    // Claimed last, once the request is otherwise valid, so a bad request
+    // never uses up or supersedes anything.
+    if (user.is_anonymous) {
+      const denied = await claimFreeMeeting(db, user.id, attempt_id);
+      if (denied) return Response.json({ error: denied }, { status: 403, headers: corsHeaders });
+    }
 
     const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
 
@@ -331,6 +341,7 @@ Deno.serve(async (req) => {
 
     const { data: meeting, error: createErr } = await db.from('board_meetings').insert({
       company_id, created_by_id: user.id, question, participants: selectedAdvisors.map(a => a.name),
+      participant_advisor_ids: selectedAdvisors.map(a => a.id),
       status: 'preparing', independent_responses: [], challenge_responses: [],
       memory_context: memoryContext,
     }).select().single();
@@ -409,7 +420,7 @@ Deno.serve(async (req) => {
     await db.from('board_meetings').update({
       status: 'independent_complete', independent_responses: independentResponses,
       chair_opening: chairOpening,
-    }).eq('id', meeting.id);
+    }).eq('id', meeting.id).eq('status', 'preparing'); // a free-meeting retry may have superseded it meanwhile
 
     return Response.json({
       meeting_id: meeting.id, status: 'independent_complete',

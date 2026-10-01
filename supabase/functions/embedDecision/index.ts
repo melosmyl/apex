@@ -3,6 +3,7 @@
 // Also runs in backfill mode to embed decisions that have no vector yet.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { embedText, decisionEmbeddingText } from '../_shared/embeddings.ts';
 
 const corsHeaders = {
@@ -74,9 +75,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Decision not found' }, { status: 404, headers: corsHeaders });
     if (user && decision.created_by_id !== user.id)
       return Response.json({ error: 'Forbidden' }, { status: 403, headers: corsHeaders });
+    if (user) await checkUserLimit(db, user.id, 'embed');
 
     return Response.json(await embedOne(db, decision), { headers: corsHeaders });
   } catch (error) {
+    const denied = accessErrorResponse(error, corsHeaders);
+    if (denied) return denied;
     console.error('embedDecision error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

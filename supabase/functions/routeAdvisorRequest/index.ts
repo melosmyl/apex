@@ -25,9 +25,14 @@ async function resolveCheapTier(db) {
   return DEFAULT_CHEAP_TIER;
 }
 
+// Advisor rows are founder-editable, so their text goes into every call
+// bounded: no one can make each call carry a book's worth of input.
+const cap = (v, n) => String(v ?? '').slice(0, n);
+const capList = (list) => (Array.isArray(list) ? list : []).slice(0, 12).map((x) => cap(x, 200));
+
 function buildSystemPrompt(advisor, customInstructions, companyContext, meetingContext, outputSchema) {
-  const instructions = customInstructions || advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`;
-  let prompt = `You are ${advisor.name}, ${advisor.role}.\n\n${instructions}\n\nDecision style: ${advisor.decision_style || 'Analytical'}.\nCommunication style: ${advisor.communication_style || 'Direct and professional'}.\nStrengths: ${(advisor.strengths || []).join(', ')}.\nBlind spots: ${(advisor.blind_spots || advisor.weaknesses || []).join(', ')}.\n\n`;
+  const instructions = cap(customInstructions || advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`, 6000);
+  let prompt = `You are ${cap(advisor.name, 100)}, ${cap(advisor.role, 100)}.\n\n${instructions}\n\nDecision style: ${cap(advisor.decision_style || 'Analytical', 300)}.\nCommunication style: ${cap(advisor.communication_style || 'Direct and professional', 300)}.\nStrengths: ${capList(advisor.strengths).join(', ')}.\nBlind spots: ${capList(advisor.blind_spots || advisor.weaknesses).join(', ')}.\n\n`;
   if (companyContext) prompt += `Company Context:\n${companyContext}\n\n`;
   if (meetingContext) prompt += `Meeting Context:\n${meetingContext}\n\n`;
   prompt += `You must respond with ONLY valid JSON. Do not include any text outside the JSON object.`;

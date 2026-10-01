@@ -1,5 +1,7 @@
 // Which models may run, read from ai_model_configurations: the model
-// registry. An active row approves a model; one active row per provider is
+// registry. An active row whose purpose is 'advisor' (or unset) approves a
+// model for advisor rows — rows registered for other purposes (cheap tier,
+// a premium Chair model) can't be picked by founders editing their advisors; one active row per provider is
 // marked is_provider_default and replaces any unapproved model an advisor
 // row asks for. Adding a model (Sonnet 5.5, Fable 5.1, a new provider) is a
 // row, not a code change.
@@ -26,10 +28,13 @@ const UNREADABLE_REGISTRY_FALLBACK: ModelRef[] = [
   { provider: 'anthropic', model: 'claude-sonnet-5' },
 ];
 
-function build(rows: { provider: string; model_name: string; is_provider_default?: boolean }[]): ModelRegistry {
-  const approved = new Set(rows.map((r) => `${r.provider}:${r.model_name}`));
+type Row = { provider: string; model_name: string; is_provider_default?: boolean; purpose?: string | null };
+
+function build(rows: Row[]): ModelRegistry {
+  const forAdvisors = rows.filter((r) => !r.purpose || r.purpose === 'advisor');
+  const approved = new Set(forAdvisors.map((r) => `${r.provider}:${r.model_name}`));
   const defaults = new Map<string, ModelRef>();
-  for (const r of rows) {
+  for (const r of forAdvisors) {
     if (r.is_provider_default && !defaults.has(r.provider)) defaults.set(r.provider, { provider: r.provider, model: r.model_name });
   }
   return {
@@ -42,7 +47,7 @@ function build(rows: { provider: string; model_name: string; is_provider_default
 export async function loadModelRegistry(db: Db): Promise<ModelRegistry> {
   try {
     const { data, error } = await db.from('ai_model_configurations')
-      .select('provider, model_name, is_provider_default').eq('is_active', true);
+      .select('provider, model_name, is_provider_default, purpose').eq('is_active', true);
     if (error) throw new Error(error.message);
     if (data?.length) return build(data);
     console.error('Model registry has no active models; using the unreadable-registry fallback');
@@ -89,13 +94,14 @@ export function resolveApprovedModels(
   let primary = requested;
   if (!approved(primary)) {
     const providerDefault = registry.defaultFor(primary.provider);
-    const [replacement, source]: [ModelRef | null, string] = approved(advisorDefault?.primary) ? [advisorDefault!.primary, "advisor's default"]
-      : approved(providerDefault) ? [providerDefault, 'provider default']
-      : [registry.anyDefault(), 'registry default'];
-    if (replacement) {
-      notes.push(`${primary.provider}/${primary.model} -> ${replacement.provider}/${replacement.model} (${source})`);
-      primary = replacement;
-    }
+    // Never let an unapproved model through: with no approved default at
+    // all, fall back to the long-standing models.
+    const [replacement, source]: [ModelRef, string] = approved(advisorDefault?.primary) ? [advisorDefault!.primary, "advisor's default"]
+      : approved(providerDefault) ? [providerDefault!, 'provider default']
+      : registry.anyDefault() ? [registry.anyDefault()!, 'registry default']
+      : [UNREADABLE_REGISTRY_FALLBACK.find((m) => m.provider === primary.provider) ?? UNREADABLE_REGISTRY_FALLBACK[0], 'built-in fallback'];
+    notes.push(`${primary.provider}/${primary.model} -> ${replacement.provider}/${replacement.model} (${source})`);
+    primary = replacement;
   }
 
   let fallback: ModelRef | null = null;

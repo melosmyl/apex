@@ -64,6 +64,14 @@ export const USER_LIMITS = {
   note_relevance: { max: 120, windowMinutes: 60 },
   note_process: { max: 60, windowMinutes: 60 },
   progression_answer: { max: 10, windowMinutes: 60 },
+  // A meeting's discussion and resolution steps; normal use is two per meeting.
+  meeting_step: { max: 50, windowMinutes: 24 * 60 },
+  followup: { max: 30, windowMinutes: 24 * 60 },
+  task_ack: { max: 50, windowMinutes: 24 * 60 },
+  embed: { max: 200, windowMinutes: 60 },
+  // A free-meeting visitor gets the onboarding plan once, plus one retry.
+  // Rows are purged after two days, which outlasts any free session.
+  onboarding_plan_anon: { max: 2, windowMinutes: 2 * 24 * 60 },
 } as const;
 
 export const TEXT_LIMITS = {

@@ -9,7 +9,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolveAdvisor } from '../_shared/advisorResolution.ts';
-import { requireOwnedRow, requireNotAnonymous, accessErrorResponse } from '../_shared/access.ts';
+import { requireOwnedRow, requireNotAnonymous, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
     if (!task.source_meeting_id)
       return Response.json({ error: 'This task has no source meeting — nothing to acknowledge on behalf of.' }, { status: 400, headers: corsHeaders });
 
+    await checkUserLimit(db, user.id, 'task_ack');
     const { data: meeting } = await db.from('board_meetings').select('question, participants').eq('id', task.source_meeting_id).eq('company_id', task.company_id).eq('created_by_id', user.id).maybeSingle();
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', task.company_id).eq('created_by_id', user.id).neq('type', 'human');
     if (!advisors?.length) return Response.json({ error: 'No advisors available to speak' }, { status: 400, headers: corsHeaders });

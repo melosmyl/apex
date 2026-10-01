@@ -1,5 +1,6 @@
 import { base44, supabase } from "@/api/base44Client";
 import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
+import { MAX_DEBATERS } from "@/lib/boardroom";
 import { buildAdvisorRecord, recommendAdvisorsHeuristic, getJourney } from "@/lib/companyJourney";
 
 const VALID_KEYS = ADVISOR_LIBRARY.map((a) => a.key);
@@ -30,6 +31,10 @@ export async function generateOnboardingPlan(answers) {
         reason: "Every board needs a Chair to synthesise the discussion into a clear recommendation."
       });
     }
+
+    // A meeting seats the Chair plus at most MAX_DEBATERS others.
+    const nonChair = plan.recommended_advisors.filter((a) => a.key !== "chair").slice(0, MAX_DEBATERS);
+    plan.recommended_advisors = [...plan.recommended_advisors.filter((a) => a.key === "chair"), ...nonChair];
 
     return plan;
   } catch (e) {

@@ -1,6 +1,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolveAdvisor } from '../_shared/advisorResolution.ts';
-import { requireOwnedRow, accessErrorResponse } from '../_shared/access.ts';
+import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
+
+// A synthesis that claimed the meeting and then died is retryable after this.
+const STALE_CLAIM_MS = 10 * 60_000;
 
 // A priority_action's assigned_to is either a genuine self-assignment ("Founder"
 // — no advisor raised it, so there's no advisor to attribute it to or to
@@ -123,6 +126,8 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let claimedMeetingId = null;
+  let dbForRelease = null;
   try {
     const authClient = createClient(
       Deno.env.get('SUPABASE_URL'),
@@ -140,10 +145,27 @@ Deno.serve(async (req) => {
     if (!meeting_id) return Response.json({ error: 'meeting_id is required' }, { status: 400, headers: corsHeaders });
 
     const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
-    // One resolution per meeting: a second run would replace it and insert
-    // its tasks again.
-    if (!['discussion_complete', 'challenge_complete', 'failed'].includes(meeting.status))
-      return Response.json({ error: meeting.status === 'complete' ? 'This meeting already has a resolution.' : 'The discussion has not finished yet.' }, { status: 409, headers: corsHeaders });
+    await checkUserLimit(db, user.id, 'meeting_step');
+
+    // A free-meeting visitor gets one finished meeting.
+    if (user.is_anonymous) {
+      const { data: done } = await db.from('board_meetings').select('id')
+        .eq('created_by_id', user.id).eq('status', 'complete').limit(1);
+      if (done?.length) return Response.json({ error: "You've already used your free board meeting." }, { status: 403, headers: corsHeaders });
+    }
+
+    // One resolution per meeting, claimed atomically so parallel requests
+    // can't each run it (and each insert its tasks). A superseded meeting
+    // (replaced by a free-meeting retry) is never finished.
+    const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+    const { data: claimed } = await db.from('board_meetings').update({ status: 'synthesizing' })
+      .eq('id', meeting.id)
+      .or(`status.in.(discussion_complete,challenge_complete,failed),and(status.eq.synthesizing,updated_at.lt.${staleBefore})`)
+      .select('id');
+    if (!claimed?.length)
+      return Response.json({ error: meeting.status === 'complete' ? 'This meeting already has a resolution.' : 'This meeting is not ready for a resolution.' }, { status: 409, headers: corsHeaders });
+    claimedMeetingId = meeting.id;
+    dbForRelease = db;
 
     const independentResponses = meeting.independent_responses || [];
     const challengeResponses = meeting.challenge_responses || [];
@@ -152,7 +174,10 @@ Deno.serve(async (req) => {
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
     let chairAdvisor = (advisors || []).find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
     if (!chairAdvisor) chairAdvisor = (advisors || []).find(a => a.type !== 'human');
-    if (!chairAdvisor) return Response.json({ error: 'No advisor available for chair synthesis' }, { status: 400, headers: corsHeaders });
+    if (!chairAdvisor) {
+      await db.from('board_meetings').update({ status: 'failed' }).eq('id', meeting.id).eq('status', 'synthesizing');
+      return Response.json({ error: 'No advisor available for chair synthesis' }, { status: 400, headers: corsHeaders });
+    }
 
     const resolutionSchema = {
       type: 'object',
@@ -226,7 +251,8 @@ Deno.serve(async (req) => {
 
     const resolution = chairResult?.response;
     if (!resolution) {
-      await db.from('board_meetings').update({ status: 'failed' }).eq('id', meeting.id);
+      await db.from('board_meetings').update({ status: 'failed' }).eq('id', meeting.id).eq('status', 'synthesizing');
+      claimedMeetingId = null;
       return Response.json({ error: 'Chair synthesis failed. The board could not reach a resolution.' }, { status: 503, headers: corsHeaders });
     }
 
@@ -271,7 +297,8 @@ Deno.serve(async (req) => {
       next_steps: priorityActions.map(a => a.title),
       assigned_tasks: priorityActions,
       discussion: discussionField,
-    }).eq('id', meeting.id).select().single();
+    }).eq('id', meeting.id).eq('status', 'synthesizing').select().single();
+    claimedMeetingId = null;
 
     // Commitments become real tasks automatically — linked back to this
     // meeting via source_meeting_id, which is what the accountability
@@ -319,6 +346,10 @@ Deno.serve(async (req) => {
       created_tasks: createdTasks,
     }, { headers: corsHeaders });
   } catch (error) {
+    if (claimedMeetingId && dbForRelease) {
+      await dbForRelease.from('board_meetings').update({ status: 'failed' })
+        .eq('id', claimedMeetingId).eq('status', 'synthesizing');
+    }
     const denied = accessErrorResponse(error, corsHeaders);
     if (denied) return denied;
     console.error('runChairSynthesis error:', error);

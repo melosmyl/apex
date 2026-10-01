@@ -1,5 +1,12 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { requireOwnedRow, accessErrorResponse } from '../_shared/access.ts';
+import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
+
+// Each Round 1 entry is pasted into every advisor's prompt; bound what a
+// browser-edited entry (human perspectives) can add.
+const MAX_ROUND1_ENTRIES = 20;
+const MAX_ENTRY_CHARS = 4000;
+// A step that claimed the meeting and then died is retryable after this.
+const STALE_CLAIM_MS = 10 * 60_000;
 import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
@@ -155,6 +162,8 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let claimedMeetingId = null;
+  let dbForRelease = null;
   try {
     const authClient = createClient(
       Deno.env.get('SUPABASE_URL'),
@@ -172,21 +181,35 @@ Deno.serve(async (req) => {
     if (!meeting_id) return Response.json({ error: 'meeting_id is required' }, { status: 400, headers: corsHeaders });
 
     const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
-    // Runs once, straight after Round 1. A failed run leaves the status at
-    // independent_complete, so a retry is still allowed.
-    if (meeting.status !== 'independent_complete')
-      return Response.json({ error: 'This meeting has already moved past the discussion.' }, { status: 409, headers: corsHeaders });
+    await checkUserLimit(db, user.id, 'meeting_step');
 
-    const independentResponses = meeting.independent_responses || [];
+    // Runs once, straight after Round 1. Claimed atomically, so parallel
+    // requests can't each run the paid rounds; a failed run hands the
+    // meeting back to independent_complete so it can be retried.
+    const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+    const { data: claimed } = await db.from('board_meetings').update({ status: 'discussing' })
+      .eq('id', meeting.id)
+      .or(`status.eq.independent_complete,and(status.eq.discussing,updated_at.lt.${staleBefore})`)
+      .select('id');
+    if (!claimed?.length)
+      return Response.json({ error: 'This meeting has already moved past the discussion.' }, { status: 409, headers: corsHeaders });
+    claimedMeetingId = meeting.id;
+    dbForRelease = db;
+
+    const independentResponses = (meeting.independent_responses || []).slice(0, MAX_ROUND1_ENTRIES);
     if (!independentResponses.length)
-      return Response.json({ error: 'No independent responses found' }, { status: 400, headers: corsHeaders });
+      throw Object.assign(new Error('No independent responses found'), { status: 400 });
 
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
+    // Only the advisors the server chose when the meeting started — never
+    // whatever ids the browser-editable independent_responses list.
+    const chosen = meeting.participant_advisor_ids?.length ? new Set(meeting.participant_advisor_ids) : null;
+    const chosenNames = new Set(meeting.participants || []);
     const meetingAdvisors = (advisors || []).filter(a =>
-      independentResponses.some(r => r.advisor_id === a.id) && a.type !== 'human'
+      a.type !== 'human' && (chosen ? chosen.has(a.id) : chosenNames.has(a.name))
     );
     if (!meetingAdvisors.length)
-      return Response.json({ error: 'No AI advisors available for discussion' }, { status: 400, headers: corsHeaders });
+      throw Object.assign(new Error('No AI advisors available for discussion'), { status: 400 });
 
     const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
     const limits = limitsList?.[0] || {};
@@ -194,9 +217,9 @@ Deno.serve(async (req) => {
 
     let transcript = independentResponses.map(r => ({
       round: 1, advisor_id: r.advisor_id, advisor_name: r.advisor_name, role: r.role,
-      message: r.position || r.recommendation || '', message_type: 'initial',
+      message: String(r.position || r.recommendation || '').slice(0, MAX_ENTRY_CHARS), message_type: 'initial',
       reply_to_advisor: null, changed_opinion: false, new_position: null,
-      new_risks: r.risks || [], confidence_score: r.confidence_score || 0,
+      new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: r.confidence_score || 0,
       provider_used: r.provider_used, model_used: r.model_used,
       unavailable: r.unavailable || false,
     }));
@@ -272,15 +295,21 @@ Deno.serve(async (req) => {
     await db.from('board_meetings').update({
       status: 'discussion_complete', discussion_transcript: transcript,
       convergence: finalConvergence.map(p => ({ advisors: p.names })),
-    }).eq('id', meeting.id);
+    }).eq('id', meeting.id).eq('status', 'discussing');
+    claimedMeetingId = null;
 
     return Response.json({
       meeting_id: meeting.id, status: 'discussion_complete', discussion_transcript: transcript,
       convergence: finalConvergence.map(p => ({ advisors: p.names })),
     }, { headers: corsHeaders });
   } catch (error) {
+    if (claimedMeetingId && dbForRelease) {
+      await dbForRelease.from('board_meetings').update({ status: 'independent_complete' })
+        .eq('id', claimedMeetingId).eq('status', 'discussing');
+    }
     const denied = accessErrorResponse(error, corsHeaders);
     if (denied) return denied;
+    if (error.status === 400) return Response.json({ error: error.message }, { status: 400, headers: corsHeaders });
     console.error('runBoardDiscussion error:', error);
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }

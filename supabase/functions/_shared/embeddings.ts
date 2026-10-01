@@ -1,12 +1,15 @@
 // Shared embedding helper. text-embedding-3-small returns 1536 dimensions,
 // matching the vector column on decisions.
 const EMBEDDING_MODEL = 'text-embedding-3-small';
+const MAX_EMBED_CHARS = 8000;
 
 export async function embedText(text: string): Promise<number[]> {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
 
-  const input = (text || '').trim();
+  // Bounded: notes and decisions are free text with no length limit, and the
+  // first few thousand words carry the meaning anyway.
+  const input = (text || '').trim().slice(0, MAX_EMBED_CHARS);
   if (!input) throw new Error('Cannot embed empty text');
 
   const res = await fetch('https://api.openai.com/v1/embeddings', {

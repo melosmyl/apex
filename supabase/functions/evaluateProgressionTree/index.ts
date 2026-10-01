@@ -20,25 +20,25 @@ const corsHeaders = {
 };
 
 const FACT_EVALUATORS = {
-  async board_assembled(db, companyId) {
-    const { data } = await db.from('advisors').select('id, type').eq('company_id', companyId);
+  async board_assembled(db, companyId, ownerId) {
+    const { data } = await db.from('advisors').select('id, type').eq('company_id', companyId).eq('created_by_id', ownerId);
     return (data || []).filter((a) => a.type !== 'human').length >= 3;
   },
-  async first_debate(db, companyId) {
-    const { count } = await db.from('board_meetings').select('id', { count: 'exact', head: true })
+  async first_debate(db, companyId, ownerId) {
+    const { count } = await db.from('board_meetings').select('id', { count: 'exact', head: true }).eq('created_by_id', ownerId)
       .eq('company_id', companyId).eq('status', 'complete');
     return (count || 0) >= 1;
   },
-  async first_decision(db, companyId) {
-    const { count } = await db.from('decisions').select('id', { count: 'exact', head: true }).eq('company_id', companyId);
+  async first_decision(db, companyId, ownerId) {
+    const { count } = await db.from('decisions').select('id', { count: 'exact', head: true }).eq('created_by_id', ownerId).eq('company_id', companyId);
     return (count || 0) >= 1;
   },
-  async first_document(db, companyId) {
-    const { count } = await db.from('documents').select('id', { count: 'exact', head: true }).eq('company_id', companyId);
+  async first_document(db, companyId, ownerId) {
+    const { count } = await db.from('documents').select('id', { count: 'exact', head: true }).eq('created_by_id', ownerId).eq('company_id', companyId);
     return (count || 0) >= 1;
   },
-  async first_commitment_closed(db, companyId) {
-    const { count } = await db.from('tasks').select('id', { count: 'exact', head: true })
+  async first_commitment_closed(db, companyId, ownerId) {
+    const { count } = await db.from('tasks').select('id', { count: 'exact', head: true }).eq('created_by_id', ownerId)
       .eq('company_id', companyId).eq('status', 'done').not('source_meeting_id', 'is', null);
     return (count || 0) >= 1;
   },
@@ -82,7 +82,8 @@ Deno.serve(async (req) => {
       const fact = node.derivation_rule?.fact;
       const evaluator = FACT_EVALUATORS[fact];
       if (!evaluator) continue;
-      if (await evaluator(db, company_id)) {
+      // Only the owner's own rows count towards a milestone.
+      if (await evaluator(db, company_id, user.id)) {
         toInsert.push({
           created_by_id: user.id,
           company_id,

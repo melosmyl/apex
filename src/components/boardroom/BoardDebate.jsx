@@ -11,7 +11,7 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
 import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS } from "@/lib/boardroom";
 import { useAssistant } from "@/lib/AssistantContext";
 
 const POLL_INTERVAL_MS = 3000;
@@ -92,8 +92,12 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const aiAdvisors = advisors.filter((a) => a.type !== "human");
   const humanAdvisors = advisors.filter((a) => a.type === "human");
 
+  // Default to the whole board, up to the server's per-meeting limit:
+  // the Chair plus at most MAX_DEBATERS others.
   useEffect(() => {
-    setSelectedIds(aiAdvisors.map((a) => a.id));
+    const chair = aiAdvisors.find((a) => a.library_key === "chair");
+    const debaters = aiAdvisors.filter((a) => a !== chair).slice(0, MAX_DEBATERS);
+    setSelectedIds([...(chair ? [chair.id] : []), ...debaters.map((a) => a.id)]);
   }, [advisors]);
 
   useEffect(() => {

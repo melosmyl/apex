@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { requireOwnedRow, requireMaxLength, accessErrorResponse, TEXT_LIMITS, MAX_FOLLOWUPS_PER_MEETING } from '../_shared/access.ts';
+import { requireOwnedRow, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS, MAX_FOLLOWUPS_PER_MEETING } from '../_shared/access.ts';
 
 // Ported from base44/functions/runFounderFollowup/entry.ts — that version
 // was never deployed (Base44 SDK, dead since the migration off Base44).
@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
 
     requireMaxLength(founder_message, TEXT_LIMITS.founder_message, 'Your message');
     const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
+    await checkUserLimit(db, user.id, 'followup');
     const followupsSoFar = (meeting.discussion_transcript || []).filter(e => e.advisor_name === 'Founder').length;
     if (followupsSoFar >= MAX_FOLLOWUPS_PER_MEETING)
       return Response.json({ error: `This meeting has reached its ${MAX_FOLLOWUPS_PER_MEETING} follow-up questions. Start a new meeting to keep going.` }, { status: 429, headers: corsHeaders });
@@ -76,8 +77,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'No independent responses found' }, { status: 400, headers: corsHeaders });
 
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
+    // Only the advisors the server chose when the meeting started, not the
+    // browser-editable independent_responses.
+    const chosen = meeting.participant_advisor_ids?.length ? new Set(meeting.participant_advisor_ids) : null;
+    const chosenNames = new Set(meeting.participants || []);
     const meetingAdvisors = (advisors || []).filter(a =>
-      independentResponses.some(r => r.advisor_id === a.id) && a.type !== 'human'
+      a.type !== 'human' && (chosen ? chosen.has(a.id) : chosenNames.has(a.name))
     );
     if (!meetingAdvisors.length)
       return Response.json({ error: 'No AI advisors available for follow-up' }, { status: 400, headers: corsHeaders });

@@ -1,5 +1,10 @@
 -- Security checkpoint, Part C: database rules that hold even if code slips.
 
+-- Re-adding foreign keys locks the tables involved until commit. Give up
+-- rather than queue behind live traffic; run it in a quiet window.
+set lock_timeout = '5s';
+set statement_timeout = '120s';
+
 -- ---------------------------------------------------------------------
 -- 1. Company ownership on every insert and update of company data.
 --

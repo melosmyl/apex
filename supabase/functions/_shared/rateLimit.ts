@@ -7,10 +7,38 @@
 // than in-memory state, since edge functions have no shared memory across
 // invocations or regions.
 
-function getClientIp(req: Request): string {
+// The client's IP, preferring headers the platform sets itself over
+// X-Forwarded-For, whose leftmost entry a client can write. Which of these
+// Supabase's gateway provides is logged once per worker (names only, never
+// values) so it can be confirmed from the function logs.
+let ipSourceLogged = false;
+export function getClientIp(req: Request): string {
+  const platform = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip');
+  if (!ipSourceLogged) {
+    ipSourceLogged = true;
+    const present = ['cf-connecting-ip', 'x-real-ip', 'x-forwarded-for'].filter((h) => req.headers.has(h));
+    console.log(`client IP headers present: ${present.join(', ') || 'none'}`);
+  }
+  if (platform) return platform.trim();
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) return forwarded.split(',')[0].trim();
-  return req.headers.get('x-real-ip') || 'unknown';
+  return 'unknown';
+}
+
+// Keyed with IP_HASH_SECRET: a plain SHA-256 of an IPv4 address can be
+// reversed by hashing all four billion of them.
+export async function hashIp(ip: string): Promise<string> {
+  const data = new TextEncoder().encode(ip);
+  const secret = Deno.env.get('IP_HASH_SECRET');
+  let hashBuffer: ArrayBuffer;
+  if (secret) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    hashBuffer = await crypto.subtle.sign('HMAC', key, data);
+  } else {
+    console.error('IP_HASH_SECRET is not set; falling back to an unkeyed hash');
+    hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  }
+  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export async function checkRateLimit(
@@ -20,7 +48,8 @@ export async function checkRateLimit(
   endpoint: string,
   { maxRequests = 30, windowMinutes = 5 }: { maxRequests?: number; windowMinutes?: number } = {}
 ): Promise<boolean> {
-  const ip = getClientIp(req);
+  // Stored and compared hashed: the access log never holds a raw IP.
+  const ip = await hashIp(getClientIp(req));
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
 
   const { count } = await db
