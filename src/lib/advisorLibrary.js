@@ -25,7 +25,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Stargazing with a telescope she doesn't fully know how to use.",
     favourite_place: "Kyoto in the rain.",
     mug: "“What's next”",
-    personal_detail_terms: ["Invisible Cities", "Calvino", "telescope", "stargazing", "Kyoto"]
+    personal_detail_terms: ["Invisible Cities", "Calvino", "my telescope", "stargazing", "Kyoto"]
   },
   {
     key: "operator",
@@ -46,7 +46,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Marathon running, boringly consistent.",
     favourite_place: "Lagos, his aunt's house, which runs better than most companies.",
     mug: "“Shipped”",
-    personal_detail_terms: ["Checklist Manifesto", "marathon", "Lagos", "my aunt"]
+    personal_detail_terms: ["Checklist Manifesto", "marathon running", "running marathons", "my marathon", "my aunt's house"]
   },
   {
     key: "creative_director",
@@ -67,7 +67,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Letterpress printing in a cold garage.",
     favourite_place: "Lake Como, out of season, in a borrowed coat.",
     mug: "“No”",
-    personal_detail_terms: ["Grid Systems", "letterpress", "Lake Como", "Como"]
+    personal_detail_terms: ["Grid Systems in Graphic Design", "letterpress", "Lake Como"]
   },
   {
     key: "marketing_director",
@@ -88,7 +88,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Pottery; everything comes out slightly wonky and she gives it away anyway.",
     favourite_place: "Mumbai, her grandmother's street, during the monsoon.",
     mug: "“Ask the customer”",
-    personal_detail_terms: ["Made to Stick", "pottery", "potter's wheel", "Mumbai", "monsoon"]
+    personal_detail_terms: ["Made to Stick", "pottery", "potter's wheel", "grandmother's street", "monsoon"]
   },
   {
     key: "marcus-delgado",
@@ -109,7 +109,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Restoring a 1970s mechanical adding machine.",
     favourite_place: "Vienna, for the coffee houses and the arithmetic of a good schnitzel.",
     mug: "“Show me the numbers”",
-    personal_detail_terms: ["Intelligent Investor", "adding machine", "Vienna", "schnitzel", "coffee house"]
+    personal_detail_terms: ["Intelligent Investor", "adding machine", "Vienna", "schnitzel"]
   },
   {
     key: "investor",
@@ -130,7 +130,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Rowing on the Thames at six in the morning.",
     favourite_place: "A particular bench in Regent's Park.",
     mug: "“Terms attached”",
-    personal_detail_terms: ["Pride and Prejudice", "rowing", "the Thames", "Regent's Park"]
+    personal_detail_terms: ["Pride and Prejudice", "rowing", "on the Thames", "Regent's Park"]
   },
   {
     key: "product_strategist",
@@ -151,7 +151,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Cross-country skiing. Alone, early, in silence.",
     favourite_place: "A cabin above Tromsø with no signal.",
     mug: "“Not now”",
-    personal_detail_terms: ["Design of Everyday Things", "cross-country", "skiing", "Tromsø", "Tromso"]
+    personal_detail_terms: ["Design of Everyday Things", "cross-country skiing", "skiing", "Tromsø", "Tromso"]
   },
   {
     key: "customer_advocate",
@@ -172,7 +172,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Allotment gardening; the courgettes are out of control.",
     favourite_place: "Whitby, fish and chips on the harbour wall.",
     mug: "“World's Best Boss” (the Chair gave her the matching one).",
-    personal_detail_terms: ["Agatha Christie", "allotment", "courgette", "Whitby"]
+    personal_detail_terms: ["Agatha Christie", "my allotment", "courgette", "Whitby"]
   },
   {
     key: "legal_advisor",
@@ -193,7 +193,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Cryptic crosswords, timed.",
     favourite_place: "The Inns of Court on a Sunday, when they're empty.",
     mug: "“Read clause 4”",
-    personal_detail_terms: ["Bleak House", "cryptic crossword", "crossword", "Inns of Court"]
+    personal_detail_terms: ["Bleak House", "cryptic crossword", "Inns of Court"]
   },
   {
     key: "scientist",
@@ -214,7 +214,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Foraging for mushrooms, with a very good book and no casualties.",
     favourite_place: "The Black Forest in September.",
     mug: "“Citation needed”",
-    personal_detail_terms: ["Structure of Scientific Revolutions", "foraging", "mushroom", "Black Forest"]
+    personal_detail_terms: ["Structure of Scientific Revolutions", "Kuhn", "foraging", "mushroom", "Black Forest"]
   },
   {
     key: "supply_chain",
@@ -235,7 +235,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Sailing; he knows exactly what cargo he's passing.",
     favourite_place: "Porto, on the river, watching the boats.",
     mug: "“Where is it?”",
-    personal_detail_terms: ["Ninety Percent of Everything", "sailing", "Porto"]
+    personal_detail_terms: ["Ninety Percent of Everything", "when I sail", "out sailing", "my boat", "Porto"]
   },
   {
     key: "people_culture",
@@ -256,7 +256,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Choir on Wednesday nights; alto, reliably.",
     favourite_place: "Her mother's kitchen in Bristol.",
     mug: "“How do we feel”",
-    personal_detail_terms: ["choir", "alto", "Bristol", "my mother's kitchen"]
+    personal_detail_terms: ["choir", "sing alto", "my mother's kitchen", "Bristol kitchen"]
   },
   {
     key: "innovation_director",
@@ -277,7 +277,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Building kites that are faster than they should be.",
     favourite_place: "Naoshima, the art island, by bicycle.",
     mug: "“What if”",
-    personal_detail_terms: ["Little Prince", "kite", "Naoshima"]
+    personal_detail_terms: ["Little Prince", "my kites", "building kites", "Naoshima"]
   },
   {
     key: "risk_analyst",
@@ -298,7 +298,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Mountain weather forecasting, as an amateur, with alarming accuracy.",
     favourite_place: "Zermatt, on a clear day, looking at the thing that could kill you.",
     mug: "“Worst case”",
-    personal_detail_terms: ["Black Swan", "mountain weather", "Zermatt"]
+    personal_detail_terms: ["Taleb", "the book The Black Swan", "mountain weather", "Zermatt"]
   },
   {
     key: "capital_allocator",
@@ -319,7 +319,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Chess by post, with one opponent, for eleven years.",
     favourite_place: "The reading room of a library in Edinburgh that he won't name.",
     mug: "“Return on what”",
-    personal_detail_terms: ["Art of War", "chess by post", "correspondence chess", "Edinburgh"]
+    personal_detail_terms: ["Art of War", "Sun Tzu", "chess by post", "correspondence chess", "reading room"]
   },
   {
     key: "ai_expert",
@@ -339,7 +339,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Building mechanical keyboards nobody is allowed to type on.",
     favourite_place: "Taipei night markets at 1am.",
     mug: "“Prove it”",
-    personal_detail_terms: ["Gödel", "Godel", "Escher", "mechanical keyboard", "Taipei", "night market"]
+    personal_detail_terms: ["Gödel", "Godel", "Escher", "Hofstadter", "mechanical keyboard", "Taipei night market"]
   },
   {
     key: "felix-hart",
@@ -359,7 +359,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Rebuilding a motorbike that has never been ridden.",
     favourite_place: "The desert at night, anywhere, with a laptop.",
     mug: "“Ship it”",
-    personal_detail_terms: ["Foundation trilogy", "motorbike", "motorcycle", "the desert at night"]
+    personal_detail_terms: ["Foundation trilogy", "Asimov", "motorbike", "motorcycle", "in the desert"]
   },
   {
     key: "arthur-penrose",
@@ -379,7 +379,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Walking the same three miles every morning, in all weather.",
     favourite_place: "A small market town in Shropshire where he once bought a shop, and still owns it.",
     mug: "“Hold”",
-    personal_detail_terms: ["Christmas Carol", "three miles", "Shropshire", "market town"]
+    personal_detail_terms: ["Christmas Carol", "Dickens", "same three miles", "morning walk", "Shropshire"]
   },
   {
     key: "nathan-cole",
@@ -399,7 +399,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Woodworking; every piece of furniture in his house is slightly too sturdy.",
     favourite_place: "A garage, any garage, with the door open.",
     mug: "“Customer first”",
-    personal_detail_terms: ["Remains of the Day", "woodworking", "furniture I build", "my garage"]
+    personal_detail_terms: ["Remains of the Day", "woodworking", "woodwork", "build furniture", "furniture I build", "my garage"]
   },
   {
     key: "theo-lindqvist",
@@ -419,7 +419,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Swimming in cold sea water, year round, without talking about it.",
     favourite_place: "A wooden sauna on a lake near Dalarna.",
     mug: "“Less”",
-    personal_detail_terms: ["Zen Mind", "Beginner's Mind", "cold sea", "cold-water swim", "sauna", "Dalarna"]
+    personal_detail_terms: ["Zen Mind", "Beginner's Mind", "cold sea", "cold water", "cold-water", "sauna", "Dalarna"]
   },
   {
     key: "contrarian",
@@ -439,7 +439,7 @@ export const ADVISOR_LIBRARY = [
     hobby: "Boxing, badly, at an age when he should know better.",
     favourite_place: "Any café where he can sit with his back to the wall.",
     mug: "“Wrong”",
-    personal_detail_terms: ["Candide", "boxing", "my back to the wall"]
+    personal_detail_terms: ["Candide", "boxing gym", "in the ring", "back to the wall"]
   },
   {
     key: "chair",

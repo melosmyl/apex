@@ -20,7 +20,7 @@ export function buildSystemPrompt(advisor: Advisor, customInstructions: string |
   // Backstops, well above what any caller builds today.
   if (companyContext) prompt += `Company Context:\n${cap(companyContext, 40000)}\n\n`;
   if (meetingContext) prompt += `Meeting Context:\n${cap(meetingContext, 150000)}\n\n`;
-  if (offerPersonalDetails && hasPersonalDetails(advisor)) prompt += `${cap(personalDetailsNote(advisor), 1500)}\n\n`;
+  if (offerPersonalDetails && hasPersonalDetails(advisor)) prompt += `${personalDetailsNote(advisor)}\n\n`;
   prompt += `You must respond with ONLY valid JSON. Do not include any text outside the JSON object.`;
   return prompt;
 }
