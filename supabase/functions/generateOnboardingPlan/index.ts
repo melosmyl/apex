@@ -34,7 +34,7 @@ supply_chain: Rafael Duarte, Supply Chain Expert — Supply chain, Manufacturing
 people_culture: Naomi Clarke, People & Culture Director — People, Culture, Organisation design
 innovation_director: Kai Nakamura, Innovation Director — Innovation, New ventures, Emerging tech
 risk_analyst: Helena Vogt, Risk Analyst — Risk, Strategy, Analysis
-capital_allocator: Warren Bishop, Capital Allocator — Value investing, Capital allocation, Mergers & acquisitions
+capital_allocator: Warren Bishop, Capital Allocator — Capital allocation, Prioritisation, Return on investment
 ai_expert: Dr. Aris Chen, AI Strategist — Artificial intelligence, Machine learning, Data strategy
 felix-hart: Felix Hart, Founder & Technologist — Engineering, Manufacturing, Frontier technology
 arthur-penrose: Arthur Penrose, Value Investor — Value investing, Capital allocation, Long-term ownership

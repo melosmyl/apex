@@ -5,7 +5,7 @@ import { assertEquals } from 'jsr:@std/assert@1';
 
 const ROOT = new URL('../../../', import.meta.url);
 const SCAN = ['src', 'supabase/functions', 'index.html'];
-const SKIP = [/\/node_modules\//, /\/dist\//, /advisorNames\.test\.ts$/];
+const SKIP = [/\/node_modules\//, /\/dist\//, /advisorNames\.test\.ts$/, /personas\.test\.ts$/]; // these two list the forbidden words
 const FORBIDDEN = [
   /\bElon\b/, /\bMusk\b/, /\bBuffett\b/, /\bBezos\b/, /Rick Rubin/, /Marcus Chen/,
   /Berkshire/, /Blue Origin/, /Def Jam/, /\bSpaceX\b/, /\bTesla\b/, /\bAmazon\b/,
