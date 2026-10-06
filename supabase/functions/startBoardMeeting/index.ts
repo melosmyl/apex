@@ -4,6 +4,7 @@ import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.
 import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
+import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -146,40 +147,56 @@ function templatedCompletedRecap(completedTasks) {
   return `Since we last met, the board saw progress on: ${titles}.`;
 }
 
-// The Chair opens with what has changed since the last meeting: work
-// finished, and how the founder responded to the last resolution. This used
+// The Chair opens every meeting. On a first meeting there's nothing to
+// recap, so she welcomes the founder, names the question and the board, and
+// says how the meeting runs, without answering it. Otherwise she opens with
+// what has changed since the last meeting: work finished, and how the
+// founder responded to the last resolution. This used
 // to also chase overdue commitments directly — that's moved to the
 // Assistant (Phase E, prepareAccountabilityChases), which can raise it
 // proactively between meetings rather than only when a new one starts, and
 // avoids two voices nagging about the same thing. This opening now stays
 // pure recap and acknowledgment — the continuity differentiator made
 // visible ("the board remembers"), never a chase.
-async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, anonymous, meetingId, newQuestion, previousMeeting, deadlineAt }) {
-  if (!previousMeeting) return null; // first meeting ever — nothing to open with
-  const completedTasks = await loadRecentlyCompletedTasks(db, companyId, userId, previousMeeting.created_at);
+function firstMeetingWelcomePrompt(company, newQuestion, debaterNames) {
+  let prompt = `You are opening the very first board meeting for ${company.name || 'this company'}, before the board addresses the founder's question.\n\n`;
+  prompt += `The founder's question: "${newQuestion}"\n`;
+  prompt += `The advisors at the table: ${debaterNames.join(', ')}.\n\n`;
+  prompt += `In 2-3 sentences, in your own voice as Chair: welcome the founder, name the question in a few words, introduce the advisors by name, and say how the meeting runs — each advisor first answers independently, then they discuss and challenge each other over a few rounds, and you close with the board's resolution.\n`;
+  prompt += `IMPORTANT: do NOT answer, judge or comment on the question itself. That is the board's job, not yours here. No filler.`;
+  return prompt;
+}
 
-  let prompt = `You are opening this board meeting for ${company.name}, before the founder's actual question is addressed.\n\n`;
-  prompt += `IMPORTANT: today's question is "${newQuestion}" — do NOT discuss, answer, or reference it. That is the rest of the board's job, not yours here. Your only job is a brief status check on what has happened since the last meeting.\n\n`;
-  prompt += `Last meeting's question was: "${previousMeeting.question}" (already resolved — do not re-litigate it, only reference what came after it).\n`;
-  if (previousMeeting.founder_decision && previousMeeting.founder_decision !== 'undecided') {
-    prompt += `The founder's response to that resolution: ${previousMeeting.founder_decision}${previousMeeting.founder_decision_notes ? ` — "${previousMeeting.founder_decision_notes}"` : ''}\n`;
-  }
-  if (completedTasks.length) {
-    prompt += `\nCompleted since then:\n`;
-    completedTasks.forEach(t => { prompt += `- ${t.title}\n`; });
-    prompt += `\nThis is mandatory, not optional: your opening_statement text must literally contain each completed item's exact title in quotes — this is the board demonstrating it remembers and noticed, not a vague "good progress." A generic "you've been busy" is NOT acceptable — name every item above.\n`;
+async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, companyId, userId, anonymous, meetingId, newQuestion, previousMeeting, debaterNames, deadlineAt }) {
+  const completedTasks = previousMeeting ? await loadRecentlyCompletedTasks(db, companyId, userId, previousMeeting.created_at) : [];
+
+  let prompt;
+  if (!previousMeeting) {
+    prompt = firstMeetingWelcomePrompt(company, newQuestion, debaterNames);
   } else {
-    prompt += `\nNothing has been marked done since then — a short, honest "quiet since we last met" is fine. Do not invent progress that didn't happen.\n`;
+    prompt = `You are opening this board meeting for ${company.name}, before the founder's actual question is addressed.\n\n`;
+    prompt += `IMPORTANT: today's question is "${newQuestion}" — do NOT discuss, answer, or reference it. That is the rest of the board's job, not yours here. Your only job is a brief status check on what has happened since the last meeting.\n\n`;
+    prompt += `Last meeting's question was: "${previousMeeting.question}" (already resolved — do not re-litigate it, only reference what came after it).\n`;
+    if (previousMeeting.founder_decision && previousMeeting.founder_decision !== 'undecided') {
+      prompt += `The founder's response to that resolution: ${previousMeeting.founder_decision}${previousMeeting.founder_decision_notes ? ` — "${previousMeeting.founder_decision_notes}"` : ''}\n`;
+    }
+    if (completedTasks.length) {
+      prompt += `\nCompleted since then:\n`;
+      completedTasks.forEach(t => { prompt += `- ${t.title}\n`; });
+      prompt += `\nThis is mandatory, not optional: your opening_statement text must literally contain each completed item's exact title in quotes — this is the board demonstrating it remembers and noticed, not a vague "good progress." A generic "you've been busy" is NOT acceptable — name every item above.\n`;
+    } else {
+      prompt += `\nNothing has been marked done since then — a short, honest "quiet since we last met" is fine. Do not invent progress that didn't happen.\n`;
+    }
+    prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question. Never chase, never ask about outstanding or overdue items — that is handled elsewhere now; this is acknowledgment only.`;
   }
-  prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question. Never chase, never ask about outstanding or overdue items — that is handled elsewhere now; this is acknowledgment only.`;
 
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
       body: JSON.stringify({
-        advisor_id: chairAdvisor.id, company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
-        system_instructions: chairAdvisor.system_instructions, company_context: null, meeting_context: null,
+        ...chairCallFields(chair), company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
+        company_context: null, meeting_context: null,
         user_question: prompt, previous_responses: [], output_schema: CHAIR_OPENING_SCHEMA,
         temperature: 0.4, request_type: 'chair_opening', deadline_at: deadlineAt,
       }),
@@ -268,10 +285,13 @@ Deno.serve(async (req) => {
 
     const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
     const limits = limitsList?.[0] || { max_advisors_per_meeting: 5, min_advisors_per_meeting: 3, max_context_size: 8000 };
+    // Both limits count debaters: the Chair opens and resolves, and is extra.
     const minAdv = limits.min_advisors_per_meeting || 3;
-
+    const maxAdv = limits.max_advisors_per_meeting || 5;
+    // Too few ids can never make enough debaters: refused before anything
+    // is counted or looked up. The exact check, without the Chair, follows.
     if (advisor_ids.length < minAdv)
-      return Response.json({ error: `Select at least ${minAdv} advisors` }, { status: 400, headers: corsHeaders });
+      return Response.json({ error: `Select at least ${minAdv} advisors to debate` }, { status: 400, headers: corsHeaders });
 
     requireMaxLength(question, TEXT_LIMITS.question, 'The question');
     const company = await requireOwnedCompany(db, company_id, user.id, '*');
@@ -290,15 +310,14 @@ Deno.serve(async (req) => {
     ]);
     const decisions = recalled.decisions;
 
-    const selectedAdvisors = (advisors || []).filter(a => advisor_ids.includes(a.id) && a.type !== 'human');
+    // The Chair never debates, even if the browser sends her id; a board
+    // without one gets the built-in Chair for the opening and resolution.
+    const chair = findChair(advisors);
+    const selectedAdvisors = withoutChair((advisors || []).filter(a => advisor_ids.includes(a.id) && a.type !== 'human'), chair);
     if (selectedAdvisors.length < minAdv)
-      return Response.json({ error: 'Not enough AI advisors selected' }, { status: 400, headers: corsHeaders });
-    // The limit counts debaters; one Chair is extra (see Phase 1b). Only one
-    // advisor can be the Chair, however many rows claim the title.
-    const maxAdv = limits.max_advisors_per_meeting || 5;
-    const chairAllowance = selectedAdvisors.some(a => a.library_key === 'chair') ? 1 : 0;
-    if (selectedAdvisors.length - chairAllowance > maxAdv)
-      return Response.json({ error: `Select at most ${maxAdv} advisors` }, { status: 400, headers: corsHeaders });
+      return Response.json({ error: `Select at least ${minAdv} advisors to debate` }, { status: 400, headers: corsHeaders });
+    if (selectedAdvisors.length > maxAdv)
+      return Response.json({ error: `Select at most ${maxAdv} advisors to debate` }, { status: 400, headers: corsHeaders });
 
     // Claimed last, once the request is otherwise valid, so a bad request
     // never uses up or supersedes anything.
@@ -337,11 +356,6 @@ Deno.serve(async (req) => {
     // Model calls end in time for this function to save their answers.
     const deadlineAt = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
 
-    // The company's standing Chair persona, regardless of whether they were
-    // specifically selected for this debate — matches how runChairSynthesis
-    // resolves the Chair for the final resolution.
-    let chairAdvisor = (advisors || []).find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
-    if (!chairAdvisor) chairAdvisor = selectedAdvisors[0];
     // The last meeting that actually reached a resolution: an abandoned,
     // failed or superseded one never happened as far as the Chair knows.
     const previousMeeting = meetings?.[0] || null;
@@ -356,8 +370,12 @@ Deno.serve(async (req) => {
         }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
       )),
       buildChairOpening({
-        supabaseUrl, serviceKey, db, chairAdvisor, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
-        meetingId: meeting.id, newQuestion: question, previousMeeting, deadlineAt,
+        supabaseUrl, serviceKey, db, chair, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
+        meetingId: meeting.id, newQuestion: question, previousMeeting, debaterNames: selectedAdvisors.map(a => a.name), deadlineAt,
+      }).catch((e) => {
+        // The opening is never worth losing the meeting over.
+        console.error('Chair opening failed:', e.message);
+        return null;
       }),
     ]);
 

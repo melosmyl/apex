@@ -16,7 +16,7 @@ function Section({ title, items }) {
   );
 }
 
-export default function AdvisorProfileDialog({ advisor, open, onOpenChange, onAction, actionLabel, actionVariant = "default" }) {
+export default function AdvisorProfileDialog({ advisor, open, onOpenChange, onAction, actionLabel, actionVariant = "default", actionNote = null }) {
   if (!advisor) return null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,6 +50,7 @@ export default function AdvisorProfileDialog({ advisor, open, onOpenChange, onAc
             <Button variant={actionVariant} onClick={() => onAction(advisor)}>{actionLabel}</Button>
           </div>
         )}
+        {actionNote && <p className="text-sm text-muted-foreground text-right mt-6">{actionNote}</p>}
       </DialogContent>
     </Dialog>
   );

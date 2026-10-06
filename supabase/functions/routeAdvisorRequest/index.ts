@@ -65,9 +65,13 @@ Deno.serve(async (req) => {
       if (advErr || !data) return Response.json({ error: 'Advisor not found' }, { status: 404, headers: corsHeaders });
       advisor = data;
     } else {
-      // No real advisor row exists yet — used only for pre-company calls like onboarding,
-      // where the caller supplies a fixed persona inline instead of a DB-backed advisor.
+      // No advisor row: a fixed persona supplied inline by a server caller —
+      // onboarding (before any company exists) and the built-in Chair for
+      // boards without one (_shared/chair.ts). Only server functions can call
+      // this, so the persona is trusted like a row; its library_key picks up
+      // that advisor's model defaults.
       advisor = {
+        library_key: advisor_override.library_key ?? null,
         name: advisor_override.name, role: advisor_override.role,
         system_instructions: advisor_override.system_instructions, biography: advisor_override.biography,
         decision_style: advisor_override.decision_style, communication_style: advisor_override.communication_style,

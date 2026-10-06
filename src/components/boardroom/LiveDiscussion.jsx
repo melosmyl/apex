@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DiscussionMessage } from "@/components/boardroom/ExecutiveDiscussion";
 import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
 import { absenteesByRound } from "@/lib/boardroom";
+import { findChair } from "@/lib/chair";
 import { MessageSquare } from "lucide-react";
 
 const PHASE_STATUS = {
@@ -45,7 +46,8 @@ export default function LiveDiscussion({ transcript = [], advisors = [], phase, 
     return { challenges, changed };
   }, [transcript]);
 
-  const absentees = useMemo(() => absenteesByRound(transcript), [transcript]);
+  const chairName = findChair(advisors)?.name || null;
+  const absentees = useMemo(() => absenteesByRound(transcript, chairName), [transcript, chairName]);
 
   useEffect(() => {
     const el = scrollRef.current;

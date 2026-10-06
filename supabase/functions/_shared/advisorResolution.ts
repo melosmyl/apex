@@ -10,13 +10,18 @@
 // commitment to the advisor who raised it) and task-completion
 // acknowledgment (acknowledgeTaskCompletion, picking who responds when a
 // task is marked done) so both resolve identically instead of drifting.
-export function resolveAdvisor(assignedTo, advisors, participantNames) {
+import { findChair } from './chair.ts';
+
+// deno-lint-ignore no-explicit-any
+type Advisor = any;
+
+export function resolveAdvisor(assignedTo: string | null | undefined, advisors: Advisor[], participantNames?: string[] | null) {
   if (assignedTo) {
-    const exact = advisors.find((a) => a.name === assignedTo);
+    const exact = advisors.find((a: Advisor) => a.name === assignedTo);
     if (exact) return exact;
 
     const needle = assignedTo.toLowerCase();
-    const byRole = advisors.find((a) => {
+    const byRole = advisors.find((a: Advisor) => {
       const role = (a.role || '').toLowerCase();
       return role && (needle.includes(role) || role.includes(needle.split(' ')[0]));
     });
@@ -24,9 +29,8 @@ export function resolveAdvisor(assignedTo, advisors, participantNames) {
   }
 
   // Prefer whoever was actually in the meeting that produced this commitment.
-  const participant = advisors.find((a) => (participantNames || []).includes(a.name));
+  const participant = advisors.find((a: Advisor) => (participantNames || []).includes(a.name));
   if (participant) return participant;
 
-  const chair = advisors.find((a) => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
-  return chair || advisors[0] || null;
+  return findChair(advisors) || advisors[0] || null;
 }

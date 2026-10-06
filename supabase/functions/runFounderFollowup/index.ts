@@ -2,9 +2,11 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS, MAX_FOLLOWUPS_PER_MEETING } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { FOLLOWUP_SCHEMA } from '../_shared/answerSchemas.ts';
+import { findChair, withoutChair } from '../_shared/chair.ts';
 
-// Five debaters plus the Chair (startBoardMeeting enforces the same).
-const MAX_ADVISORS_PER_MEETING_WITH_CHAIR = 6;
+// At most five debaters answer (startBoardMeeting seats the same); the
+// Chair doesn't debate, here or in any round.
+const MAX_DEBATERS = 5;
 
 // Ported from base44/functions/runFounderFollowup/entry.ts — that version
 // was never deployed (Base44 SDK, dead since the migration off Base44).
@@ -93,13 +95,13 @@ Deno.serve(async (req) => {
     const chosen = meeting.participant_advisor_ids?.length ? new Set(meeting.participant_advisor_ids) : null;
     const chosenNames = new Set(meeting.participants || []);
     const seenNames = new Set();
-    const meetingAdvisors = (advisors || []).filter(a => {
+    const meetingAdvisors = withoutChair((advisors || []).filter(a => {
       if (a.type === 'human') return false;
       if (chosen) return chosen.has(a.id);
       if (!chosenNames.has(a.name) || seenNames.has(a.name)) return false;
       seenNames.add(a.name);
       return true;
-    }).slice(0, MAX_ADVISORS_PER_MEETING_WITH_CHAIR);
+    }), findChair(advisors)).slice(0, MAX_DEBATERS);
     if (!meetingAdvisors.length)
       return Response.json({ error: 'No AI advisors available for follow-up' }, { status: 400, headers: corsHeaders });
 

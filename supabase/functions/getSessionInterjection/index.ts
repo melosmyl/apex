@@ -12,6 +12,7 @@
 // pure data framing, the cheapest and lowest-risk tier of everything here.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { findChair, withoutChair } from '../_shared/chair.ts';
 import { interjectionBudgetSpent } from '../_shared/assistantCalls.ts';
 import { requireOwnedCompany, AccessError } from '../_shared/access.ts';
 
@@ -86,10 +87,12 @@ Deno.serve(async (req) => {
       const { data: alreadyDone } = await db.from('progression_node_completions').select('id').eq('node_id', boardNode.id).maybeSingle();
 
       if (!alreadyShown?.length && !alreadyDone) {
-        const { data: advisors } = await db.from('advisors').select('id, type').eq('company_id', company_id);
-        const aiCount = (advisors || []).filter((a) => a.type !== 'human').length;
+        const { data: advisors } = await db.from('advisors').select('id, type, library_key, role, created_at').eq('company_id', company_id);
+        // A full board is 3 debaters plus the Chair: the Chair doesn't count.
+        const ai = (advisors || []).filter((a) => a.type !== 'human');
+        const debaterCount = withoutChair(ai, findChair(ai)).length;
 
-        if (aiCount === 2) {
+        if (debaterCount === 2) {
           await db.from('assistant_events').insert({ user_id: user.id, company_id, event_type: 'tree_unlock_shown', progression_node_id: boardNode.id });
           return Response.json({ type: 'tree_unlock', text: "You're one advisor away from a full board that can actually debate with you." }, { headers: corsHeaders });
         }

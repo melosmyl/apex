@@ -1,6 +1,6 @@
 import { base44, supabase } from "@/api/base44Client";
 import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
-import { MAX_DEBATERS } from "@/lib/boardroom";
+import { MAX_DEBATERS, MIN_DEBATERS } from "@/lib/boardroom";
 import { buildAdvisorRecord, recommendAdvisorsHeuristic, getJourney } from "@/lib/companyJourney";
 
 const VALID_KEYS = ADVISOR_LIBRARY.map((a) => a.key);
@@ -14,8 +14,8 @@ export async function generateOnboardingPlan(answers, freeAttemptId) {
       plan.recommended_advisors = plan.recommended_advisors.filter((a) => VALID_KEYS.includes(a.key));
     }
 
-    // Fallback to heuristic if LLM returned too few advisors
-    if (!plan.recommended_advisors || plan.recommended_advisors.length < 3) {
+    // Fallback to heuristic if LLM returned too few debaters (the Chair doesn't debate)
+    if (!plan.recommended_advisors || plan.recommended_advisors.filter((a) => a.key !== "chair").length < MIN_DEBATERS) {
       const heuristic = recommendAdvisorsHeuristic(answers.stage || "idea_validation", answers.advisor_involvement);
       plan.recommended_advisors = heuristic;
       plan._used_fallback = true;

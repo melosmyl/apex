@@ -5,7 +5,7 @@ import { Sparkles, X, Plus, ArrowRight, Landmark, CheckSquare, Target, Check } f
 import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
 import { getJourney, STAGE_LABELS } from "@/lib/companyJourney";
 import { createCompanyFromOnboarding } from "@/lib/onboarding";
-import { MAX_DEBATERS } from "@/lib/boardroom";
+import { MAX_DEBATERS, MIN_DEBATERS } from "@/lib/boardroom";
 
 export default function OnboardingReview({ answers, plan, onComplete, onBack }) {
   const [advisors, setAdvisors] = useState(plan.recommended_advisors || []);
@@ -188,11 +188,11 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
         <Button onClick={onBack} variant="ghost" className="px-5" disabled={creating}>
           Back
         </Button>
-        <Button onClick={handleBegin} variant="primary" className="px-8 h-12" disabled={creating || advisors.length < 3}>
+        <Button onClick={handleBegin} variant="primary" className="px-8 h-12" disabled={creating || debaterCount < MIN_DEBATERS}>
           {creating ? "Setting up your company…" : "Begin" } {!creating && <ArrowRight className="w-4 h-4 ml-1.5" />}
         </Button>
       </div>
-      {advisors.length < 3 && <p className="text-xs text-muted-foreground text-right mt-2">A board needs at least 3 advisors.</p>}
+      {debaterCount < MIN_DEBATERS && <p className="text-xs text-muted-foreground text-right mt-2">A board needs at least {MIN_DEBATERS} advisors besides the Chair.</p>}
     </div>
   );
 }

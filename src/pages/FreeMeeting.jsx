@@ -12,6 +12,8 @@ import LegalConsentLine from "@/components/LegalConsentLine";
 import TurnstileWidget from "@/components/TurnstileWidget";
 import { useCaptcha, CAPTCHA_RETRY_MESSAGE } from "@/lib/turnstile";
 import { SITE_URL } from "@/lib/branding";
+import { findChair } from "@/lib/chair";
+import { MIN_DEBATERS } from "@/lib/boardroom";
 
 function useFreeMeetingGate() {
   const check = async () => {
@@ -114,7 +116,8 @@ export default function FreeMeeting() {
         .eq("created_by_id", me.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (existingCompany) {
         const { data: existingAdvisors } = await supabase.from("advisors").select("*").eq("company_id", existingCompany.id);
-        if ((existingAdvisors || []).filter((a) => a.type !== "human").length < 3) {
+        const chair = findChair(existingAdvisors || []);
+        if ((existingAdvisors || []).filter((a) => a.type !== "human" && a.id !== chair?.id).length < MIN_DEBATERS) {
           throw new Error("Your board didn't finish setting up. Please start again in a new private window.");
         }
         setCompany(existingCompany);
@@ -149,7 +152,7 @@ export default function FreeMeeting() {
             </div>
             <h1 className="font-display text-3xl sm:text-4xl leading-tight mb-4 text-balance">One real question. One real board meeting.</h1>
             <p className="text-muted-foreground text-base sm:text-lg leading-relaxed mb-8 max-w-md mx-auto">
-              No account, no card. Bring something you're actually stuck on — five advisors will debate it for real, and you keep the result either way.
+              No account, no card. Bring something you're actually stuck on — your board will debate it for real, and you keep the result either way.
             </p>
             <Button onClick={() => setPhase("form")} variant="primary" className="px-8 h-12">Begin <ArrowRight className="w-4 h-4 ml-1.5" /></Button>
           </div>

@@ -2,6 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { DISCUSSION_SCHEMA } from '../_shared/answerSchemas.ts';
+import { findChair, withoutChair } from '../_shared/chair.ts';
 
 // Each Round 1 entry is pasted into every advisor's prompt; bound what a
 // browser-edited entry (human perspectives) can add.
@@ -203,18 +204,23 @@ Deno.serve(async (req) => {
     claimedMeetingId = meeting.id;
     dbForRelease = db;
 
-    const independentResponses = (meeting.independent_responses || []).slice(0, MAX_ROUND1_ENTRIES);
+    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
+    // The Chair doesn't debate. A meeting started before she left the debate
+    // may still hold her Round 1 answer: it's dropped here, so she neither
+    // speaks in later rounds nor shows as absent from them.
+    const chair = findChair(advisors);
+    const independentResponses = (meeting.independent_responses || [])
+      .filter(r => !chair || r.advisor_id !== chair.id).slice(0, MAX_ROUND1_ENTRIES);
     if (!independentResponses.length)
       throw Object.assign(new Error('No independent responses found'), { status: 400 });
 
-    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
     // Only the advisors the server chose when the meeting started — never
     // whatever ids the browser-editable independent_responses list.
     const chosen = meeting.participant_advisor_ids?.length ? new Set(meeting.participant_advisor_ids) : null;
     const chosenNames = new Set(meeting.participants || []);
-    const meetingAdvisors = (advisors || []).filter(a =>
+    const meetingAdvisors = withoutChair((advisors || []).filter(a =>
       a.type !== 'human' && (chosen ? chosen.has(a.id) : chosenNames.has(a.name))
-    );
+    ), chair);
     if (!meetingAdvisors.length)
       throw Object.assign(new Error('No AI advisors available for discussion'), { status: 400 });
 

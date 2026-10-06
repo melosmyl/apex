@@ -1,17 +1,19 @@
 import { base44 } from "@/api/base44Client";
 import { CHAIR_SEAT_ORDER } from "@/components/boardroom/BoardroomBanner";
 
-// Fixed for the duration of a meeting — called once when a meeting starts
-// so an advisor never jumps seats mid-discussion. Fills centre-out
-// (CHAIR_SEAT_ORDER already carries that priority) so 3 advisors sit at
-// the head of the table and 6 fan evenly down both sides.
-// Advisors who debate in one meeting, besides the Chair. Matches
-// system_limits.max_advisors_per_meeting, which startBoardMeeting enforces.
+// Advisors who debate in one meeting, besides the Chair, and the fewest a
+// debate needs. Match system_limits, which startBoardMeeting enforces.
 export const MAX_DEBATERS = 5;
+export const MIN_DEBATERS = 3;
 
-export function assignChairs(advisors = []) {
+// Fixed for the duration of a meeting — called once when a meeting starts
+// so an advisor never jumps seats mid-discussion. The Chair takes the head
+// of the table; debaters fill centre-out from there (CHAIR_SEAT_ORDER
+// already carries that priority) and fan evenly down both sides.
+export function assignChairs(debaters = [], chair = null) {
+  const seated = chair ? [chair, ...debaters] : debaters;
   const assignment = {};
-  advisors.forEach((a, i) => {
+  seated.forEach((a, i) => {
     if (i >= CHAIR_SEAT_ORDER.length) return; // more advisors than usable chairs shouldn't happen (cap is 6 of 9)
     assignment[a.name] = CHAIR_SEAT_ORDER[i];
   });
@@ -20,9 +22,11 @@ export function assignChairs(advisors = []) {
 
 // Every attending advisor is called in every discussion round, so an advisor
 // absent from a round is one whose call failed and was dropped server-side.
-export function absenteesByRound(transcript = []) {
+// The Chair doesn't debate: a Round 1 answer from her (a meeting started
+// before she left the debate) doesn't make her expected in later rounds.
+export function absenteesByRound(transcript = [], chairName = null) {
   const attending = [...new Set(
-    transcript.filter((m) => m.round === 1 && m.advisor_name).map((m) => m.advisor_name)
+    transcript.filter((m) => m.round === 1 && m.advisor_name && m.advisor_name !== chairName).map((m) => m.advisor_name)
   )];
   if (!attending.length) return {};
 

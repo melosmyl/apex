@@ -13,6 +13,7 @@
 // stays completed. Re-running this after nothing changed is a no-op.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { findChair, withoutChair } from '../_shared/chair.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +22,11 @@ const corsHeaders = {
 
 const FACT_EVALUATORS = {
   async board_assembled(db, companyId, ownerId) {
-    const { data } = await db.from('advisors').select('id, type').eq('company_id', companyId).eq('created_by_id', ownerId);
-    return (data || []).filter((a) => a.type !== 'human').length >= 3;
+    // A board that can debate: 3 AI advisors besides the Chair, who opens
+    // and resolves but doesn't debate.
+    const { data } = await db.from('advisors').select('id, type, library_key, role, created_at').eq('company_id', companyId).eq('created_by_id', ownerId);
+    const ai = (data || []).filter((a) => a.type !== 'human');
+    return withoutChair(ai, findChair(ai)).length >= 3;
   },
   async first_debate(db, companyId, ownerId) {
     const { count } = await db.from('board_meetings').select('id', { count: 'exact', head: true }).eq('created_by_id', ownerId)

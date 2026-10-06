@@ -139,7 +139,8 @@ export function getJourney(key) {
 // Heuristic fallback if the LLM is unavailable.
 export function recommendAdvisorsHeuristic(stage, involvement = "moderate") {
   const journey = getJourney(stage);
-  const count = involvement === "light" ? 3 : involvement === "deep" ? 6 : 5;
+  // Advisors including the Chair: a "light" board is the 3-debater minimum.
+  const count = involvement === "light" ? 4 : involvement === "deep" ? 6 : 5;
   const keys = journey.recommendedAdvisorKeys.slice(0, count - 1);
   const allKeys = [...keys, "chair"];
   return allKeys.map((key) => {

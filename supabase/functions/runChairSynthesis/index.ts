@@ -3,6 +3,7 @@ import { resolveAdvisor } from '../_shared/advisorResolution.ts';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { RESOLUTION_SCHEMA } from '../_shared/answerSchemas.ts';
+import { findChair, chairCallFields } from '../_shared/chair.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
@@ -189,12 +190,9 @@ Deno.serve(async (req) => {
     const discussionTranscript = meeting.discussion_transcript || [];
 
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
-    let chairAdvisor = (advisors || []).find(a => a.library_key === 'chair' || (a.role || '').toLowerCase().includes('chair'));
-    if (!chairAdvisor) chairAdvisor = (advisors || []).find(a => a.type !== 'human');
-    if (!chairAdvisor) {
-      await db.from('board_meetings').update({ status: 'failed' }).eq('id', meeting.id).eq('status', 'synthesizing');
-      return Response.json({ error: 'No advisor available for chair synthesis' }, { status: 400, headers: corsHeaders });
-    }
+    // The board's Chair writes the resolution; a board without one gets the
+    // built-in Chair, never a debater standing in.
+    const chair = findChair(advisors);
 
     let meetingContext;
     if (discussionTranscript.length > 0) {
@@ -214,7 +212,7 @@ Deno.serve(async (req) => {
     }
 
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
-      advisor_id: chairAdvisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+      ...chairCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: CHAIR_INSTRUCTIONS, company_context: null, meeting_context: meetingContext,
       user_question: meeting.question, previous_responses: [],
       output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',

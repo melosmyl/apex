@@ -11,10 +11,15 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
 import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS } from "@/lib/boardroom";
+import { findChair, chairOrBuiltIn } from "@/lib/chair";
 import { useAssistant } from "@/lib/AssistantContext";
 
 const POLL_INTERVAL_MS = 3000;
+// How long the Chair's seat is lit at the start, while she opens. The opening
+// runs alongside Round 1 in one request, so this is shown, not tracked;
+// Phase 1b Stage 3 makes it exact.
+const CHAIR_OPENING_LIGHT_MS = 4000;
 
 function toRoundOneMessages(responses = []) {
   return responses.map((r) => ({
@@ -89,24 +94,33 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     return () => clearTimeout(t);
   }, [question, phase, companyId, interjection, checkNoteRelevance]);
 
-  const aiAdvisors = advisors.filter((a) => a.type !== "human");
+  // The Chair opens and writes the resolution; she never debates, so she's
+  // never selectable. A board without one gets the built-in Chair.
+  const boardChair = findChair(advisors);
+  const chair = chairOrBuiltIn(advisors);
+  const aiAdvisors = advisors.filter((a) => a.type !== "human" && a.id !== boardChair?.id);
   const humanAdvisors = advisors.filter((a) => a.type === "human");
 
-  // Default to the whole board, up to the server's per-meeting limit:
-  // the Chair plus at most MAX_DEBATERS others.
+  // Default to the whole board, up to the server's per-meeting limit of
+  // MAX_DEBATERS debaters.
   useEffect(() => {
-    const chair = aiAdvisors.find((a) => a.library_key === "chair");
-    const debaters = aiAdvisors.filter((a) => a !== chair).slice(0, MAX_DEBATERS);
-    setSelectedIds([...(chair ? [chair.id] : []), ...debaters.map((a) => a.id)]);
+    setSelectedIds(aiAdvisors.slice(0, MAX_DEBATERS).map((a) => a.id));
   }, [advisors]);
 
+  // While positions form: the Chair's seat lights first (she opens), then
+  // the debaters' in turn.
   useEffect(() => {
     if (phase !== "preparing" || !advisors?.length) return;
-    const participants = advisors.filter((a) => selectedIds?.includes(a.id));
+    const participants = aiAdvisors.filter((a) => selectedIds?.includes(a.id));
     if (!participants.length) return;
+    setActiveName(chair.name);
     let i = 0;
-    const t = setInterval(() => { setActiveName(participants[i % participants.length].name); i++; }, 2000);
-    return () => clearInterval(t);
+    let t;
+    const opening = setTimeout(() => {
+      setActiveName(participants[0].name);
+      t = setInterval(() => { i++; setActiveName(participants[i % participants.length].name); }, 2000);
+    }, CHAIR_OPENING_LIGHT_MS);
+    return () => { clearTimeout(opening); clearInterval(t); };
   }, [phase, advisors, selectedIds]);
 
   useEffect(() => {
@@ -161,9 +175,10 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
 
   const start = async () => {
     if (!question.trim()) return;
-    if (selectedAiAdvisors.length < 3) { setError("Select at least 3 AI advisors."); return; }
+    if (selectedAiAdvisors.length < MIN_DEBATERS) { setError(`Select at least ${MIN_DEBATERS} advisors to debate.`); return; }
+    if (selectedAiAdvisors.length > MAX_DEBATERS) { setError(`Select at most ${MAX_DEBATERS} advisors to debate.`); return; }
     setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setResolutionStartedAt(null); setChairOpening(null);
-    setSeatAssignment(assignChairs(selectedAiAdvisors));
+    setSeatAssignment(assignChairs(selectedAiAdvisors, chair));
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId });
       setPendingMeetingId(phase1.meeting_id);
@@ -193,7 +208,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   useEffect(() => {
     if (!autoStart || autoStartedRef.current) return;
     if (phase !== "idle" || !question.trim() || !selectedIds) return;
-    if (selectedAiAdvisors.length < 3) return;
+    if (selectedAiAdvisors.length < MIN_DEBATERS || selectedAiAdvisors.length > MAX_DEBATERS) return;
     autoStartedRef.current = true;
     start();
   }, [autoStart, phase, question, selectedIds, selectedAiAdvisors.length]);
@@ -226,16 +241,16 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     setResult((prev) => ({ ...prev, discussion_transcript: res.discussion_transcript }));
   };
 
-  const selectedCount = selectedIds?.length || 0;
+  const debaterCountOk = selectedAiAdvisors.length >= MIN_DEBATERS && selectedAiAdvisors.length <= MAX_DEBATERS;
 
-  // Who currently has the floor: cycling through participants while
-  // positions are being formed, then the real speaking order as the
-  // transcript grows during discussion. Resolution has no seated speaker
-  // (the Chair is synthesizing, not one of the debating advisors), so no
-  // chair lights during that phase.
+  // Who currently has the floor: the Chair opening, then debaters in turn
+  // while positions form, then the real speaking order as the transcript
+  // grows during discussion, then the Chair again while she writes the
+  // resolution.
   const activeSpeakerName =
     phase === "preparing" ? activeName :
     phase === "discussion" && liveTranscript.length ? liveTranscript[liveTranscript.length - 1].advisor_name :
+    phase === "resolution" ? chair.name :
     null;
   const activeChairId = activeSpeakerName ? seatAssignment[activeSpeakerName] : null;
 
@@ -244,15 +259,15 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   // handover is a pure opacity crossfade with nothing to swap mid-fade.
   const chairLabels = {};
   for (const [name, chairId] of Object.entries(seatAssignment)) {
-    const advisor = advisors.find((a) => a.name === name);
+    const advisor = name === chair.name ? chair : advisors.find((a) => a.name === name);
     if (advisor) chairLabels[chairId] = { name: advisor.name, role: advisor.role };
   }
 
-  if (aiAdvisors.length < 3 && phase === "idle") {
+  if (aiAdvisors.length < MIN_DEBATERS && phase === "idle") {
     return (
       <EmptyState
         title="Convene at least three advisors"
-        description="A board debate needs differing perspectives. Invite at least three AI advisors to your executive team."
+        description="A board debate needs differing perspectives. Invite at least three AI advisors to your executive team, besides the Chair."
         action={<Button onClick={() => navigate(`/company/${companyId}/team`)} variant="primary" className="px-6">Go to Executive Team</Button>}
       />
     );
@@ -279,10 +294,11 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
           className="h-[200px] sm:h-[280px] rounded-2xl mb-6 rise-in"
         />
         <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
-          <AdvisorSelectionRow advisors={advisors} selectedIds={selectedIds || []} onToggle={toggleAdvisor} />
+          <AdvisorSelectionRow advisors={[...aiAdvisors, ...humanAdvisors]} selectedIds={selectedIds || []} onToggle={toggleAdvisor} chair={chair} />
           <p className="text-center text-xs text-muted-foreground mt-4">
-            {selectedCount} attending · {selectedAiAdvisors.length} AI{selectedHumanAdvisors.length > 0 && `, ${selectedHumanAdvisors.length} human`}
-            {selectedAiAdvisors.length < 3 && " · At least 3 AI advisors required"}
+            {selectedAiAdvisors.length} debating{selectedHumanAdvisors.length > 0 && `, ${selectedHumanAdvisors.length} human`}
+            {selectedAiAdvisors.length < MIN_DEBATERS && ` · At least ${MIN_DEBATERS} AI advisors must debate`}
+            {selectedAiAdvisors.length > MAX_DEBATERS && ` · At most ${MAX_DEBATERS} can debate`}
           </p>
           {error && <p className="text-center text-sm text-destructive mt-2">{error}</p>}
           <div className="max-w-xl mx-auto mt-8">
@@ -296,7 +312,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
                     <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
                   ))}
                 </div>
-                <Button onClick={start} disabled={!question.trim() || selectedAiAdvisors.length < 3} variant="primary" className="w-full mt-4 h-11">
+                <Button onClick={start} disabled={!question.trim() || !debaterCountOk} variant="primary" className="w-full mt-4 h-11">
                   <Landmark className="w-4 h-4 mr-2" /> Start Board Debate
                 </Button>
               </>
@@ -309,7 +325,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
                       <span className="font-display text-lg">{PHASE_MESSAGES[phase]}</span>
                     </div>
                     {phase === "preparing" && activeName && (
-                      <p className="text-sm text-muted-foreground mt-2">{activeName} is evaluating…</p>
+                      <p className="text-sm text-muted-foreground mt-2">{activeName === chair.name ? `${chair.name} is opening the meeting…` : `${activeName} is evaluating…`}</p>
                     )}
                   </>
                 )}
@@ -330,7 +346,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         <p className="font-display text-xl max-w-2xl">"{question}"</p>
         <Button variant="secondaryOutline" className="shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); setSeatAssignment({}); }}>New question</Button>
       </div>
-      <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id))} companyId={companyId} onRecordDecision={isAnonymous ? undefined : recordDecision} onFollowup={isAnonymous ? undefined : handleFollowup} isAnonymous={isAnonymous} />
+      <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id) || a.id === boardChair?.id)} companyId={companyId} onRecordDecision={isAnonymous ? undefined : recordDecision} onFollowup={isAnonymous ? undefined : handleFollowup} isAnonymous={isAnonymous} />
     </div>
   );
 }

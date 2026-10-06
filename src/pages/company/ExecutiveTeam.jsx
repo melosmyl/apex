@@ -11,10 +11,13 @@ import AddAdvisorDialog from "@/components/team/AddAdvisorDialog";
 import { ADVISOR_PROVIDER_CONFIG } from "@/lib/advisorLibrary";
 import InvitePersonDialog from "@/components/team/InvitePersonDialog";
 import AdvisorProfileDialog from "@/components/team/AdvisorProfileDialog";
+import { findChair } from "@/lib/chair";
 
 // Hard cap while pricing and packaging are undecided — every advisor turn is
 // a real API call. Extra slots show as "coming soon", not a paid upgrade.
 const MAX_AI_ADVISORS = 6;
+// The Chair opens every meeting and writes its resolution, so she stays.
+const CHAIR_STAYS = "The Chair runs every meeting and can't be removed.";
 
 export default function ExecutiveTeam() {
   const { companyId } = useParams();
@@ -69,6 +72,7 @@ export default function ExecutiveTeam() {
   };
 
   const existingKeys = (advisors || []).map((a) => a.library_key);
+  const chair = findChair(advisors || []);
 
   return (
     <div>
@@ -96,7 +100,9 @@ export default function ExecutiveTeam() {
             <div key={a.id} className="group bg-card border border-border/70 rounded-2xl p-5 hover:shadow-lg transition-all rise-in cursor-pointer" onClick={() => setSelected(a)}>
                 <div className="flex items-start justify-between mb-3">
                   <AdvisorAvatar name={a.name} accent={a.accent} size="lg" />
-                  <button onClick={(e) => {e.stopPropagation();remove(a);}} className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"><Trash2 className="w-4 h-4" /></button>
+                  {a.id === chair?.id ?
+                  <Badge variant="secondary" className="text-[10px] font-normal" title={CHAIR_STAYS}>Chair</Badge> :
+                  <button onClick={(e) => {e.stopPropagation();remove(a);}} aria-label={`Remove ${a.name}`} className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive transition-all"><Trash2 className="w-4 h-4" /></button>}
                 </div>
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="font-display text-lg">{a.name}</h3>
@@ -112,7 +118,8 @@ export default function ExecutiveTeam() {
       <AddAdvisorDialog open={addOpen} onOpenChange={setAddOpen} existingKeys={existingKeys} onAdd={addAdvisor} atCap={atCap} maxAdvisors={MAX_AI_ADVISORS} />
       <InvitePersonDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={invitePerson} />
       <AdvisorProfileDialog advisor={selected} open={!!selected} onOpenChange={(o) => !o && setSelected(null)}
-      onAction={remove} actionLabel="Remove from team" actionVariant="destructive" />
+      onAction={selected?.id === chair?.id ? undefined : remove} actionLabel="Remove from team" actionVariant="destructive"
+      actionNote={selected?.id === chair?.id ? CHAIR_STAYS : null} />
     </div>);
 
 }

@@ -3,6 +3,7 @@ import AdvisorAvatar from "@/components/AdvisorAvatar";
 import PinnableText from "@/components/pins/PinnableText";
 import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
 import { absenteesByRound } from "@/lib/boardroom";
+import { findChair } from "@/lib/chair";
 import { usePin } from "@/components/pins/PinContext";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { ChevronDown, ChevronUp, MessageSquare, CornerDownRight, RefreshCw, AlertTriangle, Volume2, Square } from "lucide-react";
@@ -219,7 +220,8 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
     return { rounds: rounds.length, messages: transcript.length, challenges, changed };
   }, [transcript, rounds]);
 
-  const absentees = useMemo(() => absenteesByRound(transcript), [transcript]);
+  const chairName = findChair(advisors)?.name || null;
+  const absentees = useMemo(() => absenteesByRound(transcript, chairName), [transcript, chairName]);
 
   if (!transcript.length) return null;
 
