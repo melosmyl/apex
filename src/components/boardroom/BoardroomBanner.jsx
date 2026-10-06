@@ -1,5 +1,6 @@
 import React from "react";
 import boardroomImage from "@/assets/boardroom/boardroom-bw.jpg";
+import { portraitFor } from "@/lib/portraits";
 
 // Pixel coordinates traced against the source image's native size
 // (1672x941) — every path below is only valid for this exact photograph.
@@ -51,7 +52,7 @@ const CROSSFADE_MS = 550;
 
 /**
  * activeChairId: id from CHAIRS currently holding the floor, or null.
- * chairLabels: { [chairId]: { name, role } } for every seated advisor —
+ * chairLabels: { [chairId]: { name, role, libraryKey } } for every seated advisor —
  *   fixed for the whole meeting (seats don't change speaker), not just the
  *   currently active one. Passing the full map rather than a single label
  *   is what makes the crossfade a pure opacity transition: every chair's
@@ -134,21 +135,38 @@ export default function BoardroomBanner({
         {CHAIRS.filter((c) => chairLabels[c.id]).map((c) => {
           const label = chairLabels[c.id];
           const opacity = c.id === activeChairId ? 0.92 : 0;
+          // The speaker's portrait sits above their name tag; custom advisors
+          // and people have no portrait, just the name.
+          const portrait = portraitFor({ libraryKey: label.libraryKey, name: label.name });
+          const { x, y } = TAG_ANCHOR[c.id];
           return (
+            <g key={c.id} style={{ opacity, transition: `opacity ${CROSSFADE_MS}ms ease` }}>
+              {portrait && (
+                <>
+                  <clipPath id={`tag-portrait-${c.id}`}>
+                    <circle cx={x} cy={y - 58} r="34" />
+                  </clipPath>
+                  <image
+                    href={portrait.avatar2x}
+                    x={x - 34}
+                    y={y - 92}
+                    width="68"
+                    height="68"
+                    clipPath={`url(#tag-portrait-${c.id})`}
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                  <circle cx={x} cy={y - 58} r="34" fill="none" stroke="hsl(var(--brand))" strokeWidth="2" />
+                </>
+              )}
             <text
-              key={c.id}
-              x={TAG_ANCHOR[c.id].x}
-              y={TAG_ANCHOR[c.id].y}
+              x={x}
+              y={y}
               textAnchor={TAG_ANCHOR[c.id].align}
               fontFamily="var(--font-mono)"
               fontSize="15"
               letterSpacing="1.5"
               fill="hsl(40 20% 92%)"
-              style={{
-                textTransform: "uppercase",
-                opacity,
-                transition: `opacity ${CROSSFADE_MS}ms ease`,
-              }}
+              style={{ textTransform: "uppercase" }}
             >
               {label.name}
               {label.role ? (
@@ -157,6 +175,7 @@ export default function BoardroomBanner({
                 </tspan>
               ) : null}
             </text>
+            </g>
           );
         })}
       </svg>

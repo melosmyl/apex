@@ -71,7 +71,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
           {reviews.map(({ advisor, result }, i) => (
             <div key={i} className="bg-card border border-border/70 rounded-2xl p-6 rise-in">
               <div className="flex items-center gap-3 mb-5">
-                <AdvisorAvatar name={advisor.name} accent={advisor.accent} photo_url={advisor.avatar} size="md" />
+                <AdvisorAvatar name={advisor.name} accent={advisor.accent} libraryKey={advisor.library_key} size="md" />
                 <div>
                   <div className="font-medium">{advisor.name}</div>
                   <div className="text-xs text-muted-foreground">{advisor.role}</div>
@@ -149,7 +149,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
         <div className="flex flex-wrap gap-2">
           {advisors.map((a) => (
             <button key={a.id} onClick={() => toggleAdvisor(a)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${selectedAdvisors.some((x) => x.id === a.id) ? "border-brand bg-brand-soft" : "border-border/70 bg-card hover:border-border"}`}>
-              <AdvisorAvatar name={a.name} accent={a.accent} photo_url={a.avatar} size="sm" />
+              <AdvisorAvatar name={a.name} accent={a.accent} libraryKey={a.library_key} size="sm" />
               <span className="text-sm">{a.name}</span>
             </button>
           ))}

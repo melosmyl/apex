@@ -126,7 +126,7 @@ export default function WorkingSession({ company, companyId, advisors }) {
             <div className="flex flex-wrap gap-2">
               {advisors.map((a) => (
                 <button key={a.id} onClick={() => toggleAdvisor(a)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${selectedAdvisors.some((x) => x.id === a.id) ? "border-brand bg-brand-soft" : "border-border/70 bg-card hover:border-border"}`}>
-                  <AdvisorAvatar name={a.name} accent={a.accent} photo_url={a.avatar} size="sm" />
+                  <AdvisorAvatar name={a.name} accent={a.accent} libraryKey={a.library_key} size="sm" />
                   <span className="text-sm">{a.name}</span>
                 </button>
               ))}

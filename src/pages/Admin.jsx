@@ -139,7 +139,7 @@ export default function Admin() {
           {advisors.map(a => (
             <div key={a.id} className="bg-card border border-border/70 rounded-2xl p-4">
               <div className="flex items-center gap-3 mb-3">
-                <AdvisorAvatar name={a.name} accent={a.accent} size="sm" />
+                <AdvisorAvatar name={a.name} libraryKey={a.library_key} accent={a.accent} size="sm" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm">{a.name}</span>

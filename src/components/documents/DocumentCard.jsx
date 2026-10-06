@@ -67,7 +67,7 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
         </div>
         <div className="hidden lg:flex items-center gap-1.5 w-28 shrink-0">
           {doc.created_by_advisor_id && advisor ? (
-            <AdvisorAvatar name={advisor.name} accent={advisor.accent} size="xs" />
+            <AdvisorAvatar name={advisor.name} libraryKey={advisor.library_key} accent={advisor.accent} size="xs" />
           ) : (
             <User className="w-3 h-3 text-muted-foreground" />
           )}
@@ -134,7 +134,7 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5 min-w-0">
           {doc.created_by_advisor_id && advisor ? (
-            <AdvisorAvatar name={advisor.name} accent={advisor.accent} size="xs" />
+            <AdvisorAvatar name={advisor.name} libraryKey={advisor.library_key} accent={advisor.accent} size="xs" />
           ) : (
             <User className="w-3 h-3" />
           )}

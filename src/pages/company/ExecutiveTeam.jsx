@@ -99,7 +99,7 @@ export default function ExecutiveTeam() {
           {advisors.map((a) => (
             <div key={a.id} className="group bg-card border border-border/70 rounded-2xl p-5 hover:shadow-lg transition-all rise-in cursor-pointer" onClick={() => setSelected(a)}>
                 <div className="flex items-start justify-between mb-3">
-                  <AdvisorAvatar name={a.name} accent={a.accent} size="lg" />
+                  <AdvisorAvatar name={a.name} libraryKey={a.library_key} accent={a.accent} size="lg" />
                   {a.id === chair?.id ?
                   <Badge variant="secondary" className="text-[10px] font-normal" title={CHAIR_STAYS}>Chair</Badge> :
                   <button onClick={(e) => {e.stopPropagation();remove(a);}} aria-label={`Remove ${a.name}`} className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-destructive transition-all"><Trash2 className="w-4 h-4" /></button>}

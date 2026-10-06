@@ -215,7 +215,7 @@ export default function DocumentDetailDialog({
         <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground py-2 border-y border-border/50">
           {advisor && (
             <div className="flex items-center gap-1.5">
-              <AdvisorAvatar name={advisor.name} accent={advisor.accent} size="xs" />
+              <AdvisorAvatar name={advisor.name} libraryKey={advisor.library_key} accent={advisor.accent} size="xs" />
               <span>{advisor.name}</span>
             </div>
           )}

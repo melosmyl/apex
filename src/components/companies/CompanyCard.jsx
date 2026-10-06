@@ -101,7 +101,7 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
           <div className="flex items-center gap-1.5 min-w-0">
             {seats.map((a, i) =>
               a ? (
-                <AdvisorAvatar key={a.id || i} name={a.name} size="sm" />
+                <AdvisorAvatar key={a.id || i} name={a.name} libraryKey={a.library_key} size="sm" />
               ) : (
                 <AdvisorAvatar key={`empty-${i}`} empty size="sm" />
               )

@@ -22,7 +22,7 @@ export default function AdvisorProfileDialog({ advisor, open, onOpenChange, onAc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <div className="flex items-center gap-4 mb-5">
-          <AdvisorAvatar name={advisor.name} accent={advisor.accent} size="xl" />
+          <AdvisorAvatar name={advisor.name} libraryKey={advisor.library_key} accent={advisor.accent} size="xl" />
           <div>
             <h2 className="font-display text-2xl">{advisor.name}</h2>
             <p className="text-muted-foreground">{advisor.role}</p>

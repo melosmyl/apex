@@ -97,7 +97,7 @@ export default function PinCard({ pin, advisor, onEdit, onViewContext, onConvert
       {/* Footer: source, advisor, date */}
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground pt-2 border-t border-border/40">
         <div className="flex items-center gap-1.5 min-w-0">
-          {advisor && <AdvisorAvatar name={advisor.name} accent={advisor.accent} size="xs" />}
+          {advisor && <AdvisorAvatar name={advisor.name} libraryKey={advisor.library_key} accent={advisor.accent} size="xs" />}
           <button onClick={() => onViewContext?.(pin)} className="truncate hover:text-foreground transition-colors flex items-center gap-1">
             <ExternalLink className="w-3 h-3 shrink-0" />
             <span className="truncate">{SOURCE_TYPE_LABELS[pin.source_type] || pin.source_type}</span>

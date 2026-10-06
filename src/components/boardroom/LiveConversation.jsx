@@ -144,7 +144,7 @@ export default function LiveConversation({ company, companyId, advisors }) {
                   <AdvisorAvatar
                     name={advisor.name}
                     accent={advisor.accent}
-                    photo_url={advisor.avatar}
+                    libraryKey={advisor.library_key}
                     size="md"
                   />
                   <p className="font-display text-xs font-medium mt-2 text-center leading-tight">{advisor.name}</p>

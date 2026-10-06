@@ -127,7 +127,7 @@ export default function VoiceMeetingScreen({
                   <AdvisorAvatar
                     name={currentSpeaker.name}
                     accent={currentSpeaker.accent || "#7a5c3e"}
-                    photo_url={currentSpeaker.avatar}
+                    libraryKey={currentSpeaker.library_key}
                     size="xl"
                   />
                   {isSpeaking && (

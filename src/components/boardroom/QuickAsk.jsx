@@ -39,7 +39,7 @@ export default function QuickAsk({ company, companyId, advisors, initialQuestion
       <div>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <AdvisorAvatar name={selectedAdvisor?.name} accent={selectedAdvisor?.accent} photo_url={selectedAdvisor?.avatar} size="md" />
+            <AdvisorAvatar name={selectedAdvisor?.name} accent={selectedAdvisor?.accent} libraryKey={selectedAdvisor?.library_key} size="md" />
             <div>
               <div className="font-medium">{selectedAdvisor?.name}</div>
               <div className="text-xs text-muted-foreground">{selectedAdvisor?.role}</div>
@@ -89,7 +89,7 @@ export default function QuickAsk({ company, companyId, advisors, initialQuestion
                 selectedAdvisor?.id === a.id ? "border-brand bg-brand-soft" : "border-border/70 bg-card hover:border-border"
               }`}
             >
-              <AdvisorAvatar name={a.name} accent={a.accent} photo_url={a.avatar} size="sm" />
+              <AdvisorAvatar name={a.name} accent={a.accent} libraryKey={a.library_key} size="sm" />
               <span className="text-sm">{a.name}</span>
             </button>
           ))}

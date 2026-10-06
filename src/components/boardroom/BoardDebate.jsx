@@ -260,7 +260,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const chairLabels = {};
   for (const [name, chairId] of Object.entries(seatAssignment)) {
     const advisor = name === chair.name ? chair : advisors.find((a) => a.name === name);
-    if (advisor) chairLabels[chairId] = { name: advisor.name, role: advisor.role };
+    if (advisor) chairLabels[chairId] = { name: advisor.name, role: advisor.role, libraryKey: advisor.library_key };
   }
 
   if (aiAdvisors.length < MIN_DEBATERS && phase === "idle") {

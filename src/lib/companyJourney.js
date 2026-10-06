@@ -175,7 +175,8 @@ export function buildAdvisorRecord(key, companyId) {
     personality_traits: lib.personality_traits,
     ...characterFields(lib),
     system_instructions: config.system_instructions || "",
-    avatar: lib.photo_url || "",
+    // Portraits are found by library key (src/lib/portraits.js), not stored per row.
+    avatar: "",
     accent: lib.accent || "#7a5c3e",
     is_premium: config.is_premium || false,
     default_provider: config.default_provider || "openai",

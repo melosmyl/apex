@@ -15,7 +15,7 @@ export default function ParticipantCard({ advisor, isActive, isSpeaking, isMuted
         <AdvisorAvatar
           name={advisor.name}
           accent={advisor.accent || "#7a5c3e"}
-          photo_url={advisor.avatar}
+          libraryKey={advisor.library_key}
           size="lg"
           className={isSpeaking ? "ring-2 ring-brand ring-offset-2 ring-offset-card" : ""}
         />

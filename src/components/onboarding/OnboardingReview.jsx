@@ -92,7 +92,7 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
             <div className="grid sm:grid-cols-2 gap-2">
               {availableToAdd.map((a) => (
                 <button key={a.key} onClick={() => addAdvisor(a)} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent/50 transition-colors text-left">
-                  <AdvisorAvatar name={a.name} accent={a.accent} photo_url={a.photo_url} size="sm" />
+                  <AdvisorAvatar name={a.name} accent={a.accent} libraryKey={a.key} size="sm" />
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">{a.name}</div>
                     <div className="text-xs text-muted-foreground truncate">{a.role}</div>
@@ -109,7 +109,7 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
             const lib = ADVISOR_LIBRARY.find((la) => la.key === a.key);
             return (
               <div key={a.key} className="bg-card border border-border/70 rounded-2xl p-4 flex items-start gap-4 group rise-in">
-                <AdvisorAvatar name={a.name} accent={lib?.accent || "#7a5c3e"} photo_url={lib?.photo_url} size="md" />
+                <AdvisorAvatar name={a.name} accent={lib?.accent || "#7a5c3e"} libraryKey={lib?.key} size="md" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{a.name}</span>

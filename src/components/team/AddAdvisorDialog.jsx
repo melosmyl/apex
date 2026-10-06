@@ -31,7 +31,7 @@ export default function AddAdvisorDialog({ open, onOpenChange, existingKeys = []
             const on = existingKeys.includes(a.key);
             return (
               <div key={a.key} className="flex items-center gap-3 border border-border/70 rounded-xl p-3">
-                <AdvisorAvatar name={a.name} accent={a.accent} size="md" />
+                <AdvisorAvatar name={a.name} libraryKey={a.key} accent={a.accent} size="md" />
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-sm truncate">{a.name}</div>
                   <div className="text-xs text-muted-foreground truncate">{a.role}</div>
