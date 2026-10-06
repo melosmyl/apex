@@ -5,23 +5,25 @@
 // deno-lint-ignore-file no-explicit-any
 const PORT = 54399;
 const script: Record<string, string[]> = { anthropic: [], openai: [] };
+// Advisors (by name) who mention their book whenever it's offered to them.
+let mentionBy: string[] = [];
 const log: any[] = [];
 
-function sample(s: any, key = ''): any {
+function sample(s: any, key = '', book = ''): any {
   if (!s || typeof s !== 'object') return null;
   if (Array.isArray(s.enum)) return key === 'profile_field' ? 'business_model' : s.enum.find((e: any) => e !== null);
   const type = Array.isArray(s.type) ? s.type.find((t: string) => t !== 'null') : s.type;
   if (type === 'object' || s.properties) {
     const o: any = {};
-    for (const [k, v] of Object.entries(s.properties || {})) o[k] = sample(v, k);
+    for (const [k, v] of Object.entries(s.properties || {})) o[k] = sample(v, k, book);
     return o;
   }
-  if (type === 'array') return [sample(s.items, key)];
+  if (type === 'array') return [sample(s.items, key, book)];
   if (type === 'number' || type === 'integer') return 72;
   if (type === 'boolean') return key === 'answerable';
   if (key === 'assigned_to') return 'Founder';
   if (key === 'reply_to_advisor' || key === 'agrees_with' || key === 'new_position' || key === 'minority_opinion') return '';
-  return `fake ${key || 'text'}`;
+  return `fake ${key || 'text'}${book && (key === 'position' || key === 'message') ? ` — as ${book} taught me` : ''}`;
 }
 
 function pastedSchema(text: string) {
@@ -31,16 +33,27 @@ function pastedSchema(text: string) {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Who is speaking, whether their personal details were offered, and the book
+// to mention if they're scripted to.
+function speaker(system: string) {
+  const who = system.match(/You are ([^,.]+)[,.]/)?.[1] || '';
+  const offered = system.includes('Off the clock');
+  const book = offered && mentionBy.includes(who) ? (system.match(/\nBook: ([^,.\n]+)/)?.[1] || '') : '';
+  // Mug lettering uses curly quotes, which no prompt text should contain.
+  return { who, offered, book, mugQuote: system.includes('“') };
+}
+
 const sse = (e: any) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`;
 
 async function anthropic(body: any): Promise<Response> {
   const mode = script.anthropic.shift() || 'ok';
   const schema = body.output_config?.format?.schema ?? pastedSchema(String(body.system));
-  log.push({ provider: 'anthropic', mode, model: body.model, max_tokens: body.max_tokens, thinking: body.thinking, effort: body.output_config?.effort,
+  const sp = speaker(String(body.system));
+  log.push({ provider: 'anthropic', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, thinking: body.thinking, effort: body.output_config?.effort,
     native: !!body.output_config?.format, pasted: String(body.system).includes('JSON structure'), temperature: body.temperature, stream: body.stream });
   if (mode === 'overload529') return Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 529, headers: { 'retry-after': '1' } });
   if (mode === 'reject400') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'output_config.format.schema: unsupported' } }, { status: 400 });
-  const answer = JSON.stringify(sample(schema));
+  const answer = JSON.stringify(sample(schema, '', sp.book));
   const input = Math.ceil((String(body.system).length + JSON.stringify(body.messages).length) / 4);
   const enc = new TextEncoder();
   const stream = new ReadableStream({
@@ -74,9 +87,10 @@ function openai(body: any): Response {
   const mode = script.openai.shift() || 'ok';
   const rf = body.response_format;
   const schema = rf?.type === 'json_schema' ? rf.json_schema.schema : pastedSchema(String(body.messages?.[0]?.content));
-  log.push({ provider: 'openai', mode, model: body.model, max_tokens: body.max_tokens, format: rf?.type, strict: rf?.json_schema?.strict, temperature: body.temperature });
+  const sp = speaker(String(body.messages?.[0]?.content));
+  log.push({ provider: 'openai', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, format: rf?.type, strict: rf?.json_schema?.strict, temperature: body.temperature });
   if (mode === 'overload529') return Response.json({ error: { message: 'busy', type: 'server_error' } }, { status: 503 });
-  const content = mode === 'refusal' ? null : JSON.stringify(sample(schema));
+  const content = mode === 'refusal' ? null : JSON.stringify(sample(schema, '', sp.book));
   return Response.json({
     choices: [{ message: { content, refusal: mode === 'refusal' ? 'fake refusal' : null }, finish_reason: 'stop' }],
     usage: { prompt_tokens: Math.ceil(JSON.stringify(body.messages).length / 4), completion_tokens: Math.ceil((content || '').length / 4) },
@@ -85,7 +99,7 @@ function openai(body: any): Response {
 
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
-  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; log.length = 0; return Response.json({ ok: true }); }
+  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; log.length = 0; return Response.json({ ok: true }); }
   if (url.pathname === '/__log') return Response.json(log);
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);

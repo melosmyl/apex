@@ -1,6 +1,7 @@
 // Workstream K2: the advisor personas. Guards what the character sheet's
 // house rules forbid, and keeps the server's built-in Chair identical to the
 // library's Chair.
+// deno-lint-ignore-file no-explicit-any
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { ADVISOR_LIBRARY, ADVISOR_PROVIDER_CONFIG } from '../../../src/lib/advisorLibrary.js';
 import { BUILT_IN_CHAIR } from './chair.ts';
@@ -35,6 +36,21 @@ Deno.test('the built-in Chair is the library Chair, word for word', () => {
   assertEquals(BUILT_IN_CHAIR.strengths, lib.strengths);
   assertEquals(BUILT_IN_CHAIR.weaknesses, lib.weaknesses);
   assertEquals([BUILT_IN_CHAIR.default_provider, BUILT_IN_CHAIR.default_model], [cfg.default_provider, cfg.default_model]);
+});
+
+Deno.test('every library advisor has the character-sheet details (K3), within the house rules', () => {
+  for (const a of ADVISOR_LIBRARY as Record<string, any>[]) {
+    for (const f of ['voice_line', 'argues_for', 'book', 'hobby', 'favourite_place', 'mug']) {
+      assert(typeof a[f] === 'string' && a[f].trim().length > 1, `${a.key}: ${f} is missing`);
+      assert(!FORBIDDEN.test(a[f]), `${a.key}: ${f} breaks a house rule: ${a[f].match(FORBIDDEN)?.[0]}`);
+    }
+    assert(Array.isArray(a.personal_detail_terms) && a.personal_detail_terms.length >= 2, `${a.key}: needs detail terms`);
+  }
+});
+
+Deno.test("the built-in Chair carries the library Chair's personal details", () => {
+  const lib = ADVISOR_LIBRARY.find((a) => a.key === 'chair') as Record<string, any>;
+  assertEquals([BUILT_IN_CHAIR.book, BUILT_IN_CHAIR.hobby, BUILT_IN_CHAIR.favourite_place], [lib.book, lib.hobby, lib.favourite_place]);
 });
 
 Deno.test("the Chair's persona keeps her out of the debate", () => {

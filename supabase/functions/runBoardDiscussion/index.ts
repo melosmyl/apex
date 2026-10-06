@@ -3,6 +3,7 @@ import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { DISCUSSION_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair } from '../_shared/chair.ts';
+import { usedPersonalDetail, ownWords } from '../_shared/personalDetails.ts';
 
 // Each Round 1 entry is pasted into every advisor's prompt; bound what a
 // browser-edited entry (human perspectives) can add.
@@ -274,6 +275,8 @@ Deno.serve(async (req) => {
           system_instructions: null, company_context: null, meeting_context: meetingContext,
           user_question: meeting.question, previous_responses: [], output_schema: DISCUSSION_SCHEMA,
           temperature: advisor.temperature, request_type: `discussion_round_${round}`, deadline_at: roundDeadline,
+          // Their book, hobby or place stay on offer until they've used one.
+          personal_details: !usedPersonalDetail(advisor, ownWords(advisor, independentResponses, transcript)),
         }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }));
       }));
 

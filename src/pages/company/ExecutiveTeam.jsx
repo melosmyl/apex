@@ -8,7 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import AddAdvisorDialog from "@/components/team/AddAdvisorDialog";
-import { ADVISOR_PROVIDER_CONFIG } from "@/lib/advisorLibrary";
+import { ADVISOR_PROVIDER_CONFIG, characterFields } from "@/lib/advisorLibrary";
 import InvitePersonDialog from "@/components/team/InvitePersonDialog";
 import AdvisorProfileDialog from "@/components/team/AdvisorProfileDialog";
 import { findChair } from "@/lib/chair";
@@ -49,7 +49,7 @@ export default function ExecutiveTeam() {
       company_id: companyId, library_key: lib.key, name: lib.name, role: lib.role,
       biography: lib.biography, short_bio: lib.biography, decision_style: lib.decision_style, communication_style: lib.communication_style,
       strengths: lib.strengths, weaknesses: lib.weaknesses, blind_spots: lib.weaknesses, expertise: lib.expertise,
-      personality_traits: lib.personality_traits, accent: lib.accent,
+      personality_traits: lib.personality_traits, accent: lib.accent, ...characterFields(lib),
       system_instructions: config.system_instructions,
       default_provider: config.default_provider || "openai", default_model: config.default_model || "gpt-4o",
       fallback_provider: config.fallback_provider, fallback_model: config.fallback_model,

@@ -3,6 +3,8 @@
 // copy that had drifted: no length caps, no meeting context. The answer
 // shape isn't part of it: llmCall either enforces it natively or appends it.
 
+import { hasPersonalDetails, personalDetailsNote } from './personalDetails.ts';
+
 // deno-lint-ignore no-explicit-any
 type Advisor = any;
 
@@ -12,12 +14,13 @@ const cap = (v: unknown, n: number) => String(v ?? '').slice(0, n);
 const capList = (list: unknown) => (Array.isArray(list) ? list : []).slice(0, 12).map((x) => cap(x, 200));
 
 export function buildSystemPrompt(advisor: Advisor, customInstructions: string | null | undefined,
-  companyContext: string | null | undefined, meetingContext: string | null | undefined) {
+  companyContext: string | null | undefined, meetingContext: string | null | undefined, offerPersonalDetails = false) {
   const instructions = cap(customInstructions || advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`, 6000);
   let prompt = `You are ${cap(advisor.name, 100)}, ${cap(advisor.role, 100)}.\n\n${instructions}\n\nDecision style: ${cap(advisor.decision_style || 'Analytical', 300)}.\nCommunication style: ${cap(advisor.communication_style || 'Direct and professional', 300)}.\nStrengths: ${capList(advisor.strengths).join(', ')}.\nBlind spots: ${capList(advisor.blind_spots || advisor.weaknesses).join(', ')}.\n\n`;
   // Backstops, well above what any caller builds today.
   if (companyContext) prompt += `Company Context:\n${cap(companyContext, 40000)}\n\n`;
   if (meetingContext) prompt += `Meeting Context:\n${cap(meetingContext, 150000)}\n\n`;
+  if (offerPersonalDetails && hasPersonalDetails(advisor)) prompt += `${cap(personalDetailsNote(advisor), 1500)}\n\n`;
   prompt += `You must respond with ONLY valid JSON. Do not include any text outside the JSON object.`;
   return prompt;
 }

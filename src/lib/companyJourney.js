@@ -1,4 +1,4 @@
-import { ADVISOR_LIBRARY, ADVISOR_PROVIDER_CONFIG } from "@/lib/advisorLibrary";
+import { ADVISOR_LIBRARY, ADVISOR_PROVIDER_CONFIG, characterFields } from "@/lib/advisorLibrary";
 
 // Stage-based company journeys — each guides without becoming a rigid checklist.
 export const COMPANY_JOURNEYS = [
@@ -173,6 +173,7 @@ export function buildAdvisorRecord(key, companyId) {
     weaknesses: lib.weaknesses || [],
     blind_spots: lib.weaknesses || [],
     personality_traits: lib.personality_traits,
+    ...characterFields(lib),
     system_instructions: config.system_instructions || "",
     avatar: lib.photo_url || "",
     accent: lib.accent || "#7a5c3e",

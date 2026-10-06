@@ -158,12 +158,16 @@ function templatedCompletedRecap(completedTasks) {
 // avoids two voices nagging about the same thing. This opening now stays
 // pure recap and acknowledgment — the continuity differentiator made
 // visible ("the board remembers"), never a chase.
+// She doesn't know the time of day, and the board speaks next, not the founder.
+const OPENING_WORDING = `Don't greet with a time of day ("good morning", "good evening"). When you hand over, hand over to the board, not to the founder.`;
+
 function firstMeetingWelcomePrompt(company, newQuestion, debaterNames) {
   let prompt = `You are opening the very first board meeting for ${company.name || 'this company'}, before the board addresses the founder's question.\n\n`;
   prompt += `The founder's question: "${newQuestion}"\n`;
   prompt += `The advisors at the table: ${debaterNames.join(', ')}.\n\n`;
   prompt += `In 2-3 sentences, in your own voice as Chair: welcome the founder, name the question in a few words, introduce the advisors by name, and say how the meeting runs — each advisor first answers independently, then they discuss and challenge each other over a few rounds, and you close with the board's resolution.\n`;
-  prompt += `IMPORTANT: do NOT answer, judge or comment on the question itself. That is the board's job, not yours here. No filler.`;
+  prompt += `IMPORTANT: do NOT answer, judge or comment on the question itself. That is the board's job, not yours here. No filler.\n`;
+  prompt += OPENING_WORDING;
   return prompt;
 }
 
@@ -177,6 +181,8 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
     prompt = `You are opening this board meeting for ${company.name}, before the founder's actual question is addressed.\n\n`;
     prompt += `IMPORTANT: today's question is "${newQuestion}" — do NOT discuss, answer, or reference it. That is the rest of the board's job, not yours here. Your only job is a brief status check on what has happened since the last meeting.\n\n`;
     prompt += `Last meeting's question was: "${previousMeeting.question}" (already resolved — do not re-litigate it, only reference what came after it).\n`;
+    const lastDirection = previousMeeting.board_resolution?.recommended_direction || previousMeeting.recommendation;
+    if (lastDirection) prompt += `What the board resolved then: "${String(lastDirection).slice(0, 1500)}". If you mention it, describe it accurately; never restate it as something else.\n`;
     if (previousMeeting.founder_decision && previousMeeting.founder_decision !== 'undecided') {
       prompt += `The founder's response to that resolution: ${previousMeeting.founder_decision}${previousMeeting.founder_decision_notes ? ` — "${previousMeeting.founder_decision_notes}"` : ''}\n`;
     }
@@ -188,6 +194,7 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
       prompt += `\nNothing has been marked done since then — a short, honest "quiet since we last met" is fine. Do not invent progress that didn't happen.\n`;
     }
     prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question. Never chase, never ask about outstanding or overdue items — that is handled elsewhere now; this is acknowledgment only.`;
+    prompt += `\n${OPENING_WORDING}`;
   }
 
   try {
@@ -196,6 +203,8 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
       body: JSON.stringify({
         ...chairCallFields(chair), company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
+        // Her book, hobby or place may come up here; never in the resolution.
+        personal_details: true,
         company_context: null, meeting_context: null,
         user_question: prompt, previous_responses: [], output_schema: CHAIR_OPENING_SCHEMA,
         temperature: 0.4, request_type: 'chair_opening', deadline_at: deadlineAt,
@@ -367,6 +376,7 @@ Deno.serve(async (req) => {
           system_instructions: advisor.system_instructions, company_context: contextPackage,
           user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
           temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
+          personal_details: true, // nothing said yet in this meeting
         }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
       )),
       buildChairOpening({

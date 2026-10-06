@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     const fbModel = advisor.fallback_model;
 
     // The same prompt and call rules a meeting's Round 1 uses.
-    const systemPrompt = buildSystemPrompt(advisor, null, companyContext, null);
+    const systemPrompt = buildSystemPrompt(advisor, null, companyContext, null, true);
     const userPrompt = buildUserPrompt(question);
 
     const { result, attempts, lastError } = await callWithFallback({

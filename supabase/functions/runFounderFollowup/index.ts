@@ -3,6 +3,7 @@ import { requireOwnedRow, requireMaxLength, checkUserLimit, accessErrorResponse,
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { FOLLOWUP_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair } from '../_shared/chair.ts';
+import { usedPersonalDetail, ownWords } from '../_shared/personalDetails.ts';
 
 // At most five debaters answer (startBoardMeeting seats the same); the
 // Chair doesn't debate, here or in any round.
@@ -143,6 +144,8 @@ Deno.serve(async (req) => {
         system_instructions: null, company_context: null, meeting_context: followupContext,
         user_question: meeting.question, previous_responses: [], output_schema: FOLLOWUP_SCHEMA,
         temperature: advisor.temperature, request_type: 'founder_followup', deadline_at: deadlineAt,
+        // Their book, hobby or place stay on offer until they've used one.
+        personal_details: !usedPersonalDetail(advisor, ownWords(advisor, meeting.independent_responses || [], updatedTranscript)),
       }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
     ));
 

@@ -42,6 +42,10 @@ export const BUILT_IN_CHAIR = {
   fallback_provider: 'openai',
   fallback_model: 'gpt-4o',
   temperature: 0.5,
+  // Off the clock (K3); offered in her opening only, never in the resolution.
+  book: "Middlemarch. Rereads it every winter.",
+  hobby: "Bridge on Thursdays. Plays to win and doesn't discuss it.",
+  favourite_place: "The Yorkshire Dales in October, when the tourists have gone.",
 };
 
 // What a routeAdvisorRequest call needs to speak as the Chair: her row, or

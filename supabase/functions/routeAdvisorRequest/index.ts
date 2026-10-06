@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
     const { advisor_id, advisor_override, company_id, meeting_id, system_instructions, company_context, meeting_context,
       user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier, anonymous,
-      deadline_at } = await req.json();
+      deadline_at, personal_details } = await req.json();
 
     if ((!advisor_id && !advisor_override) || !user_question)
       return Response.json({ error: 'advisor_id (or advisor_override) and user_question are required' }, { status: 400, headers: corsHeaders });
@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
         fallback_provider: advisor_override.fallback_provider,
         fallback_model: advisor_override.fallback_model,
         temperature: advisor_override.temperature,
+        book: advisor_override.book, hobby: advisor_override.hobby, favourite_place: advisor_override.favourite_place,
         maximum_output_length: advisor_override.maximum_output_length,
       };
     }
@@ -120,7 +121,9 @@ Deno.serve(async (req) => {
       model = cheap.model;
     }
 
-    const systemPrompt = buildSystemPrompt(advisor, system_instructions, company_context, meeting_context);
+    // The advisor's book, hobby and place, only when the caller offers them
+    // (meeting turns where they haven't been used yet).
+    const systemPrompt = buildSystemPrompt(advisor, system_instructions, company_context, meeting_context, personal_details === true);
     const userPrompt = buildUserPrompt(user_question, previous_responses);
 
     // The caller's own deadline, if earlier: it needs time to save the answer.
