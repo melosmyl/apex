@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import PageHeader from "@/components/PageHeader";
+import ProviderHealthBanner from "@/components/ProviderHealthBanner";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Shield, Save, Activity, Settings, FlaskConical, Loader2, AlertCircle, Sparkles } from "lucide-react";
 
@@ -109,6 +110,11 @@ export default function Admin() {
     <div className="max-w-5xl mx-auto px-5 py-12">
       <PageHeader eyebrow="System Administration" title="AI Intelligence Console"
         description="Manage advisor model assignments, monitor usage, and configure system limits." />
+
+      {/* Provider and spend alerts live here only, never on founder pages. */}
+      <div className="mb-8 rounded-2xl overflow-hidden empty:hidden">
+        <ProviderHealthBanner />
+      </div>
 
       {/* Usage Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">

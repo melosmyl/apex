@@ -4,9 +4,10 @@ import { supabase } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 
 // Surfaces provider_health_alerts (populated every 15 min by a Postgres cron
-// job, see 20260809180000_provider_health_alerts.sql) on every authenticated
-// page, admin only — these are operational signals for the owner, not
-// something a founder or free-meeting visitor should see. Born from a real
+// job, see 20260809180000_provider_health_alerts.sql) on the Admin page only:
+// these are operational signals for the owner. Founder pages never show
+// them, even to an admin; a founder whose meeting fails gets a plain message
+// inside the meeting instead. Born from a real
 // incident: Anthropic ran out of credits for hours and nothing surfaced it,
 // because every advisor call has a configured fallback — the product kept
 // working, just silently on the wrong model. Dismissing here only clears it
@@ -39,7 +40,7 @@ export default function ProviderHealthBanner() {
   if (!visible.length) return null;
 
   return (
-    <div className="sticky top-0 z-50">
+    <div>
       {visible.map((a) => (
         <div key={a.id} className="bg-amber-100 border-b border-amber-300 px-4 py-2 flex items-center gap-3 text-sm text-amber-900">
           <AlertTriangle className="w-4 h-4 shrink-0" strokeWidth={1.5} />

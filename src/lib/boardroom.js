@@ -38,6 +38,19 @@ export function absenteesByRound(transcript = []) {
   return result;
 }
 
+// What a founder sees when a meeting step fails: our own refusals are already
+// written in plain English and pass through; server faults, timeouts and
+// technical errors become one calm sentence, never provider or database detail.
+function meetingErrorMessage(e, fallback) {
+  const status = e?.response?.status;
+  const serverMessage = e?.response?.data?.error;
+  if (status === 401) return "Your session has ended. Please sign in again to continue.";
+  if (status === 403 && (!serverMessage || serverMessage === "Forbidden"))
+    return "This company belongs to a different account. Sign in with the account that created it to hold a meeting.";
+  if (status && status < 500 && serverMessage) return serverMessage;
+  return fallback;
+}
+
 export async function startMeeting({ companyId, question, advisorIds, freeAttemptId }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
@@ -47,7 +60,7 @@ export async function startMeeting({ companyId, question, advisorIds, freeAttemp
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(e.response?.data?.error || e.message || "Failed to start the meeting.");
+    throw new Error(meetingErrorMessage(e, "Your board couldn't start the meeting just now. Please try again in a moment."));
   }
 }
 
@@ -57,7 +70,7 @@ export async function runDiscussion(meetingId) {
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(e.response?.data?.error || e.message || "Board discussion failed.");
+    throw new Error(meetingErrorMessage(e, "Your board couldn't finish the discussion just now. Please try again in a moment."));
   }
 }
 
@@ -67,7 +80,7 @@ export async function runResolution(meetingId) {
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(e.response?.data?.error || e.message || "Resolution failed.");
+    throw new Error(meetingErrorMessage(e, "The Chair couldn't finish the resolution just now. Please try again in a moment."));
   }
 }
 
@@ -88,6 +101,6 @@ export async function runFounderFollowup(meetingId, founderMessage) {
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(e.response?.data?.error || e.message || "Follow-up failed.");
+    throw new Error(meetingErrorMessage(e, "Your board couldn't answer just now. Please try again in a moment."));
   }
 }

@@ -14,7 +14,7 @@ export function useAssistant() {
   return useContext(AssistantContext) || NOOP_ASSISTANT_CONTEXT;
 }
 
-// Mounted in ProtectedRoute, alongside ProviderHealthBanner — high enough
+// Mounted in ProtectedRoute — high enough
 // in the tree that BoardDebate (nested under CompanyLayout/Boardroom) can
 // still reach it via useAssistant() to report when a meeting is running,
 // which is what lets the widget below fully suppress itself, and to check

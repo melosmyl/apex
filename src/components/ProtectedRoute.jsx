@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-import ProviderHealthBanner from '@/components/ProviderHealthBanner';
 import { AssistantProvider } from '@/lib/AssistantContext';
 
 const DefaultFallback = () => (
@@ -37,7 +36,6 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
 
   return (
     <AssistantProvider>
-      <ProviderHealthBanner />
       <Outlet />
     </AssistantProvider>
   );
