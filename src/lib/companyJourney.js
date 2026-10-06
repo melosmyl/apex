@@ -41,7 +41,7 @@ export const COMPANY_JOURNEYS = [
       "First decision outcome reviewed",
       "Growth channel identified"
     ],
-    recommendedAdvisorKeys: ["cfo", "marketing_director", "operator", "customer_advocate"]
+    recommendedAdvisorKeys: ["marcus-delgado", "marketing_director", "operator", "customer_advocate"]
   },
   {
     key: "growth",
@@ -54,7 +54,7 @@ export const COMPANY_JOURNEYS = [
       "Second growth channel tested",
       "First decision outcome reviewed"
     ],
-    recommendedAdvisorKeys: ["operator", "cfo", "people_culture", "marketing_director"]
+    recommendedAdvisorKeys: ["operator", "marcus-delgado", "people_culture", "marketing_director"]
   },
   {
     key: "fundraising",
@@ -67,7 +67,7 @@ export const COMPANY_JOURNEYS = [
       "Term sheet reviewed",
       "First board meeting completed"
     ],
-    recommendedAdvisorKeys: ["investor", "cfo", "visionary", "legal_advisor"]
+    recommendedAdvisorKeys: ["investor", "marcus-delgado", "visionary", "legal_advisor"]
   },
   {
     key: "product_launch",
@@ -106,7 +106,7 @@ export const COMPANY_JOURNEYS = [
       "Cash flow secured",
       "First decision outcome reviewed"
     ],
-    recommendedAdvisorKeys: ["cfo", "operator", "risk_analyst", "investor"]
+    recommendedAdvisorKeys: ["marcus-delgado", "operator", "risk_analyst", "investor"]
   }
 ];
 

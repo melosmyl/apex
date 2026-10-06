@@ -24,7 +24,7 @@ const ADVISOR_OPTIONS = `visionary: Amara Vance, Visionary — Strategy, Fundrai
 operator: Daniel Okoye, Operator — Operations, Scaling, Hiring
 creative_director: Sofia Marchetti, Creative Director — Brand, Design, Creative direction
 marketing_director: Priya Nair, Marketing Director — Marketing, Growth, Positioning
-cfo: Marcus Chen, Chief Financial Officer — Finance, Fundraising, Unit economics
+marcus-delgado: Marcus Delgado, Chief Financial Officer — Finance, Fundraising, Unit economics
 investor: Eleanor Whitfield, Investor — Venture, Markets, Strategy
 product_strategist: Tomas Berg, Product Strategist — Product, UX strategy, Roadmapping
 customer_advocate: Grace Bennett, Customer Advocate — Customer success, Support, Loyalty
@@ -36,10 +36,10 @@ innovation_director: Kai Nakamura, Innovation Director — Innovation, New ventu
 risk_analyst: Helena Vogt, Risk Analyst — Risk, Strategy, Analysis
 capital_allocator: Warren Bishop, Capital Allocator — Value investing, Capital allocation, Mergers & acquisitions
 ai_expert: Dr. Aris Chen, AI Strategist — Artificial intelligence, Machine learning, Data strategy
-elon_musk: Elon Musk, Founder & Technologist — Engineering, Manufacturing, Frontier technology
-warren_buffett: Warren Buffett, Value Investor — Value investing, Capital allocation, Insurance & float
-jeff_bezos: Jeff Bezos, Founder & Builder — E-commerce, Cloud computing, Logistics, Space
-rick_rubin: Rick Rubin, Creative Producer — Creative direction, Artistic vision, Taste
+felix-hart: Felix Hart, Founder & Technologist — Engineering, Manufacturing, Frontier technology
+arthur-penrose: Arthur Penrose, Value Investor — Value investing, Capital allocation, Long-term ownership
+nathan-cole: Nathan Cole, Founder & Builder — Customer experience, Operations at scale, Logistics
+theo-lindqvist: Theo Lindqvist, Creative Producer — Creative direction, Artistic vision, Taste
 contrarian: Victor Hale, Contrarian — Critical thinking, Risk assessment, Strategy`;
 
 function buildPrompt(answers: Record<string, unknown>) {
