@@ -8,6 +8,8 @@
 // creation: acknowledgment follows what the founder actually committed to.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
+import { TASK_ACK_SCHEMA } from '../_shared/answerSchemas.ts';
 import { resolveAdvisor } from '../_shared/advisorResolution.ts';
 import { requireOwnedRow, requireNotAnonymous, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 
@@ -18,6 +20,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const startedAt = Date.now();
 
   try {
     const authClient = createClient(
@@ -58,16 +61,15 @@ Deno.serve(async (req) => {
     if (meeting?.question) prompt += `It came out of the board meeting where you discussed: "${String(meeting.question).slice(0, 1000)}"\n`;
     prompt += `\nRespond briefly (1-2 sentences, occasionally 3 if it earns it) in your own voice, acknowledging that this is now done. Reference the specific task by what it actually was, and say why it mattered — what it unblocks, what it was standing in the way of, or what happens next now that it's done. Do not use generic praise like "great job" or "nice work" with no substance behind it — if you can't say something specific, say something short and factual instead ("Good — that clears the way for X.").`;
 
-    const schema = { type: 'object', properties: { acknowledgment: { type: 'string' } }, required: ['acknowledgment'] };
-
     const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/routeAdvisorRequest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: JSON.stringify({
         advisor_id: speaker.id, company_id: task.company_id, meeting_id: task.source_meeting_id, user_id: user.id,
         system_instructions: speaker.system_instructions, company_context: null, meeting_context: null,
-        user_question: prompt, previous_responses: [], output_schema: schema,
-        temperature: 0.6, max_output_length: 300, request_type: 'task_acknowledgment',
+        user_question: prompt, previous_responses: [], output_schema: TASK_ACK_SCHEMA,
+        temperature: 0.6, request_type: 'task_acknowledgment',
+        deadline_at: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,
       }),
     });
     const data = await res.json();

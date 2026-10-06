@@ -1,5 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
+import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
+import { DISCUSSION_SCHEMA } from '../_shared/answerSchemas.ts';
 
 // Each Round 1 entry is pasted into every advisor's prompt; bound what a
 // browser-edited entry (human perspectives) can add.
@@ -7,6 +9,10 @@ const MAX_ROUND1_ENTRIES = 20;
 const MAX_ENTRY_CHARS = 4000;
 // A step that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
+// A round isn't started with less time than this left: its answers would
+// only be cut off. Covers the 20s a debater keeps back for its fallback
+// model, the 5s an attempt needs, and routeAdvisorRequest's own setup.
+const MIN_ROUND_MS = 30_000;
 import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
@@ -162,6 +168,7 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const startedAt = Date.now();
   let claimedMeetingId = null;
   let dbForRelease = null;
   try {
@@ -230,22 +237,6 @@ Deno.serve(async (req) => {
       unavailable: r.unavailable || false,
     }));
 
-    const discussionSchema = {
-      type: 'object',
-      properties: {
-        message: { type: 'string', description: 'Your contribution to the board discussion. Be specific, critical, and substantive. Speak naturally as you would in a real board room.' },
-        message_type: { type: 'string', enum: ['question', 'challenge', 'defense', 'rebuttal', 'support', 'new_information', 'risk_identified', 'opinion_changed', 'final_statement'], description: 'The primary nature of your contribution' },
-        reply_to_advisor: { type: 'string', description: 'Name of the advisor you are primarily responding to. Leave empty if addressing the board generally.' },
-        changed_opinion: { type: 'boolean', description: 'Whether this discussion has changed your position from your initial independent response' },
-        new_position: { type: 'string', description: 'If you changed your opinion, state your new position. Leave empty if unchanged.' },
-        new_risks: { type: 'array', items: { type: 'string' }, description: 'Any new risks or blind spots you have identified that have not been mentioned yet' },
-        confidence_score: { type: 'number', description: 'Your current confidence in your recommendation, 0-100' },
-        answerable: { type: 'boolean', description: 'false if the question genuinely cannot be answered well without missing information — see HONEST UNCERTAINTY. true otherwise (the default).' },
-        agrees_with: { type: 'string', description: 'Name of another advisor whose position you now fully agree with and have nothing to add to. Leave empty if you have your own distinct view — do not fill this in just to seem cooperative.' },
-      },
-      required: ['message', 'message_type', 'confidence_score'],
-    };
-
     // The server-chosen AI advisors plus the company's human advisors, all
     // named from their rows: the entries themselves are browser-editable.
     const meetingAdvisorIds = new Set(meetingAdvisors.map(a => a.id));
@@ -254,17 +245,29 @@ Deno.serve(async (req) => {
       .map(r => ({ advisor_name: byId.get(r.advisor_id).name, recommendation: String(r.recommendation || '').slice(0, 2000) }));
     const convergencePairs = await detectConvergence(convergenceInput);
 
+    // Every round runs inside this one request until the meeting moves to
+    // the server (Phase 1b Stage 3): each round gets an equal share of the
+    // time left, and a round that couldn't finish isn't started.
+    const stepDeadline = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
     for (let round = 2; round <= maxRounds; round++) {
-      const isLastRound = round === maxRounds;
+      const timeLeft = stepDeadline - Date.now();
+      if (timeLeft < MIN_ROUND_MS) {
+        console.error(`runBoardDiscussion: stopping before round ${round} of ${maxRounds}, ${Math.round(timeLeft / 1000)}s left`);
+        break;
+      }
+      const roundShare = Math.floor(timeLeft / (maxRounds - round + 1));
+      const roundDeadline = Date.now() + roundShare;
+      // If no round can follow this one in the time left, this one gets the
+      // final-round instructions, so the discussion still closes properly.
+      const isLastRound = round === maxRounds || timeLeft - roundShare < MIN_ROUND_MS;
 
       const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
         const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs);
         return callAdvisor(supabaseUrl, serviceKey, {
           advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
           system_instructions: null, company_context: null, meeting_context: meetingContext,
-          user_question: meeting.question, previous_responses: [], output_schema: discussionSchema,
-          temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,
-          request_type: `discussion_round_${round}`,
+          user_question: meeting.question, previous_responses: [], output_schema: DISCUSSION_SCHEMA,
+          temperature: advisor.temperature, request_type: `discussion_round_${round}`, deadline_at: roundDeadline,
         }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }));
       }));
 

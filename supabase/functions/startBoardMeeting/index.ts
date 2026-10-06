@@ -2,30 +2,21 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { embedText } from '../_shared/embeddings.ts';
 import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
 import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
+import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
+import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// The founder never gave us these — onboarding is deliberately short now.
-// Rather than a form, the board recovers them in conversation, only when
-// they'd actually change the answer. See buildContext's gap block below.
-const PROFILE_GAPS = [
-  { key: 'industry', label: 'what industry they\'re in' },
-  { key: 'business_model', label: 'how the business makes money' },
-  { key: 'solo_founder', label: 'whether they\'re building alone or with a team' },
-  { key: 'team_size', label: 'how big the team is' },
-  { key: 'target_customer', label: 'who the target customer is' },
-  { key: 'primary_market', label: 'the primary market or geography' },
-  { key: 'available_capital', label: 'what capital is available' },
-  { key: 'available_time', label: 'how much time they can commit' },
-  { key: 'existing_assets', label: 'what they already have (prototype, customers, IP)' },
-  { key: 'immediate_goal', label: 'their most immediate goal' },
-  { key: 'confidence_gaps', label: 'where they lack confidence' },
-  { key: 'deadlines', label: 'any important deadlines' },
-  { key: 'country', label: 'which country they\'re registering the business in' },
-];
+// The answer card offers to save an answer only into a profile field that
+// is still empty: one the founder already filled in is never overwritten.
+function keepOpenProfileField(item, company) {
+  if (!item || typeof item !== 'object') return item;
+  const { profile_field, ...rest } = item;
+  return PROFILE_FIELD_KEYS.includes(profile_field) && !company[profile_field] ? { ...rest, profile_field } : rest;
+}
 
 // The founder's Progression Tree, summarised for the board — completed
 // items plus the next few not-yet ones, by order_index. Reuses the same
@@ -163,7 +154,7 @@ function templatedCompletedRecap(completedTasks) {
 // avoids two voices nagging about the same thing. This opening now stays
 // pure recap and acknowledgment — the continuity differentiator made
 // visible ("the board remembers"), never a chase.
-async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, anonymous, meetingId, newQuestion, previousMeeting }) {
+async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, company, companyId, userId, anonymous, meetingId, newQuestion, previousMeeting, deadlineAt }) {
   if (!previousMeeting) return null; // first meeting ever — nothing to open with
   const completedTasks = await loadRecentlyCompletedTasks(db, companyId, userId, previousMeeting.created_at);
 
@@ -182,12 +173,6 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, co
   }
   prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question. Never chase, never ask about outstanding or overdue items — that is handled elsewhere now; this is acknowledgment only.`;
 
-  const schema = {
-    type: 'object',
-    properties: { opening_statement: { type: 'string' } },
-    required: ['opening_statement'],
-  };
-
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
       method: 'POST',
@@ -195,8 +180,8 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chairAdvisor, co
       body: JSON.stringify({
         advisor_id: chairAdvisor.id, company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
         system_instructions: chairAdvisor.system_instructions, company_context: null, meeting_context: null,
-        user_question: prompt, previous_responses: [], output_schema: schema,
-        temperature: 0.4, max_output_length: 500, request_type: 'chair_opening',
+        user_question: prompt, previous_responses: [], output_schema: CHAIR_OPENING_SCHEMA,
+        temperature: 0.4, request_type: 'chair_opening', deadline_at: deadlineAt,
       }),
     });
     const data = await res.json();
@@ -262,6 +247,7 @@ async function claimFreeMeeting(db, userId, attemptId) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const startedAt = Date.now();
 
   try {
     const authClient = createClient(
@@ -348,30 +334,8 @@ Deno.serve(async (req) => {
     }).select().single();
     if (createErr) throw createErr;
 
-    const independentSchema = {
-      type: 'object',
-      properties: {
-        position: { type: 'string', description: 'Your overall position on the question' },
-        recommendation: { type: 'string', description: 'Your specific recommendation' },
-        key_arguments: { type: 'array', items: { type: 'string' } },
-        assumptions: { type: 'array', items: { type: 'string' } },
-        risks: { type: 'array', items: { type: 'string' } },
-        missing_information: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              detail: { type: 'string', description: 'The gap, phrased as a direct question to the founder' },
-              profile_field: { type: 'string', description: 'The exact profile_field key from the "Not yet on file" list above, only if this gap is one of those — omit entirely otherwise' },
-            },
-            required: ['detail'],
-          },
-        },
-        suggested_actions: { type: 'array', items: { type: 'string' } },
-        confidence_score: { type: 'number', description: '0-100' },
-      },
-      required: ['position', 'recommendation', 'key_arguments', 'confidence_score'],
-    };
+    // Model calls end in time for this function to save their answers.
+    const deadlineAt = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
 
     // The company's standing Chair persona, regardless of whether they were
     // specifically selected for this debate — matches how runChairSynthesis
@@ -387,14 +351,13 @@ Deno.serve(async (req) => {
         callAdvisor(supabaseUrl, serviceKey, {
           advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
           system_instructions: advisor.system_instructions, company_context: contextPackage,
-          user_question: question, previous_responses: [], output_schema: independentSchema,
-          temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,
-          request_type: 'independent',
+          user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
+          temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
         }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
       )),
       buildChairOpening({
         supabaseUrl, serviceKey, db, chairAdvisor, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
-        meetingId: meeting.id, newQuestion: question, previousMeeting,
+        meetingId: meeting.id, newQuestion: question, previousMeeting, deadlineAt,
       }),
     ]);
 
@@ -415,7 +378,7 @@ Deno.serve(async (req) => {
         provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
         position: resp.position || '', recommendation: resp.recommendation || '',
         key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
-        risks: resp.risks || [], missing_information: resp.missing_information || [],
+        risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m) => keepOpenProfileField(m, company)),
         suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
       };
     });

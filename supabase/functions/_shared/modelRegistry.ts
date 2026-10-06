@@ -118,6 +118,16 @@ export function resolveApprovedModels(
     }
   }
 
+  // A swap can land the primary on the fallback's model (e.g. an admin
+  // switches Claude off and gpt-4o was already the backup). Running the same
+  // model twice isn't a fallback: use another provider's default, or none.
+  if (fallback && fallback.provider === primary.provider && fallback.model === primary.model) {
+    const other = ['openai', 'anthropic'].find((p) => p !== primary.provider && registry.defaultFor(p));
+    const replacement = other ? registry.defaultFor(other) : null;
+    notes.push(`fallback ${fallback.provider}/${fallback.model} is the primary -> ${replacement ? `${replacement.provider}/${replacement.model}` : 'none'}`);
+    fallback = replacement;
+  }
+
   const substitution = notes.length ? notes.join('; ') : null;
   if (substitution) console.warn(`Model substitution: ${substitution}`);
   return { primary, fallback, substitution };

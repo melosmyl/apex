@@ -9,6 +9,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { PRODUCT_NAME } from '../_shared/branding.ts';
 import { checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
+import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
+import { ONBOARDING_SCHEMA } from '../_shared/answerSchemas.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,49 +42,6 @@ jeff_bezos: Jeff Bezos, Founder & Builder — E-commerce, Cloud computing, Logis
 rick_rubin: Rick Rubin, Creative Producer — Creative direction, Artistic vision, Taste
 contrarian: Victor Hale, Contrarian — Critical thinking, Risk assessment, Strategy`;
 
-const RESPONSE_SCHEMA = {
-  type: 'object',
-  properties: {
-    company_type: { type: 'string', description: "A short label for the type of company, e.g. 'DTC Consumer Brand' or 'B2B SaaS Startup' — infer this from whatever the founder shared, even if limited" },
-    recommended_journey: {
-      type: 'string',
-      enum: ['idea_validation', 'pre_launch', 'early_revenue', 'growth', 'fundraising', 'product_launch', 'market_expansion', 'turnaround'],
-    },
-    executive_briefing: { type: 'string', description: 'A warm, concise 2-3 sentence personalised briefing for the founder' },
-    recommended_advisors: {
-      type: 'array',
-      description: '4 to 6 advisors from the provided library, including the chair',
-      items: {
-        type: 'object',
-        properties: {
-          key: { type: 'string', description: 'Must be one of the valid advisor keys provided' },
-          name: { type: 'string' },
-          role: { type: 'string' },
-          reason: { type: 'string', description: 'One sentence explaining why this advisor is recommended for this specific founder' },
-        },
-      },
-    },
-    suggested_meetings: {
-      type: 'array',
-      description: 'Exactly 3 strategic questions the founder should bring to their board',
-      items: { type: 'string' },
-    },
-    suggested_tasks: {
-      type: 'array',
-      description: '3 to 5 concrete first tasks',
-      items: {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          assigned_to: { type: 'string', description: "The advisor role or 'Founder'" },
-        },
-      },
-    },
-    start_here_action: { type: 'string', description: 'One clear, specific primary action the founder should take first' },
-  },
-  required: ['company_type', 'recommended_journey', 'executive_briefing', 'recommended_advisors', 'suggested_meetings', 'suggested_tasks', 'start_here_action'],
-};
-
 function buildPrompt(answers: Record<string, unknown>) {
   const answersText = Object.entries(answers || {})
     .filter(([, v]) => v && String(v).trim())
@@ -112,6 +71,7 @@ Be specific and personal where the founder gave you something specific to work w
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const startedAt = Date.now();
 
   try {
     const authClient = createClient(
@@ -165,16 +125,16 @@ Deno.serve(async (req) => {
           // fields), not billing. Revisit if the schema is ever simplified.
           default_provider: 'openai', default_model: 'gpt-4o',
           fallback_provider: 'anthropic', fallback_model: 'claude-sonnet-5',
-          temperature: 0.7, maximum_output_length: 3000,
+          temperature: 0.7,
         },
         user_id: user.id,
         anonymous: !!user.is_anonymous,
         user_question: buildPrompt(answers),
         previous_responses: [],
-        output_schema: RESPONSE_SCHEMA,
+        output_schema: ONBOARDING_SCHEMA,
         temperature: 0.7,
-        max_output_length: 3000,
         request_type: 'onboarding_plan',
+        deadline_at: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,
       }),
     });
     const data = await res.json();

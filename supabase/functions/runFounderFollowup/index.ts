@@ -1,5 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS, MAX_FOLLOWUPS_PER_MEETING } from '../_shared/access.ts';
+import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
+import { FOLLOWUP_SCHEMA } from '../_shared/answerSchemas.ts';
 
 // Five debaters plus the Chair (startBoardMeeting enforces the same).
 const MAX_ADVISORS_PER_MEETING_WITH_CHAIR = 6;
@@ -45,6 +47,7 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const startedAt = Date.now();
 
   try {
     const authClient = createClient(
@@ -129,31 +132,15 @@ Deno.serve(async (req) => {
 
     const followupContext = buildFollowupContext(founder_message.trim(), updatedTranscript, meeting.question);
 
-    const discussionSchema = {
-      type: 'object',
-      properties: {
-        message: { type: 'string', description: 'Your response to the founder. Address their message directly, provide additional insights, and if appropriate, revise your recommendation.' },
-        message_type: {
-          type: 'string',
-          enum: ['question', 'challenge', 'defense', 'rebuttal', 'support', 'new_information', 'risk_identified', 'opinion_changed', 'final_statement'],
-          description: 'The primary nature of your response',
-        },
-        reply_to_advisor: { type: 'string', description: 'Set to "Founder" since you are responding to the founder.' },
-        changed_opinion: { type: 'boolean', description: 'Whether the founder\'s input has changed your position' },
-        new_position: { type: 'string', description: 'If you changed your opinion, state your new position. Leave empty if unchanged.' },
-        new_risks: { type: 'array', items: { type: 'string' }, description: 'Any new risks or blind spots identified from the founder\'s input' },
-        confidence_score: { type: 'number', description: 'Your current confidence, 0-100' },
-      },
-      required: ['message', 'message_type', 'confidence_score'],
-    };
+    // Model calls end in time for this function to save their answers.
+    const deadlineAt = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
 
     const roundResults = await Promise.all(meetingAdvisors.map(advisor =>
       callAdvisor(supabaseUrl, serviceKey, {
         advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
         system_instructions: null, company_context: null, meeting_context: followupContext,
-        user_question: meeting.question, previous_responses: [], output_schema: discussionSchema,
-        temperature: advisor.temperature, max_output_length: advisor.maximum_output_length,
-        request_type: 'founder_followup',
+        user_question: meeting.question, previous_responses: [], output_schema: FOLLOWUP_SCHEMA,
+        temperature: advisor.temperature, request_type: 'founder_followup', deadline_at: deadlineAt,
       }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
     ));
 

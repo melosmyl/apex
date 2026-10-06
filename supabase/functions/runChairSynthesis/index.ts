@@ -1,6 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolveAdvisor } from '../_shared/advisorResolution.ts';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
+import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
+import { RESOLUTION_SCHEMA } from '../_shared/answerSchemas.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
@@ -127,6 +129,7 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const startedAt = Date.now();
   let claimedMeetingId = null;
   let dbForRelease = null;
   try {
@@ -193,51 +196,6 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'No advisor available for chair synthesis' }, { status: 400, headers: corsHeaders });
     }
 
-    const resolutionSchema = {
-      type: 'object',
-      properties: {
-        executive_summary: { type: 'string' },
-        decision_question: { type: 'string' },
-        recommended_direction: { type: 'string' },
-        reasoning: { type: 'string' },
-        areas_of_agreement: { type: 'array', items: { type: 'string' } },
-        areas_of_disagreement: { type: 'array', items: { type: 'string' } },
-        main_risks: { type: 'array', items: { type: 'string' } },
-        minority_opinion: { type: 'string' },
-        assumptions: { type: 'array', items: { type: 'string' } },
-        missing_information: { type: 'array', items: { type: 'string' } },
-        recommended_experiment: { type: 'string' },
-        priority_frame: { type: 'string', description: 'One sentence naming the explicit criterion: what has to happen before spending more time or money on this question. Not a generic "these are worth doing."' },
-        priority_actions: {
-          type: 'array',
-          description: 'At most 3 items — the ranked things to do before spending more time or money on this, not every next-step anyone mentioned. These become the real tasks created from this meeting.',
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              assigned_to: { type: 'string' },
-              why_first: { type: 'string', description: 'Why this specific item has to happen before spending more time or money, per priority_frame.' },
-            },
-            required: ['title'],
-          },
-        },
-        overall_confidence_score: { type: 'number', description: 'A whole number from 0 to 100, never a 0-1 fraction' },
-        discussion_evaluation: {
-          type: 'object',
-          properties: {
-            strongest_arguments: { type: 'array', items: { type: 'string' } },
-            disproven_arguments: { type: 'array', items: { type: 'string' } },
-            uncertain_assumptions: { type: 'array', items: { type: 'string' } },
-            most_persuasive_advisor: { type: 'string' },
-            consensus_assessment: { type: 'string' },
-            opinions_changed: { type: 'array', items: { type: 'string' } },
-            missing_evidence: { type: 'array', items: { type: 'string' } },
-          },
-        },
-      },
-      required: ['executive_summary', 'recommended_direction', 'reasoning', 'overall_confidence_score'],
-    };
-
     let meetingContext;
     if (discussionTranscript.length > 0) {
       meetingContext = `=== FULL BOARD DISCUSSION TRANSCRIPT ===\nQuestion: ${meeting.question}\n\n${formatTranscriptForChair(discussionTranscript)}`;
@@ -259,8 +217,9 @@ Deno.serve(async (req) => {
       advisor_id: chairAdvisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: CHAIR_INSTRUCTIONS, company_context: null, meeting_context: meetingContext,
       user_question: meeting.question, previous_responses: [],
-      output_schema: resolutionSchema, temperature: 0.5, max_output_length: 4000,
-      request_type: 'chair_synthesis',
+      output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',
+      // Ends in time for this function to save the resolution and its tasks.
+      deadline_at: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,
     });
 
     const resolution = chairResult?.response;

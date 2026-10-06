@@ -1,6 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { loadModelRegistry, loadAdvisorDefault, resolveApprovedModels } from '../_shared/modelRegistry.ts';
 import { callWithFallback, usageTotals, insertUsageLog, CALL_DEADLINE_MS } from '../_shared/llmCall.ts';
+import { policyFor, legacyPolicy } from '../_shared/callPolicy.ts';
+import { buildSystemPrompt, buildUserPrompt } from '../_shared/advisorPrompt.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,38 +27,8 @@ async function resolveCheapTier(db) {
   return DEFAULT_CHEAP_TIER;
 }
 
-// Advisor rows are founder-editable, so their text goes into every call
-// bounded: no one can make each call carry a book's worth of input.
-const cap = (v, n) => String(v ?? '').slice(0, n);
-const capList = (list) => (Array.isArray(list) ? list : []).slice(0, 12).map((x) => cap(x, 200));
-
-function buildSystemPrompt(advisor, customInstructions, companyContext, meetingContext, outputSchema) {
-  const instructions = cap(customInstructions || advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`, 6000);
-  let prompt = `You are ${cap(advisor.name, 100)}, ${cap(advisor.role, 100)}.\n\n${instructions}\n\nDecision style: ${cap(advisor.decision_style || 'Analytical', 300)}.\nCommunication style: ${cap(advisor.communication_style || 'Direct and professional', 300)}.\nStrengths: ${capList(advisor.strengths).join(', ')}.\nBlind spots: ${capList(advisor.blind_spots || advisor.weaknesses).join(', ')}.\n\n`;
-  // Backstops, well above what any caller builds today.
-  if (companyContext) prompt += `Company Context:\n${cap(companyContext, 40000)}\n\n`;
-  if (meetingContext) prompt += `Meeting Context:\n${cap(meetingContext, 150000)}\n\n`;
-  prompt += `You must respond with ONLY valid JSON. Do not include any text outside the JSON object.`;
-  if (outputSchema) prompt += `\n\nJSON structure:\n${JSON.stringify(outputSchema, null, 2)}`;
-  return prompt;
-}
-
-function buildUserPrompt(question, previousResponses) {
-  // A backstop: callers already bound what founders type, but nothing should
-  // reach a model unbounded. Generous enough for the longest internal prompts.
-  let prompt = `The founder asks the board: "${cap(question, 20000)}"\n\n`;
-  if (previousResponses?.length) {
-    prompt += `Other advisors have responded:\n`;
-    previousResponses.forEach(r => {
-      if (r.position) prompt += `- ${r.advisor}: ${r.position}${r.recommendation ? ` (Recommends: ${r.recommendation})` : ''}\n`;
-      else if (r.revised_position) prompt += `- ${r.advisor} (challenge): ${r.revised_position}\n`;
-    });
-    prompt += '\n';
-  }
-  prompt += `Provide your response as a JSON object.`;
-  return prompt;
-}
-
+// Output limits for the calls callPolicy.ts leaves as they were (documents
+// and the small assistant calls); meeting calls take theirs from the policy.
 const MAX_OUTPUT_DEFAULT = 4000;
 const MAX_OUTPUT_BY_REQUEST_TYPE = { deliverable_spec: 16000 };
 
@@ -81,7 +53,8 @@ Deno.serve(async (req) => {
     const db = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
     const { advisor_id, advisor_override, company_id, meeting_id, system_instructions, company_context, meeting_context,
-      user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier, anonymous } = await req.json();
+      user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier, anonymous,
+      deadline_at } = await req.json();
 
     if ((!advisor_id && !advisor_override) || !user_question)
       return Response.json({ error: 'advisor_id (or advisor_override) and user_question are required' }, { status: 400, headers: corsHeaders });
@@ -115,10 +88,13 @@ Deno.serve(async (req) => {
     const retryCount = limits.retry_count ?? 1;
     // Founders can edit their advisor rows directly, so the model, length and
     // temperature on a row are requests, not instructions: only approved
-    // models run, and length and temperature are capped here.
+    // models run, and length and temperature are capped here. Meeting calls
+    // ignore the row's length: the policy sets it per provider.
     const temp = clamp(Number(temperature ?? advisor.temperature ?? 0.7), 0, 1, 0.7);
-    const maxLen = clamp(Number(max_output_length ?? advisor.maximum_output_length ?? limits.max_output_length ?? 2000),
-      100, MAX_OUTPUT_BY_REQUEST_TYPE[request_type] ?? MAX_OUTPUT_DEFAULT, 2000);
+    const policy = policyFor(request_type) ?? legacyPolicy(
+      clamp(Number(max_output_length ?? advisor.maximum_output_length ?? limits.max_output_length ?? 2000),
+        100, MAX_OUTPUT_BY_REQUEST_TYPE[request_type] ?? MAX_OUTPUT_DEFAULT, 2000),
+      timeoutMs);
 
     const [registry, advisorDefault] = await Promise.all([loadModelRegistry(db), loadAdvisorDefault(db, advisor.library_key)]);
     const { primary, fallback, substitution } = resolveApprovedModels(registry,
@@ -140,14 +116,16 @@ Deno.serve(async (req) => {
       model = cheap.model;
     }
 
-    const systemPrompt = buildSystemPrompt(advisor, system_instructions, company_context, meeting_context, output_schema);
+    const systemPrompt = buildSystemPrompt(advisor, system_instructions, company_context, meeting_context);
     const userPrompt = buildUserPrompt(user_question, previous_responses);
-    const requiredFields = output_schema?.required || [];
+
+    // The caller's own deadline, if earlier: it needs time to save the answer.
+    const deadlineAt = Math.min(startedAt + CALL_DEADLINE_MS,
+      typeof deadline_at === 'number' && Number.isFinite(deadline_at) ? deadline_at : Infinity);
 
     const { result, attempts, lastError } = await callWithFallback({
-      provider, model, fbProvider, fbModel, systemPrompt, userPrompt,
-      temperature: temp, maxTokens: maxLen, timeoutMs, retryCount, requiredFields,
-      deadlineAt: startedAt + CALL_DEADLINE_MS,
+      provider, model, fbProvider, fbModel, systemPrompt, userPrompt, outputSchema: output_schema || null,
+      policy, temperature: temp, retryCount, deadlineAt,
     });
 
     // Tokens and cost cover every attempt (failed ones were billed too);
@@ -157,7 +135,7 @@ Deno.serve(async (req) => {
       user_id: user_id || null, company_id: company_id || null, meeting_id: meeting_id || null, advisor_id: advisor_id || null,
       provider: result ? result.provider_used : provider, model: result ? result.model_used : model,
       request_type: request_type || 'unknown',
-      input_size: totals.input, output_size: totals.output, estimated_cost: totals.cost,
+      input_size: totals.input, output_size: totals.output, thinking_size: totals.thinking, estimated_cost: totals.cost,
       latency_ms: result ? result.latency_ms : Date.now() - startedAt,
       status: result ? (result.used_fallback ? 'fallback_used' : 'success') : 'error',
       error_code: !result ? lastError : null,

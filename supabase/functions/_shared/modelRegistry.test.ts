@@ -84,3 +84,25 @@ Deno.test('a model registered for another purpose is not selectable by advisor r
   assertEquals(r.isApproved('anthropic', 'claude-opus-5-5'), false);
   assertEquals(r.isApproved('anthropic', 'claude-sonnet-5'), true);
 });
+
+Deno.test('switching the primary model off never makes the fallback run the same model', async () => {
+  // Claude switched off by an admin: the only active models are OpenAI's.
+  const r = await loadModelRegistry(fakeDb([{ provider: 'openai', model_name: 'gpt-4o', is_provider_default: true }]));
+  const { primary, fallback, substitution } = resolveApprovedModels(r,
+    { provider: 'anthropic', model: 'claude-sonnet-5' }, { provider: 'openai', model: 'gpt-4o' });
+  assertEquals(primary, { provider: 'openai', model: 'gpt-4o' });
+  assertEquals(fallback, null);
+  assertEquals(substitution, 'anthropic/claude-sonnet-5 -> openai/gpt-4o (registry default); fallback openai/gpt-4o is the primary -> none');
+});
+
+Deno.test('a fallback that lands on the primary moves to the other provider', async () => {
+  const rows = [
+    { provider: 'openai', model_name: 'gpt-4o', is_provider_default: true },
+    { provider: 'anthropic', model_name: 'claude-sonnet-5-5', is_provider_default: true },
+  ];
+  const r = await loadModelRegistry(fakeDb(rows));
+  const { primary, fallback } = resolveApprovedModels(r,
+    { provider: 'anthropic', model: 'claude-sonnet-5' }, { provider: 'anthropic', model: 'claude-sonnet-5-5' });
+  assertEquals(primary, { provider: 'anthropic', model: 'claude-sonnet-5-5' });
+  assertEquals(fallback, { provider: 'openai', model: 'gpt-4o' });
+});

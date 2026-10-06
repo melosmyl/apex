@@ -1,23 +1,13 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callWithFallback, usageTotals, insertUsageLog, CALL_DEADLINE_MS } from '../_shared/llmCall.ts';
+import { policyFor } from '../_shared/callPolicy.ts';
+import { buildSystemPrompt, buildUserPrompt } from '../_shared/advisorPrompt.ts';
+import { ADMIN_TEST_SCHEMA } from '../_shared/answerSchemas.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-function buildSystemPrompt(advisor, customInstructions, companyContext, outputSchema) {
-  const instructions = customInstructions || advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`;
-  let prompt = `You are ${advisor.name}, ${advisor.role}.\n\n${instructions}\n\nDecision style: ${advisor.decision_style || 'Analytical'}.\nCommunication style: ${advisor.communication_style || 'Direct and professional'}.\nStrengths: ${(advisor.strengths || []).join(', ')}.\nBlind spots: ${(advisor.blind_spots || advisor.weaknesses || []).join(', ')}.\n\n`;
-  if (companyContext) prompt += `Company Context:\n${companyContext}\n\n`;
-  prompt += `You must respond with ONLY valid JSON. Do not include any text outside the JSON object.`;
-  if (outputSchema) prompt += `\n\nJSON structure:\n${JSON.stringify(outputSchema, null, 2)}`;
-  return prompt;
-}
-
-function buildUserPrompt(question) {
-  return `The founder asks the board: "${question}"\n\nProvide your response as a JSON object.`;
-}
 
 // ─── Main Handler ───────────────────────────────────────────────
 Deno.serve(async (req) => {
@@ -54,35 +44,22 @@ Deno.serve(async (req) => {
     }
 
     const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
-    const limits = limitsList?.[0] || { retry_count: 1, request_timeout_ms: 60000, max_output_length: 2000 };
-    const timeoutMs = limits.request_timeout_ms || 60000;
+    const limits = limitsList?.[0] || { retry_count: 1 };
     const retryCount = limits.retry_count ?? 1;
     const temp = advisor.temperature ?? 0.7;
-    const maxLen = advisor.maximum_output_length ?? limits.max_output_length ?? 2000;
 
     const provider = advisor.default_provider || 'openai';
     const model = advisor.default_model || 'gpt-4o';
     const fbProvider = advisor.fallback_provider;
     const fbModel = advisor.fallback_model;
 
-    const testSchema = {
-      type: 'object',
-      properties: {
-        position: { type: 'string' },
-        recommendation: { type: 'string' },
-        key_arguments: { type: 'array', items: { type: 'string' } },
-        confidence_score: { type: 'number' },
-      },
-      required: ['position', 'recommendation', 'confidence_score'],
-    };
-
-    const systemPrompt = buildSystemPrompt(advisor, null, companyContext, testSchema);
+    // The same prompt and call rules a meeting's Round 1 uses.
+    const systemPrompt = buildSystemPrompt(advisor, null, companyContext, null);
     const userPrompt = buildUserPrompt(question);
-    const requiredFields = testSchema.required;
 
     const { result, attempts, lastError } = await callWithFallback({
-      provider, model, fbProvider, fbModel, systemPrompt, userPrompt,
-      temperature: temp, maxTokens: maxLen, timeoutMs, retryCount, requiredFields,
+      provider, model, fbProvider, fbModel, systemPrompt, userPrompt, outputSchema: ADMIN_TEST_SCHEMA,
+      policy: policyFor('admin_test')!, temperature: temp, retryCount,
       deadlineAt: startedAt + CALL_DEADLINE_MS,
     });
 
@@ -91,7 +68,7 @@ Deno.serve(async (req) => {
       user_id: user.id, company_id: company_id || null, advisor_id,
       provider: result ? result.provider_used : provider, model: result ? result.model_used : model,
       request_type: 'admin_test',
-      input_size: totals.input, output_size: totals.output, estimated_cost: totals.cost,
+      input_size: totals.input, output_size: totals.output, thinking_size: totals.thinking, estimated_cost: totals.cost,
       latency_ms: result ? result.latency_ms : Date.now() - startedAt,
       status: result ? (result.used_fallback ? 'fallback_used' : 'success') : 'error',
       error_code: !result ? lastError : null,
