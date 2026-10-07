@@ -78,10 +78,10 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
         </div>
       )}
 
-      {/* Recommended board */}
+      {/* The starting board */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display text-xl">Your recommended board</h3>
+          <h3 className="font-display text-xl">Your board</h3>
           <button onClick={() => setShowAddPanel(!showAddPanel)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
             <Plus className="w-3.5 h-3.5" /> Add advisor
           </button>
@@ -89,6 +89,9 @@ export default function OnboardingReview({ answers, plan, onComplete, onBack }) 
 
         {showAddPanel && (
           <div className="bg-secondary/50 rounded-2xl p-4 mb-4 max-h-64 overflow-y-auto">
+            {debaterCount >= MAX_DEBATERS && (
+              <p className="text-sm text-muted-foreground mb-2">Five advisors can debate besides the Chair. Remove one to swap someone in.</p>
+            )}
             <div className="grid sm:grid-cols-2 gap-2">
               {availableToAdd.map((a) => (
                 <button key={a.key} onClick={() => addAdvisor(a)} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent/50 transition-colors text-left">

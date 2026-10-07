@@ -171,11 +171,11 @@ export const ONBOARDING_SCHEMA = {
     executive_briefing: { type: 'string', description: 'A warm, concise 2-3 sentence personalised briefing for the founder' },
     recommended_advisors: {
       type: 'array',
-      description: '4 to 6 advisors from the provided library, including the chair',
+      description: 'The six starting advisors listed in the prompt, in order, each with a personal reason',
       items: {
         type: 'object',
         properties: {
-          key: { type: 'string', description: 'Must be one of the valid advisor keys provided' },
+          key: { type: 'string', description: 'One of the six keys listed in the prompt' },
           name: { type: 'string' },
           role: { type: 'string' },
           reason: { type: 'string', description: 'One sentence explaining why this advisor is recommended for this specific founder' },

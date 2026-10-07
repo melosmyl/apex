@@ -1,50 +1,23 @@
 import { base44, supabase } from "@/api/base44Client";
-import { ADVISOR_LIBRARY } from "@/lib/advisorLibrary";
-import { MAX_DEBATERS, MIN_DEBATERS } from "@/lib/boardroom";
-import { buildAdvisorRecord, recommendAdvisorsHeuristic, getJourney } from "@/lib/companyJourney";
-
-const VALID_KEYS = ADVISOR_LIBRARY.map((a) => a.key);
+import { buildAdvisorRecord, startingBoard, getJourney } from "@/lib/companyJourney";
 
 export async function generateOnboardingPlan(answers, freeAttemptId) {
   try {
     const { data: plan } = await base44.functions.invoke("generateOnboardingPlan", { answers, ...(freeAttemptId ? { attempt_id: freeAttemptId } : {}) });
 
-    // Validate advisor keys — filter out invalid ones
-    if (plan.recommended_advisors) {
-      plan.recommended_advisors = plan.recommended_advisors.filter((a) => VALID_KEYS.includes(a.key));
-    }
-
-    // Fallback to heuristic if LLM returned too few debaters (the Chair doesn't debate)
-    if (!plan.recommended_advisors || plan.recommended_advisors.filter((a) => a.key !== "chair").length < MIN_DEBATERS) {
-      const heuristic = recommendAdvisorsHeuristic(answers.stage || "idea_validation", answers.advisor_involvement);
-      plan.recommended_advisors = heuristic;
-      plan._used_fallback = true;
-    }
-
-    // Ensure chair is included
-    if (!plan.recommended_advisors.some((a) => a.key === "chair")) {
-      const chair = ADVISOR_LIBRARY.find((a) => a.key === "chair");
-      plan.recommended_advisors.push({
-        key: "chair",
-        name: chair.name,
-        role: chair.role,
-        reason: "Every board needs a Chair to synthesise the discussion into a clear recommendation."
-      });
-    }
-
-    // A meeting seats the Chair plus at most MAX_DEBATERS others.
-    const nonChair = plan.recommended_advisors.filter((a) => a.key !== "chair").slice(0, MAX_DEBATERS);
-    plan.recommended_advisors = [...plan.recommended_advisors.filter((a) => a.key === "chair"), ...nonChair];
+    // Every new board starts with the same six; the AI's part is a personal
+    // reason for each, kept only for those six keys.
+    const reasons = Object.fromEntries((plan.recommended_advisors || []).filter((a) => a?.key).map((a) => [a.key, a.reason]));
+    plan.recommended_advisors = startingBoard(reasons);
 
     return plan;
   } catch (e) {
-    console.warn("Onboarding LLM failed, using heuristic:", e);
-    const heuristic = recommendAdvisorsHeuristic(answers.stage || "idea_validation", answers.advisor_involvement);
+    console.warn("Onboarding plan failed, using the plain starting board:", e);
     return {
       company_type: answers.industry ? `${answers.industry} ${answers.business_model || "business"}` : "New venture",
       recommended_journey: answers.stage || "idea_validation",
       executive_briefing: `Welcome aboard. Based on what you've shared, we've assembled a board to help you with ${answers.immediate_goal || "your next steps"}. Your advisors are ready when you are.`,
-      recommended_advisors: heuristic,
+      recommended_advisors: startingBoard(),
       suggested_meetings: [
         "What is the single biggest assumption we need to validate first?",
         "What should our priorities be for the next 90 days?",

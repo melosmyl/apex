@@ -1,10 +1,11 @@
 // generateOnboardingPlan — the very first LLM call a founder ever triggers,
 // right after the (now 4-question) onboarding form. Runs as the Chair
 // persona via routeAdvisorRequest's advisor_override, since no company or
-// advisor row exists yet at this point. The client (src/lib/onboarding.js)
-// validates recommended advisor keys against the authoritative ADVISOR_LIBRARY
-// and falls back to a heuristic plan if this call fails outright — this
-// function's only job is to produce a genuinely personalised plan when it can.
+// advisor row exists yet at this point. Every new board starts with the same
+// six advisors: the client (src/lib/onboarding.js) builds that board itself
+// and keeps only the personal reasons written here, falling back to plain
+// ones if this call fails — this function's only job is to make the plan
+// genuinely personal when it can.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { PRODUCT_NAME } from '../_shared/branding.ts';
@@ -17,30 +18,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Compact mirror of src/lib/advisorLibrary.js (key, name, role, expertise only)
-// — enough for the LLM to pick sensible keys. The client re-validates every
-// returned key against the real library afterward, so drift here is self-healing.
-const ADVISOR_OPTIONS = `visionary: Amara Vance, Visionary — Strategy, Fundraising, Category creation
-operator: Daniel Okoye, Operator — Operations, Scaling, Hiring
-creative_director: Sofia Marchetti, Creative Director — Brand, Design, Creative direction
-marketing_director: Priya Nair, Marketing Director — Marketing, Growth, Positioning
-marcus-delgado: Marcus Delgado, Chief Financial Officer — Finance, Fundraising, Unit economics
-investor: Eleanor Whitfield, Investor — Venture, Markets, Strategy
-product_strategist: Tomas Berg, Product Strategist — Product, UX strategy, Roadmapping
-customer_advocate: Grace Bennett, Customer Advocate — Customer success, Support, Loyalty
-legal_advisor: Julian Rhodes, Legal Advisor — Legal, Compliance, Contracts
-scientist: Dr. Lena Fisher, Scientist — R&D, Data, Innovation
-supply_chain: Rafael Duarte, Supply Chain Expert — Supply chain, Manufacturing, Logistics
-people_culture: Naomi Clarke, People & Culture Director — People, Culture, Organisation design
-innovation_director: Kai Nakamura, Innovation Director — Innovation, New ventures, Emerging tech
-risk_analyst: Helena Vogt, Risk Analyst — Risk, Strategy, Analysis
-capital_allocator: Warren Bishop, Capital Allocator — Capital allocation, Prioritisation, Return on investment
-ai_expert: Dr. Aris Chen, AI Strategist — Artificial intelligence, Machine learning, Data strategy
-felix-hart: Felix Hart, Founder & Technologist — Engineering, Manufacturing, Frontier technology
-arthur-penrose: Arthur Penrose, Value Investor — Value investing, Capital allocation, Long-term ownership
-nathan-cole: Nathan Cole, Founder & Builder — Customer experience, Operations at scale, Logistics
-theo-lindqvist: Theo Lindqvist, Creative Producer — Creative direction, Artistic vision, Taste
-contrarian: Victor Hale, Contrarian — Critical thinking, Risk assessment, Strategy`;
+// Every new board starts with the same six (owner's decision, B3; the same
+// list as STARTING_BOARD_KEYS in src/lib/companyJourney.js). The model only
+// writes a personal reason for each; the client builds the board itself.
+const STARTING_BOARD = `chair: Margaret Ashworth, The Chair — runs every meeting and writes the resolution
+visionary: Amara Vance, Visionary — strategy, fundraising, category creation
+marketing_director: Priya Nair, Marketing Director — marketing, growth, positioning
+product_strategist: Tomas Berg, Product Strategist — product, UX strategy, roadmapping
+ai_expert: Dr. Aris Chen, AI Strategist — artificial intelligence, machine learning, data strategy
+customer_advocate: Grace Bennett, Customer Advocate — customer success, support, loyalty`;
 
 function buildPrompt(answers: Record<string, unknown>) {
   const answersText = Object.entries(answers || {})
@@ -53,18 +39,17 @@ function buildPrompt(answers: Record<string, unknown>) {
 Here is what the founder has shared — it may be brief, since onboarding is deliberately short. Work with what's here rather than assuming more detail than was given:
 ${answersText}
 
-Available advisors (use ONLY these keys):
-${ADVISOR_OPTIONS}
+Every new board starts with these six advisors:
+${STARTING_BOARD}
 
 Based on the founder's situation, generate a personalised onboarding plan:
-1. Recommend 4–6 advisors (always include "chair" — Margaret Ashworth synthesises the board). Pick advisors whose expertise directly addresses the founder's stage and challenge.
-2. Write a warm, specific reason for each recommendation — tie it to what the founder shared.
-3. Suggest exactly 3 strategic questions for their first board meetings.
-4. Suggest 3–5 concrete first tasks. Assign each to the most relevant advisor role or "Founder".
-5. Give ONE clear primary action labelled as the start_here_action — the single most important thing to do first.
-6. Write a warm 2-3 sentence executive briefing that makes the founder feel understood and supported.
-7. Classify the company type in a short label.
-8. Choose the recommended_journey that best fits their current stage.
+1. In recommended_advisors, list exactly these six, with these keys, names and roles, in this order. For each, write one warm, specific sentence on why they'll be useful to this founder — tie it to what the founder shared.
+2. Suggest exactly 3 strategic questions for their first board meetings.
+3. Suggest 3–5 concrete first tasks. Assign each to the most relevant of the six advisors' roles or "Founder".
+4. Give ONE clear primary action labelled as the start_here_action — the single most important thing to do first.
+5. Write a warm 2-3 sentence executive briefing that makes the founder feel understood and supported.
+6. Classify the company type in a short label.
+7. Choose the recommended_journey that best fits their current stage.
 
 Be specific and personal where the founder gave you something specific to work with. Where they didn't, stay general rather than inventing detail they never gave you — never fabricate facts about their business. Never use placeholder text.`;
 }
@@ -112,7 +97,7 @@ Deno.serve(async (req) => {
         advisor_override: {
           name: 'Margaret Ashworth',
           role: 'The Chair',
-          system_instructions: 'You are Margaret Ashworth, a veteran board chair. Right now you are not chairing a debate — you are meeting a brand-new founder for the first time and assembling their board. Be warm, precise and genuinely personal to what they told you.',
+          system_instructions: 'You are Margaret Ashworth, a veteran board chair. Right now you are not chairing a debate — you are meeting a brand-new founder for the first time and introducing their board. Be warm, precise and genuinely personal to what they told you.',
           decision_style: 'Balanced, synthesising, evidence-weighing',
           communication_style: 'Warm, clear, precise',
           strengths: ['Synthesis', 'Reading a founder\'s real situation quickly'],

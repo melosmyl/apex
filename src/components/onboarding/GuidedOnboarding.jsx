@@ -36,7 +36,7 @@ export const QUESTIONS = [
 
 const PHASE_MESSAGES = [
   "Understanding your situation…",
-  "Selecting the right advisors…",
+  "Introducing your board…",
   "Preparing your first steps…"
 ];
 
@@ -136,7 +136,7 @@ export default function GuidedOnboarding({ open, onClose }) {
                 Let's build your board.
               </h1>
               <p className="text-muted-foreground text-base sm:text-lg leading-relaxed max-w-md mx-auto mb-8">
-                Five quick questions. We'll assemble the right advisors and map your first steps — the rest, your board will ask you directly.
+                Five quick questions. We'll introduce your board and map your first steps — the rest, your board will ask you directly.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button onClick={beginQuestions} variant="primary" className="px-8 h-12 text-[0.95rem]">
