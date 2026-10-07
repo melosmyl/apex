@@ -1,236 +1,231 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { PRODUCT_NAME } from "@/lib/branding";
-import LandingTranscript from "@/components/landing/LandingTranscript";
-import officeImage from "@/assets/landing/office.jpg";
-import floorPapersImage from "@/assets/landing/floor-papers.jpg";
-import tornPageImage from "@/assets/landing/torn-page-dark.jpg";
+import { ADVISOR_LIBRARY, getAdvisorByKey } from "@/lib/advisorLibrary";
+import { portraitFor } from "@/lib/portraits";
+import { OFF_DUTY } from "@/lib/offDuty";
+import { ADVISORS_ARE_AI, PRODUCT_NAME } from "@/lib/branding";
+import "@/styles/room.css";
+import "@/styles/landing.css";
 
-// Swap in the real board meeting's share token here — see /share/meeting/:token.
-// Until it's set, section 4 shows an honest "in session" placeholder rather
-// than a mockup or illustrative copy.
-const FEATURED_MEETING_TOKEN = "";
+// The page logged-out visitors see at "/", built from jatr-landing-mock.html
+// as it opens: palette C, Comic, frames off. Names, roles, voice lines, mugs
+// and portraits all come from the advisor library, so a rename or a new
+// portrait shows up here without touching this file.
 
-// The founder note is written by the founder, not drafted here — this is a
-// visible placeholder, not a stand-in quote, until real copy is dropped in.
-const FOUNDER_NOTE = "";
+// Who sits in the board strip, and who gets a card further down.
+const STRIP_KEYS = ["chair", "legal_advisor", "scientist", "supply_chain", "people_culture", "innovation_director"];
+const CARD_KEYS = ["investor", "legal_advisor", "scientist", "supply_chain", "people_culture", "innovation_director"];
 
-// Dark sections are a fixed page-level treatment, independent of the app's
-// own light/dark theme (which this page otherwise never toggles) — applied
-// via inline style rather than the `.dark` token scope so --brand stays the
-// same deep indigo everywhere on the page, per the revision brief's "indigo
-// with cream text" CTA rule holding on both cream and dark sections alike.
-const DARK_SECTION = { background: "hsl(220 8% 7%)", color: "hsl(40 10% 92%)" };
+const pick = (keys) => keys.map(getAdvisorByKey).filter(Boolean);
 
-// Fine film grain over the whole page — texture without content, so the
-// cream sections stop reading as a flat solid field. An inline SVG noise
-// filter rather than a photograph: zero network requests, a few hundred
-// bytes total, and it reads identically over both cream and dark sections
-// since it's a blend mode, not a background image tied to one palette.
-const GRAIN_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>`;
-const GRAIN_STYLE = {
-  backgroundImage: `url("data:image/svg+xml,${GRAIN_SVG.replace(/#/g, "%23")}")`,
-  backgroundRepeat: "repeat",
-  backgroundSize: "180px 180px",
-  opacity: 0.05,
-  mixBlendMode: "overlay",
-};
-
-const FOR_YOU = [
-  "You're leaving a long career to build something of your own",
-  "You want a second opinion that isn't just agreement",
-  "You'd rather hear the hard truth now than find out later",
-  "You're working this out part-time, around everything else",
-];
-
-const NOT_FOR_YOU = [
-  "You want a co-founder who'll always agree with you",
-  "You're already deep in fundraising and need investor-speak",
-  "You want one definitive answer with no debate attached",
-  "You're after a project manager, not a sounding board",
-];
-
-function Kicker({ children }) {
-  return <p className="font-mono text-[11px] sm:text-xs tracking-[0.25em] uppercase opacity-55">{children}</p>;
+// A mug is stored as it's described ("“Hold”", or with an aside after it);
+// the ticker and the cards want just the words printed on it.
+function mugWords(mug = "") {
+  const quoted = mug.match(/“([^”]+)”/);
+  return (quoted ? quoted[1] : mug).trim();
 }
 
-function Section({ children, className = "", dark = false }) {
-  return (
-    <section className={`px-5 sm:px-8 ${className}`} style={dark ? DARK_SECTION : undefined}>
-      {children}
-    </section>
-  );
+const ONES = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+function inWords(n) {
+  if (n < 20) return ONES[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? `-${ONES[n % 10]}` : "");
+  return String(n);
+}
+const capitalised = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const firstName = (name) => name.replace(/^Dr\.\s+/, "").split(" ")[0];
+
+function Portrait({ advisor, size = "card", className }) {
+  const p = portraitFor({ libraryKey: advisor.key });
+  if (!p) return null;
+  return <img src={p[size]} alt="" loading="lazy" className={className} />;
+}
+
+// Cards rise in as they scroll into view. They're only hidden once this has
+// armed the list (the "rise" class), so without IntersectionObserver, with
+// reduced motion, or if this never runs, they're simply there.
+function useRiseIn(ref) {
+  useEffect(() => {
+    const list = ref.current;
+    const cards = [...(list?.querySelectorAll(".card") || [])];
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!list || reduce || !("IntersectionObserver" in window)) return undefined;
+    list.classList.add("rise");
+    const timers = [];
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          timers.push(setTimeout(() => e.target.classList.add("in"), (cards.indexOf(e.target) % 6) * 90));
+          io.unobserve(e.target);
+        });
+      },
+      { threshold: 0.2 }
+    );
+    cards.forEach((c) => io.observe(c));
+    return () => {
+      io.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, [ref]);
 }
 
 export default function Landing() {
+  const listRef = useRef(null);
+  useRiseIn(listRef);
+
+  const strip = pick(STRIP_KEYS);
+  const cards = pick(CARD_KEYS);
+  const mugs = [...new Set(ADVISOR_LIBRARY.map((a) => mugWords(a.mug)).filter(Boolean))];
+  const count = inWords(ADVISOR_LIBRARY.length);
+  const offDuty = OFF_DUTY.map((o) => ({ ...o, advisor: ADVISOR_LIBRARY.find((a) => a.portrait_slug === o.slug) })).filter((o) => o.advisor);
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* No persistent header on this page by design, but a returning user
-          with an existing account still needs a way back in without
-          already knowing the /login URL — the only other links here
-          ("Sit in on one" / "Take a seat") both go to the anonymous /board
-          flow, which reads as sign-up, not sign-in. Fixed rather than
-          scrolled-to in the footer, so it's found immediately. */}
-      <Link
-        to="/login"
-        className="absolute top-5 right-5 sm:top-6 sm:right-8 z-50 font-mono text-[11px] tracking-[0.2em] uppercase text-foreground/60 hover:text-foreground transition-colors"
-      >
-        Log in
-      </Link>
+    <div className="room landing">
+      <div className="room-grain" aria-hidden="true" />
+      <main>
+        <div className="wrap">
+          <header className="top">
+            <Link className="brand" to="/">{PRODUCT_NAME}</Link>
+            <nav aria-label="Main">
+              <Link className="wide-only" to="/advisors">The advisors</Link>
+              <a className="wide-only" href="#how">How it works</a>
+              <Link to="/login">Log in</Link>
+              <Link className="room-btn-line" to="/board">Sit in on a meeting</Link>
+            </nav>
+          </header>
 
-      {/* 1. Hero — cream */}
-      <Section className="pt-16 sm:pt-24 pb-16 sm:pb-24">
-        <div className="max-w-5xl mx-auto text-center rise-in">
-          <Kicker>{PRODUCT_NAME}</Kicker>
-          <h1 className="font-display text-[2.75rem] leading-[1.05] sm:text-7xl sm:leading-[0.98] lg:text-8xl lg:leading-[0.95] mt-5 mb-6 text-balance">
-            Don't decide alone.
-          </h1>
-          <p className="text-lg sm:text-xl lg:text-2xl leading-relaxed text-foreground/75 mb-10 text-balance max-w-2xl mx-auto">
-            A board of advisors who argue about your business.{" "}
-            <br className="hidden sm:block" />
-            Not one confident answer. Five people who disagree.
-          </p>
-          {/* No dark stage behind the button — the metal border itself
-              (see .btn-metal in index.css) is firm enough to define the
-              button's edges against cream on its own. */}
-          <Button asChild variant="primary" size="lg" className="px-8 h-12 text-base">
-            <Link to="/board">Sit in on one <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
-          </Button>
-        </div>
-      </Section>
-
-      {/* 2. The room — full-bleed photograph, atmosphere before argument.
-          Desaturated hard in the file itself (near-greyscale, lamps keep a
-          little warmth) rather than via a CSS filter, since a flat
-          `grayscale` class would kill the lamp glow along with the rest. */}
-      <div className="w-full hero-photo">
-        <img
-          src={officeImage}
-          alt=""
-          role="presentation"
-          loading="lazy"
-          className="w-full h-[46vh] sm:h-[62vh] object-cover"
-        />
-      </div>
-
-      {/* 3. The differentiator — dark */}
-      <Section dark className="py-20 sm:py-28">
-        <div className="max-w-xl mx-auto text-center">
-          <h2 className="font-display text-4xl sm:text-5xl leading-tight mb-6 text-balance">
-            AI that disagrees with you.
-          </h2>
-          <p className="text-lg sm:text-xl leading-relaxed opacity-85 text-balance">
-            Everything else tells you your idea is great.{" "}
-            <br className="hidden sm:block" />
-            Your board tells you when it isn't.
-          </p>
-        </div>
-      </Section>
-
-      {/* 4. A real transcript — cream, the only evidence on the page */}
-      <Section className="py-16 sm:py-20">
-        <div className="max-w-2xl mx-auto">
-          <LandingTranscript token={FEATURED_MEETING_TOKEN} />
-        </div>
-      </Section>
-
-      {/* 5. Who this is for / not for — dark */}
-      <Section dark className="py-16 sm:py-24">
-        <div className="max-w-3xl mx-auto">
-          <div className="grid sm:grid-cols-2 gap-8 sm:gap-6">
-            <div>
-              <Kicker>This is for you if</Kicker>
-              <ul className="mt-5 space-y-4">
-                {FOR_YOU.map((line, i) => (
-                  <li key={i} className="flex gap-3 text-[15px] sm:text-base leading-relaxed">
-                    <span className="text-brand shrink-0">—</span>{line}
-                  </li>
-                ))}
-              </ul>
+          <section className="hero">
+            <span className="room-mono">An AI board of advisors</span>
+            <h1>Don't decide <em>alone.</em></h1>
+            <div className="hero-row">
+              <p className="lede">
+                A board of advisors who argue about your business. Not one confident answer: five people who disagree, and a Chair who writes down what you should do next.
+              </p>
+              <Link className="room-btn" to="/board">Sit in on a meeting <span aria-hidden="true">→</span></Link>
             </div>
-            <div>
-              <Kicker>Not for you if</Kicker>
-              <ul className="mt-5 space-y-4">
-                {NOT_FOR_YOU.map((line, i) => (
-                  <li key={i} className="flex gap-3 text-[15px] sm:text-base leading-relaxed opacity-75">
-                    <span className="shrink-0">—</span>{line}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          </section>
+        </div>
+
+        <section className="strip" aria-label="The board">
+          <div className="row">
+            {strip.map((a) => (
+              <figure key={a.key} tabIndex={0} aria-label={`${a.name}, ${a.role}`}>
+                <Portrait advisor={a} />
+                <figcaption>
+                  <b>{a.name}</b>
+                  <span>{a.role}</span>
+                  {a.voice_line && <q className="room-bubble">{a.voice_line}</q>}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+        <div className="wrap">
+          <div className="strip-foot">
+            <span className="room-mono">The room, in session</span>
+            <span className="room-mono hover-hint">Hover an advisor</span>
           </div>
         </div>
-      </Section>
 
-      {/* 6. Founder note — cream. Image beside the note, not behind it —
-          atmosphere, not a hero. Fully desaturated per the imagery brief. */}
-      <Section className="py-16 sm:py-20">
-        <div className="max-w-2xl mx-auto grid sm:grid-cols-[minmax(0,280px)_1fr] gap-8 sm:gap-10 items-center">
-          <img
-            src={floorPapersImage}
-            alt=""
-            role="presentation"
-            loading="lazy"
-            className="w-full aspect-[4/3] object-cover rounded-sm shadow-card grayscale"
-          />
-          <div>
-            <Kicker>Why I built this</Kicker>
-            {FOUNDER_NOTE ? (
-              <>
-                <p className="font-display text-xl sm:text-2xl italic leading-snug mt-4 mb-4 text-balance">
-                  {FOUNDER_NOTE}
+        <div className="ticker" aria-hidden="true">
+          <div className="track">
+            {[...mugs, ...mugs].map((m, i) => <span key={i}>{m}</span>)}
+          </div>
+        </div>
+
+        <div className="wrap">
+          <section className="speak" id="advisors">
+            <div className="section-head">
+              <div>
+                <span className="room-mono">Who's in the room</span>
+                <h2>{capitalised(count)} advisors. None of them agree.</h2>
+              </div>
+              <p className="sub">
+                Each argues from their own corner. The Chair keeps the view you'd rather not hear in the minutes, so the decision is yours with your eyes open.
+              </p>
+            </div>
+            <div className="list" ref={listRef}>
+              {cards.map((a) => (
+                <article className="card" key={a.key}>
+                  <Portrait advisor={a} />
+                  <div className="who">
+                    <Link to={`/advisors/${a.portrait_slug}`}>{a.name}</Link>
+                    <span>{a.role}</span>
+                  </div>
+                  {a.voice_line ? <q className="room-bubble room-bubble--tail-left">{a.voice_line}</q> : <span />}
+                  <div className="mug">Mug<b>{mugWords(a.mug)}</b></div>
+                </article>
+              ))}
+            </div>
+            <div className="more">
+              <Link className="text-link" to="/advisors">Meet all {count} <span aria-hidden="true">→</span></Link>
+            </div>
+          </section>
+
+          <section className="how" id="how">
+            <span className="room-mono">How it works</span>
+            <h2>A boardroom for founders who've never had one.</h2>
+            <div className="steps">
+              <div className="step room-card">
+                <div className="n">1</div>
+                <h3>Choose your advisors</h3>
+                <p>Pick the voices you need: a finance head, a marketer, a sceptic. They remember your business from one meeting to the next.</p>
+              </div>
+              <div className="step room-card">
+                <div className="n">2</div>
+                <h3>Ask your question</h3>
+                <p>Plain words are fine. The room debates it from every side and tells you where they agree and where they don't.</p>
+              </div>
+              <div className="step room-card">
+                <div className="n">3</div>
+                <h3>Get it done</h3>
+                {/* The owner's wording ("agents pick up the tasks and finish
+                    them…") goes back in when agents ship. */}
+                <p>After the meeting, the decision becomes a short list of tasks with owners, and your advisors follow up until they're done.</p>
+              </div>
+            </div>
+          </section>
+
+          {offDuty.length > 0 && (
+            <section className="off" id="off">
+              <div className="section-head">
+                <div>
+                  <span className="room-mono">Off the clock</span>
+                  <h2>They do have lives. Apparently.</h2>
+                </div>
+                <p className="sub">
+                  Every advisor has a book, a hobby and a place they'd rather be. They'll mention it once a meeting, at most, and only when it helps.
                 </p>
-                <p className="text-sm text-foreground/75 leading-relaxed">— Melody, founder</p>
-              </>
-            ) : (
-              <p className="text-sm text-foreground/75 italic leading-relaxed mt-4 border border-dashed border-border rounded-lg px-4 py-3">
-                Founder note pending — drop real copy into FOUNDER_NOTE in Landing.jsx.
-              </p>
-            )}
-          </div>
+              </div>
+              <div className="gallery">
+                {offDuty.map((o) => (
+                  <Link className="shot" key={o.slug} to={`/advisors/${o.slug}`}>
+                    <img src={`/advisors/off/${o.slug}.jpg`} alt="" loading="lazy" />
+                    <span className="cap"><b>{firstName(o.advisor.name)}</b> {o.caption}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="closer">
+            <h2>Bring them the decision that's keeping you up.</h2>
+            <Link className="room-btn" to="/board">Sit in on a meeting <span aria-hidden="true">→</span></Link>
+          </section>
+
+          <footer>
+            <nav aria-label="Footer">
+              <Link to="/advisors">The advisors</Link>
+              <Link to="/pricing">Pricing</Link>
+              <Link to="/privacy">Privacy</Link>
+              <Link to="/terms">Terms</Link>
+            </nav>
+            <p className="ai-note">{ADVISORS_ARE_AI}</p>
+          </footer>
         </div>
-      </Section>
-
-      {/* 7. Close — dark, the page's true dark anchor. The paper is an
-          object on the ground, not a background — cropped tight so it
-          fills the frame, not stretched full-bleed (which would lose the
-          torn edge and cast shadow the whole effect depends on). */}
-      <Section dark className="pt-6 sm:pt-8 pb-16 sm:pb-24">
-        <div className="max-w-md sm:max-w-xl mx-auto">
-          <div className="relative">
-            <img
-              src={tornPageImage}
-              alt=""
-              role="presentation"
-              loading="lazy"
-              className="w-full aspect-[5/3] object-cover object-[51%_50%] rounded-sm shadow-elevated"
-            />
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 sm:px-12">
-              <h2 className="font-display text-3xl sm:text-5xl leading-[1.05] text-[hsl(220_8%_10%)] mb-3 sm:mb-5 text-balance">
-                Take a seat.
-              </h2>
-              <p className="text-sm sm:text-lg leading-snug text-[hsl(220_8%_22%)] mb-5 sm:mb-8 text-balance">
-                Real boards cost £50,000 a year.
-                <br />
-                Yours starts free, tonight.
-              </p>
-              <Button asChild variant="primary" size="lg" className="px-6 sm:px-8 h-10 sm:h-12 text-xs sm:text-base">
-                <Link to="/board">Take a seat <ArrowRight className="w-4 h-4 ml-1.5" /></Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <footer className="flex items-center justify-center gap-4 mt-14 sm:mt-16">
-          <Link to="/advisors" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Meet the advisors</Link>
-          <Link to="/privacy" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Privacy</Link>
-          <Link to="/terms" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Terms</Link>
-        </footer>
-      </Section>
-
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-40" style={GRAIN_STYLE} />
+      </main>
     </div>
   );
 }

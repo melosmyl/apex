@@ -55,6 +55,17 @@ export default function AdvisorProfile({ profile, actions = null, headingLevel =
         {profile.offTheClock.length > 0 && (
           <section>
             <h3 className="text-[11px] uppercase tracking-widest text-muted-foreground mb-2">Off the clock</h3>
+            {profile.offDuty && (
+              <figure className="mb-3 max-w-[180px]">
+                <img
+                  src={profile.offDuty.src}
+                  alt={`${profile.name}, off the clock`}
+                  loading="lazy"
+                  className="w-full aspect-[4/5] object-cover object-top rounded-lg bg-secondary"
+                />
+                <figcaption className="text-xs text-muted-foreground mt-1.5 leading-snug">{profile.offDuty.caption}</figcaption>
+              </figure>
+            )}
             <dl className="grid gap-2 text-sm">
               {profile.offTheClock.map(([label, value]) => (
                 <div key={label} className="grid grid-cols-[110px_minmax(0,1fr)] gap-3">

@@ -1,5 +1,6 @@
 import { ADVISOR_LIBRARY, getAdvisorByKey } from "@/lib/advisorLibrary";
 import { portraitFor } from "@/lib/portraits";
+import { offDutyPhotoFor } from "@/lib/offDuty";
 
 // What an advisor's profile shows (Workstream K4): the library character,
 // with the board's own copy taking precedence where the founder has one
@@ -35,5 +36,6 @@ export function profileFor({ advisor = null, libraryKey, name, role } = {}) {
     ].filter(([, v]) => v),
     isPerson: advisor?.type === "human",
     portrait: portraitFor({ libraryKey: lib?.key, name: advisor?.name || name }),
+    offDuty: offDutyPhotoFor(lib?.portrait_slug),
   };
 }
