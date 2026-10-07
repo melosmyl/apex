@@ -223,6 +223,7 @@ export default function FreeMeeting() {
         )}
 
         <div className="flex items-center justify-center gap-4 mt-16 pt-6 border-t border-border/50">
+          <Link to="/advisors" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Meet the advisors</Link>
           <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
           <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
         </div>

@@ -19,3 +19,7 @@ export const SITE_URL = (import.meta.env.VITE_SITE_URL || window.location.origin
 // 2026-08-12) — this placeholder exists so renaming her later is a one-line
 // change here, not a find-and-replace across the codebase.
 export const ASSISTANT_NAME = "The Assistant";
+
+// D1: shown wherever an advisor is presented (profiles, the advisors pages).
+// The owner's wording; change it here only with their sign-off.
+export const ADVISORS_ARE_AI = "Every advisor at Just Ask The Room is an AI character. Their backgrounds are invented, and their advice comes from AI models, not people. The decisions are yours.";

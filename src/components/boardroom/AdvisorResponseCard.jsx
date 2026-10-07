@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
+import { ProfileTrigger } from "@/components/advisors/AdvisorProfilePanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,9 +74,9 @@ export default function AdvisorResponseCard({ independent, challenge, accent, me
     return (
       <div className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
         <div className="flex items-start gap-3 mb-4">
-          <AdvisorAvatar name={independent.advisor_name} accent={accent} size="md" />
+          <ProfileTrigger name={independent.advisor_name} role={independent.role}><AdvisorAvatar name={independent.advisor_name} accent={accent} size="md" /></ProfileTrigger>
           <div className="flex-1 min-w-0">
-            <h4 className="font-display text-lg leading-tight">{independent.advisor_name}</h4>
+            <h4 className="font-display text-lg leading-tight"><ProfileTrigger name={independent.advisor_name} role={independent.role}>{independent.advisor_name}</ProfileTrigger></h4>
             <p className="text-xs text-muted-foreground">{independent.role}</p>
           </div>
           <div className="text-center shrink-0">
@@ -92,9 +93,9 @@ export default function AdvisorResponseCard({ independent, challenge, accent, me
   return (
     <div className="bg-card border border-border/70 rounded-2xl p-5 rise-in">
       <div className="flex items-start gap-3 mb-4">
-        <AdvisorAvatar name={independent.advisor_name} accent={accent} size="md" />
+        <ProfileTrigger name={independent.advisor_name} role={independent.role}><AdvisorAvatar name={independent.advisor_name} accent={accent} size="md" /></ProfileTrigger>
         <div className="flex-1 min-w-0">
-          <h4 className="font-display text-lg leading-tight">{independent.advisor_name}</h4>
+          <h4 className="font-display text-lg leading-tight"><ProfileTrigger name={independent.advisor_name} role={independent.role}>{independent.advisor_name}</ProfileTrigger></h4>
           <p className="text-xs text-muted-foreground">{independent.role}</p>
         </div>
         <div className="text-center shrink-0">

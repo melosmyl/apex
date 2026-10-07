@@ -13,6 +13,7 @@ import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
 import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
 import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
+import { useAdvisorProfile } from "@/components/advisors/AdvisorProfilePanel";
 import { useAssistant } from "@/lib/AssistantContext";
 
 const POLL_INTERVAL_MS = 3000;
@@ -77,6 +78,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   // attention while one is active. Mirrors this component's own state
   // outward rather than changing its state machine.
   const { setMeetingRunning, checkNoteRelevance, interjection } = useAssistant();
+  const { open: openProfile } = useAdvisorProfile();
   useEffect(() => {
     setMeetingRunning(["preparing", "discussion", "resolution", "human_input"].includes(phase));
     return () => setMeetingRunning(false);
@@ -291,6 +293,9 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         <BoardroomBanner
           activeChairId={activeChairId}
           chairLabels={chairLabels}
+          onPortraitClick={openProfile ? (label) => openProfile({
+            advisor: advisors.find((a) => a.name === label.name), name: label.name, libraryKey: label.libraryKey, role: label.role,
+          }) : null}
           className="h-[200px] sm:h-[280px] rounded-2xl mb-6 rise-in"
         />
         <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">

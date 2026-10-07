@@ -75,6 +75,8 @@ const PORTRAIT_R = 85;
 export default function BoardroomBanner({
   activeChairId = null,
   chairLabels = {},
+  // Clicking the speaker's portrait (e.g. to open their profile).
+  onPortraitClick = null,
   // "screen" is the chosen default after comparing against lighten,
   // soft-light, multiply, overlay, and color-dodge on the real photo:
   // multiply/overlay disappear into the near-black image, color-dodge
@@ -143,7 +145,17 @@ export default function BoardroomBanner({
           const portrait = portraitFor({ libraryKey: label.libraryKey, name: label.name });
           const { x, y } = TAG_ANCHOR[c.id];
           return (
-            <g key={c.id} style={{ opacity, transition: `opacity ${CROSSFADE_MS}ms ease` }}>
+            <g
+              key={c.id}
+              style={{
+                opacity, transition: `opacity ${CROSSFADE_MS}ms ease`,
+                // Only the lit seat's portrait can be clicked.
+                pointerEvents: onPortraitClick && portrait && c.id === activeChairId ? "auto" : "none",
+                cursor: onPortraitClick && portrait ? "pointer" : undefined,
+              }}
+              onClick={onPortraitClick && portrait ? () => onPortraitClick(label) : undefined}
+            >
+              {portrait && onPortraitClick && <title>{`Open ${label.name}'s profile`}</title>}
               {portrait && (
                 <>
                   <clipPath id={`tag-portrait-${c.id}`}>

@@ -38,6 +38,9 @@ import Research from '@/pages/company/Research';
 import Decisions from '@/pages/company/Decisions';
 import Meetings from '@/pages/company/Meetings';
 import CompanySettings from '@/pages/company/CompanySettings';
+import AdvisorsIndex from '@/pages/advisors/AdvisorsIndex';
+import AdvisorPage from '@/pages/advisors/AdvisorPage';
+import { AdvisorProfileProvider } from '@/components/advisors/AdvisorProfilePanel';
 // import CompanySettings from '@/pages/company/CompanySettings';
 
 const AuthenticatedApp = () => {
@@ -73,6 +76,8 @@ const AuthenticatedApp = () => {
       <Route path="/share/document/:token" element={<SharedDocumentView />} />
       <Route path="/share/meeting/:token" element={<SharedMeetingView />} />
       <Route path="/board" element={<FreeMeeting />} />
+      <Route path="/advisors" element={<AdvisorsIndex />} />
+      <Route path="/advisors/:slug" element={<AdvisorPage />} />
       <Route path="/_test/buttons" element={<ButtonDemoTest />} />
       <Route path="/_test/boardroom" element={<BoardroomDemoTest />} />
       <Route element={<ProtectedRoute unauthenticatedElement={<Landing />} />}>
@@ -114,7 +119,9 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
-          <AuthenticatedApp />
+          <AdvisorProfileProvider>
+            <AuthenticatedApp />
+          </AdvisorProfileProvider>
         </Router>
         <Toaster />
       </QueryClientProvider>

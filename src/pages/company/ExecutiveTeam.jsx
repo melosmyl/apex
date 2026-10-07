@@ -115,7 +115,7 @@ export default function ExecutiveTeam() {
         </div>
       }
 
-      <AddAdvisorDialog open={addOpen} onOpenChange={setAddOpen} existingKeys={existingKeys} onAdd={addAdvisor} atCap={atCap} maxAdvisors={MAX_AI_ADVISORS} />
+      <AddAdvisorDialog open={addOpen} onOpenChange={setAddOpen} existingKeys={existingKeys} onAdd={addAdvisor} atCap={atCap} maxAdvisors={MAX_AI_ADVISORS} seatsFilled={aiAdvisorCount} />
       <InvitePersonDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={invitePerson} />
       <AdvisorProfileDialog advisor={selected} open={!!selected} onOpenChange={(o) => !o && setSelected(null)}
       onAction={selected?.id === chair?.id ? undefined : remove} actionLabel="Remove from team" actionVariant="destructive"

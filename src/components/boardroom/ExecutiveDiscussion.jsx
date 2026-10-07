@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
+import { ProfileTrigger } from "@/components/advisors/AdvisorProfilePanel";
 import PinnableText from "@/components/pins/PinnableText";
 import UnavailableNotice from "@/components/boardroom/UnavailableNotice";
 import { absenteesByRound } from "@/lib/boardroom";
@@ -54,11 +55,11 @@ export function DiscussionMessage({ msg, accent }) {
     return (
       <div className="flex gap-3">
         <div className="shrink-0 pt-0.5 opacity-50">
-          <AdvisorAvatar name={msg.advisor_name} accent={accent} size="sm" />
+          <ProfileTrigger name={msg.advisor_name} role={msg.role}><AdvisorAvatar name={msg.advisor_name} accent={accent} size="sm" /></ProfileTrigger>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="font-display text-sm font-medium text-muted-foreground">{msg.advisor_name}</span>
+            <ProfileTrigger name={msg.advisor_name} role={msg.role}><span className="font-display text-sm font-medium text-muted-foreground">{msg.advisor_name}</span></ProfileTrigger>
             <span className="text-xs text-muted-foreground">{msg.role}</span>
           </div>
           <UnavailableNotice>Could not be reached — gave no position. The board continued without them.</UnavailableNotice>
@@ -91,11 +92,11 @@ export function DiscussionMessage({ msg, accent }) {
   return (
     <div className="flex gap-3 group">
       <div className="shrink-0 pt-0.5">
-        <AdvisorAvatar name={msg.advisor_name} accent={accent} size="sm" />
+        <ProfileTrigger name={msg.advisor_name} role={msg.role}><AdvisorAvatar name={msg.advisor_name} accent={accent} size="sm" /></ProfileTrigger>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className="font-display text-sm font-medium">{msg.advisor_name}</span>
+          <ProfileTrigger name={msg.advisor_name} role={msg.role}><span className="font-display text-sm font-medium">{msg.advisor_name}</span></ProfileTrigger>
           <span className="text-xs text-muted-foreground">{msg.role}</span>
           {msg.reply_to_advisor && (
             <span className="text-xs text-muted-foreground flex items-center gap-0.5 italic">

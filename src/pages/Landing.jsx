@@ -224,6 +224,7 @@ export default function Landing() {
         </div>
 
         <footer className="flex items-center justify-center gap-4 mt-14 sm:mt-16">
+          <Link to="/advisors" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Meet the advisors</Link>
           <Link to="/privacy" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Privacy</Link>
           <Link to="/terms" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Terms</Link>
         </footer>
