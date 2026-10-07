@@ -1,26 +1,22 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { base44, supabase } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Landmark, Sparkles } from "lucide-react";
+import { Landmark } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import BoardroomBanner from "@/components/boardroom/BoardroomBanner";
 import AdvisorSelectionRow from "@/components/boardroom/AdvisorSelectionRow";
 import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
-import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
-import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
+import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
+import { usePin } from "@/components/pins/PinContext";
 import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, SUGGESTED_QUESTIONS } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
 import { useAdvisorProfile } from "@/components/advisors/AdvisorProfilePanel";
 import { useAssistant } from "@/lib/AssistantContext";
 
 const POLL_INTERVAL_MS = 3000;
-// How long the Chair's seat is lit at the start, while she opens. The opening
-// runs alongside Round 1 in one request, so this is shown, not tracked;
-// Phase 1b Stage 3 makes it exact.
-const CHAIR_OPENING_LIGHT_MS = 4000;
 
 function toRoundOneMessages(responses = []) {
   return responses.map((r) => ({
@@ -40,24 +36,37 @@ function toRoundOneMessages(responses = []) {
 }
 
 
-const PHASE_MESSAGES = {
-  preparing: "Reviewing company context",
-  discussion: "The board is in executive discussion",
-  resolution: "The Chair is preparing the resolution",
-};
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, initialSelectedIds, onSelectionChange, loadedMeeting, autoStart, onResult, routeFromNoteId, freeAttemptId }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, initialSelectedIds, onSelectionChange, loadedMeeting, autoStart, onResult, onResultShown, routeFromNoteId, freeAttemptId }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [question, setQuestion] = useState(initialQuestion || "");
   const [phase, setPhase] = useState(loadedMeeting ? "result" : "idle");
-  const [activeName, setActiveName] = useState(null);
   const [result, setResult] = useState(loadedMeeting || null);
   const [error, setError] = useState(null);
   const [pendingMeetingId, setPendingMeetingId] = useState(null);
   const [liveTranscript, setLiveTranscript] = useState([]);
-  const [resolutionStartedAt, setResolutionStartedAt] = useState(null);
+  // When this meeting was convened, for the "Meeting in session" line.
+  const [startedAt, setStartedAt] = useState(null);
+  // A finished meeting's result shows once the live playback has caught up
+  // (or the founder skips ahead); a loaded past meeting shows straight away.
+  const [showResult, setShowResult] = useState(!!loadedMeeting);
+  const finishPlayback = useCallback(() => { setShowResult(true); onResultShown?.(); }, [onResultShown]);
+  // How many rounds a discussion can run, as the engine reads it.
+  const [maxRounds, setMaxRounds] = useState(3);
+  useEffect(() => {
+    base44.entities.SystemLimits.list().then((rows) => {
+      const n = rows?.[0]?.max_discussion_rounds;
+      if (Number.isInteger(n) && n > 0) setMaxRounds(n);
+    }).catch(() => {});
+  }, []);
+  // The transcript only ever grows: a slow poll answering after a newer one
+  // mustn't take rounds away.
+  const growTranscript = useCallback((next) => {
+    if (next?.length) setLiveTranscript((prev) => (next.length >= prev.length ? next : prev));
+  }, []);
+  const { createPin } = usePin();
   const [chairOpening, setChairOpening] = useState(loadedMeeting?.chair_opening || null);
   const [isAnonymous, setIsAnonymous] = useState(false);
   // Fixed once a meeting starts — an advisor keeps the same chair for the
@@ -113,31 +122,13 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     setSelectedIds(aiAdvisors.slice(0, MAX_DEBATERS).map((a) => a.id));
   }, [advisors, initialSelectedIds]);
 
-  // While positions form: the Chair's seat lights first (she opens), then
-  // the debaters' in turn.
-  useEffect(() => {
-    if (phase !== "preparing" || !advisors?.length) return;
-    const participants = aiAdvisors.filter((a) => selectedIds?.includes(a.id));
-    if (!participants.length) return;
-    setActiveName(chair.name);
-    let i = 0;
-    let t;
-    const opening = setTimeout(() => {
-      setActiveName(participants[0].name);
-      t = setInterval(() => { i++; setActiveName(participants[i % participants.length].name); }, 2000);
-    }, CHAIR_OPENING_LIGHT_MS);
-    return () => { clearTimeout(opening); clearInterval(t); };
-  }, [phase, advisors, selectedIds]);
-
   useEffect(() => {
     if (phase !== "discussion" || !pendingMeetingId) return;
     let cancelled = false;
     const poll = async () => {
       try {
         const meeting = await base44.entities.BoardMeeting.get(pendingMeetingId);
-        if (!cancelled && meeting?.discussion_transcript?.length) {
-          setLiveTranscript(meeting.discussion_transcript);
-        }
+        if (!cancelled) growTranscript(meeting?.discussion_transcript);
       } catch {
         // A dropped poll is cosmetic — the discussion continues server-side regardless.
       }
@@ -169,13 +160,15 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         await base44.entities.BoardMeeting.update(meetingId, { independent_responses: updatedResponses });
         setLiveTranscript(toRoundOneMessages(updatedResponses));
       }
-      await runDiscussion(meetingId);
-      setResolutionStartedAt(Date.now());
+      const discussed = await runDiscussion(meetingId);
+      // The poll stops with the discussion, and the last round can land
+      // between two polls: the engine returns the finished transcript, so
+      // the live view plays every round.
+      growTranscript(discussed?.discussion_transcript);
       setPhase("resolution");
       const final = await runResolution(meetingId);
       setResult(final);
       setPhase("result");
-      setActiveName(null);
       onResult?.(final);
     } catch (e) {
       setError(e.message || "The board could not convene.");
@@ -187,7 +180,8 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     if (!question.trim()) return;
     if (selectedAiAdvisors.length < MIN_DEBATERS) { setError(`Select at least ${MIN_DEBATERS} advisors to debate.`); return; }
     if (selectedAiAdvisors.length > MAX_DEBATERS) { setError(`Select at most ${MAX_DEBATERS} advisors to debate.`); return; }
-    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setResolutionStartedAt(null); setChairOpening(null);
+    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setChairOpening(null);
+    setStartedAt(new Date()); setShowResult(false);
     setSeatAssignment(assignChairs(selectedAiAdvisors, chair));
     try {
       const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId });
@@ -253,32 +247,26 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
 
   const debaterCountOk = selectedAiAdvisors.length >= MIN_DEBATERS && selectedAiAdvisors.length <= MAX_DEBATERS;
 
-  // Who currently has the floor: the Chair opening, then debaters in turn
-  // while positions form, then the real speaking order as the transcript
-  // grows during discussion, then the Chair again while she writes the
-  // resolution.
-  const activeSpeakerName =
-    phase === "preparing" ? activeName :
-    phase === "discussion" && liveTranscript.length ? liveTranscript[liveTranscript.length - 1].advisor_name :
-    phase === "resolution" ? chair.name :
-    null;
-  const activeChairId = activeSpeakerName ? seatAssignment[activeSpeakerName] : null;
-
-  // Fixed for the meeting, not just the active speaker — every seated
-  // advisor's tag stays mounted with unchanging text the whole time, so
-  // handover is a pure opacity crossfade with nothing to swap mid-fade.
-  const chairLabels = {};
-  for (const [name, chairId] of Object.entries(seatAssignment)) {
-    const advisor = name === chair.name ? chair : advisors.find((a) => a.name === name);
-    if (advisor) chairLabels[chairId] = { name: advisor.name, role: advisor.role, libraryKey: advisor.library_key };
-  }
+  // "Pin this" on a live turn: the founder's own boards only (the free
+  // meeting has no pins).
+  const pinTurn = !isAnonymous && !freeAttemptId && pendingMeetingId ? (m) => createPin({
+    selected_text: m.message,
+    surrounding_context: m.message,
+    source_type: m.round === 1 ? "advisor_perspective" : "executive_discussion",
+    source_id: pendingMeetingId,
+    source_title: question,
+    source_url: `/company/${companyId}/boardroom?meeting=${pendingMeetingId}`,
+    advisor_id: m.advisor_id,
+    meeting_id: pendingMeetingId,
+    company_id: companyId,
+  }) : null;
 
   if (aiAdvisors.length < MIN_DEBATERS && phase === "idle") {
     return (
       <EmptyState
         title="Convene at least three advisors"
-        description="A board debate needs differing perspectives. Invite at least three AI advisors to your executive team, besides the Chair."
-        action={<Button onClick={() => navigate(`/company/${companyId}/team`)} variant="primary" className="px-6">Go to Executive Team</Button>}
+        description="A board debate needs differing perspectives. Invite at least three AI advisors to your board, besides the Chair."
+        action={<Button onClick={() => navigate(`/company/${companyId}/team`)} variant="primary" className="px-6">Go to Your advisors</Button>}
       />
     );
   }
@@ -295,17 +283,31 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     );
   }
 
+  // In session (and a finished meeting still playing back): the live room.
+  if (phase !== "idle" && !(phase === "result" && showResult)) {
+    return (
+      <LiveMeeting
+        phase={phase}
+        question={question}
+        startedAt={startedAt}
+        chair={chair}
+        debaters={selectedAiAdvisors}
+        seatAssignment={seatAssignment}
+        transcript={liveTranscript}
+        chairOpening={chairOpening}
+        advisors={advisors}
+        onOpenProfile={openProfile}
+        maxRounds={maxRounds}
+        onPin={pinTurn}
+        onFinished={finishPlayback}
+      />
+    );
+  }
+
   if (phase !== "result") {
     return (
       <div className="max-w-3xl">
-        <BoardroomBanner
-          activeChairId={activeChairId}
-          chairLabels={chairLabels}
-          onPortraitClick={openProfile ? (label) => openProfile({
-            advisor: advisors.find((a) => a.name === label.name), name: label.name, libraryKey: label.libraryKey, role: label.role,
-          }) : null}
-          className="h-[200px] sm:h-[280px] rounded-2xl mb-6 rise-in"
-        />
+        <BoardroomBanner className="h-[200px] sm:h-[280px] rounded-md border-2 border-foreground mb-6 rise-in" />
         <div className="bg-card border border-border/70 rounded-3xl p-6 sm:p-10 mb-8 rise-in">
           <AdvisorSelectionRow advisors={[...aiAdvisors, ...humanAdvisors]} selectedIds={selectedIds || []} onToggle={toggleAdvisor} chair={chair} />
           <p className="text-center text-xs text-muted-foreground mt-4">
@@ -315,40 +317,19 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
           </p>
           {error && <p className="text-center text-sm text-destructive mt-2">{error}</p>}
           <div className="max-w-xl mx-auto mt-8">
-            {phase === "idle" ? (
-              <>
-                <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={3}
-                  placeholder="Ask your board a strategic question…"
-                  className="text-base resize-none bg-background rounded-2xl" />
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {SUGGESTED_QUESTIONS.map((p) => (
-                    <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
-                  ))}
-                </div>
-                <Button onClick={start} disabled={!question.trim() || !debaterCountOk} variant="primary" className="w-full mt-4 h-11">
-                  <Landmark className="w-4 h-4 mr-2" /> Start Board Debate
-                </Button>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                {!liveTranscript.length && (
-                  <>
-                    <div className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Sparkles className="w-4 h-4 animate-pulse" />
-                      <span className="font-display text-lg">{PHASE_MESSAGES[phase]}</span>
-                    </div>
-                    {phase === "preparing" && activeName && (
-                      <p className="text-sm text-muted-foreground mt-2">{activeName === chair.name ? `${chair.name} is opening the meeting…` : `${activeName} is evaluating…`}</p>
-                    )}
-                  </>
-                )}
-                <p className="font-display text-base mt-4 max-w-md mx-auto text-muted-foreground italic">"{question}"</p>
-              </div>
-            )}
+            <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={3}
+              placeholder="Ask your board a strategic question…"
+              className="text-base resize-none bg-background rounded-2xl" />
+            <div className="flex flex-wrap gap-2 mt-3">
+              {SUGGESTED_QUESTIONS.map((p) => (
+                <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
+              ))}
+            </div>
+            <Button onClick={start} disabled={!question.trim() || !debaterCountOk} variant="primary" className="w-full mt-4 h-11">
+              <Landmark className="w-4 h-4" /> Convene the board
+            </Button>
           </div>
         </div>
-        {chairOpening && <div className="mb-6"><ChairOpeningNote chairOpening={chairOpening} /></div>}
-        <LiveDiscussion transcript={liveTranscript} advisors={advisors} phase={phase} resolutionStartedAt={resolutionStartedAt} />
       </div>
     );
   }
@@ -357,7 +338,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     <div>
       <div className="flex items-center justify-between mb-6">
         <p className="font-display text-xl max-w-2xl">"{question}"</p>
-        <Button variant="secondaryOutline" className="shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); setSeatAssignment({}); }}>New question</Button>
+        <Button variant="secondaryOutline" className="shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); setSeatAssignment({}); setChairOpening(null); }}>New question</Button>
       </div>
       <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id) || a.id === boardChair?.id)} companyId={companyId} onRecordDecision={isAnonymous ? undefined : recordDecision} onFollowup={isAnonymous ? undefined : handleFollowup} isAnonymous={isAnonymous} />
     </div>

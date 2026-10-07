@@ -12,8 +12,10 @@ export const MAX_AI_ADVISORS = 6;
 
 // What a meeting is, as the engine runs it: Round 1 positions, then up to
 // two rounds of discussion (it stops early once nobody moves), then the
-// Chair's resolution.
-export const MEETING_HINT = "Plain words are fine. Up to three rounds, then a resolution.";
+// Chair's resolution. The time is measured, not guessed: 16 completed
+// meetings, 23 Aug–7 Oct 2026, from convening to the resolution: median
+// 2m15s, middle half 1m40s–3m47s, longest 5m08s.
+export const MEETING_HINT = "Plain words are fine. Up to three rounds, then a resolution. Usually two to four minutes.";
 
 // Questions a founder can start from.
 export const SUGGESTED_QUESTIONS = [

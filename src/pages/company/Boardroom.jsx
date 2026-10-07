@@ -97,13 +97,16 @@ export default function Boardroom() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Your board"
-        title={<>The <em>Room.</em></>}
-        description={`Bring a question. They'll argue about it, and ${chairName} will write down what you should do.`}
-      >
-        {!mode && <span className="room-pill">{counts.attending} attending · {counts.debating} debating</span>}
-      </PageHeader>
+      {/* A meeting has its own header (LiveMeeting); the front page has this one. */}
+      {!mode && (
+        <PageHeader
+          eyebrow="Your board"
+          title={<>The <em>Room.</em></>}
+          description={`Bring a question. They'll argue about it, and ${chairName} will write down what you should do.`}
+        >
+          <span className="room-pill">{counts.attending} attending · {counts.debating} debating</span>
+        </PageHeader>
+      )}
 
       {mode ? (
         <div className="rise-in">

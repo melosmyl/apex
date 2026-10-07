@@ -202,3 +202,48 @@
 :where(.bg-card .bg-card):where(.rounded-xl, .rounded-2xl, .rounded-3xl) {
   box-shadow: none;
 }
+
+/* Live meeting (Workstream L, meeting mock). */
+/* The big bubble under the seat cards, its tail pointing up at the column
+   of whoever has the floor (--col3 on phones' three columns, --col6 above). */
+.meeting-now-bubble { position: relative; }
+.meeting-now-bubble.has-tail::before,
+.meeting-now-bubble.has-tail::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-color: transparent;
+  left: calc((var(--col3) - 0.5) * (100% / 3));
+}
+@media (min-width: 640px) {
+  .meeting-now-bubble.has-tail::before,
+  .meeting-now-bubble.has-tail::after { left: calc((var(--col6) - 0.5) * (100% / 6)); }
+}
+/* On phones six seats wrap to two rows of three; a column alone can't say
+   which row the speaker is in, so the tail only shows for the first row
+   (the bubble's label names the speaker either way). */
+@media (max-width: 639px) {
+  .meeting-now-bubble.tail-wide-only::before,
+  .meeting-now-bubble.tail-wide-only::after { display: none; }
+}
+.meeting-now-bubble.has-tail::before { top: -11px; margin-left: -9px; border-width: 0 9px 11px 9px; border-bottom-color: var(--room-ink); }
+.meeting-now-bubble.has-tail::after { top: -7px; margin-left: -7px; border-width: 0 7px 8px 7px; border-bottom-color: var(--room-mat); }
+
+/* "Thinking…" dots. */
+.meeting-dots::after { content: "…"; display: inline-block; animation: meeting-dots 1.4s steps(4, end) infinite; }
+@keyframes meeting-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+/* The lamp's pool of light breathes a little. */
+.meeting-stage-pool { transform-box: fill-box; transform-origin: center; animation: meeting-breathe 3s ease-in-out infinite; }
+@keyframes meeting-breathe { 50% { transform: scale(1.07); opacity: 0.9; } }
+
+/* The live pill's blinking dot. */
+.meeting-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--room-ink); animation: meeting-blink 1.2s ease-in-out infinite; }
+@keyframes meeting-blink { 50% { opacity: 0.2; } }
+
+@media (max-width: 640px) { .meeting-stage-caption { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .meeting-dots::after, .meeting-stage-pool, .meeting-live-dot { animation: none; }
+}

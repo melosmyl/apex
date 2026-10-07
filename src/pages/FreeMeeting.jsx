@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,8 +136,11 @@ export default function FreeMeeting() {
     }
   };
 
+  const handleResultShown = useCallback(() => setResultReady(true), []);
+
+  // The engine has finished: record it. The "keep this board" card waits
+  // until the visitor actually sees the resolution (handleResultShown).
   const handleResult = (final) => {
-    setResultReady(true);
     setMeetingIdForConversion(final?.meeting_id);
     gate.complete(attemptId, final?.meeting_id);
   };
@@ -217,7 +220,7 @@ export default function FreeMeeting() {
 
         {phase === "debate" && company && advisors && (
           <div className="space-y-8">
-            <BoardDebate company={company} companyId={company.id} advisors={advisors} initialQuestion={question} autoStart onResult={handleResult} freeAttemptId={attemptId} />
+            <BoardDebate company={company} companyId={company.id} advisors={advisors} initialQuestion={question} autoStart onResult={handleResult} onResultShown={handleResultShown} freeAttemptId={attemptId} />
             {resultReady && <ConversionCapture meetingId={meetingIdForConversion} companyId={company.id} />}
           </div>
         )}

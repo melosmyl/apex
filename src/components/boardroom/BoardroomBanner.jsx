@@ -36,7 +36,7 @@ export const CHAIR_SEAT_ORDER = CHAIRS.map((c) => c.id);
 
 // Name-tag anchor per chair — just outside the backrest, on the side that
 // has clear dark wall/floor behind it rather than overlapping the table.
-const TAG_ANCHOR = {
+export const TAG_ANCHOR = {
   "far-1": { x: 703, y: 456, align: "middle" },
   "far-2": { x: 830, y: 460, align: "middle" },
   "far-3": { x: 955, y: 456, align: "middle" },
