@@ -12,10 +12,8 @@ import { ADVISOR_PROVIDER_CONFIG, characterFields } from "@/lib/advisorLibrary";
 import InvitePersonDialog from "@/components/team/InvitePersonDialog";
 import AdvisorProfileDialog from "@/components/team/AdvisorProfileDialog";
 import { findChair } from "@/lib/chair";
+import { MAX_AI_ADVISORS } from "@/lib/boardroom";
 
-// Hard cap while pricing and packaging are undecided — every advisor turn is
-// a real API call. Extra slots show as "coming soon", not a paid upgrade.
-const MAX_AI_ADVISORS = 6;
 // The Chair opens every meeting and writes its resolution, so she stays.
 const CHAIR_STAYS = "The Chair runs every meeting and can't be removed.";
 

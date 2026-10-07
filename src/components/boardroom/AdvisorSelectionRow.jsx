@@ -2,9 +2,9 @@ import React from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { ProfileTrigger } from "@/components/advisors/AdvisorProfilePanel";
 
-// Replaces BoardTable's old click-a-seat-in-the-photo interaction — the
-// banner shows who has the floor, nothing else, so attendance toggling
-// gets its own plain control instead. Orange marks selection because it's
+// Attendance inside a meeting view (the Boardroom's front page has its own
+// seat toggles in BoardTable.jsx); the banner shows who has the floor,
+// nothing else. Orange marks selection because it's
 // state the founder caused, not state the product is announcing.
 // The Chair isn't a toggle: she chairs every meeting and never debates, so
 // she's shown as a fixed line above the advisors the founder picks from.

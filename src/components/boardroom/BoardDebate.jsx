@@ -11,7 +11,7 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveDiscussion from "@/components/boardroom/LiveDiscussion";
 import ChairOpeningNote from "@/components/boardroom/ChairOpeningNote";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, SUGGESTED_QUESTIONS } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
 import { useAdvisorProfile } from "@/components/advisors/AdvisorProfilePanel";
 import { useAssistant } from "@/lib/AssistantContext";
@@ -39,11 +39,6 @@ function toRoundOneMessages(responses = []) {
   }));
 }
 
-const PROMPTS = [
-  "Should we manufacture our products in Portugal or Vietnam?",
-  "Is now the right time to raise a funding round?",
-  "Should we launch a premium tier or stay focused on our core product?",
-];
 
 const PHASE_MESSAGES = {
   preparing: "Reviewing company context",
@@ -51,7 +46,7 @@ const PHASE_MESSAGES = {
   resolution: "The Chair is preparing the resolution",
 };
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, loadedMeeting, autoStart, onResult, routeFromNoteId, freeAttemptId }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, initialSelectedIds, onSelectionChange, loadedMeeting, autoStart, onResult, routeFromNoteId, freeAttemptId }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -103,11 +98,20 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const aiAdvisors = advisors.filter((a) => a.type !== "human" && a.id !== boardChair?.id);
   const humanAdvisors = advisors.filter((a) => a.type === "human");
 
-  // Default to the whole board, up to the server's per-meeting limit of
-  // MAX_DEBATERS debaters.
+  // Who attends: as seated on the Boardroom's table when the founder came
+  // from there, otherwise the whole board, up to the server's per-meeting
+  // limit of MAX_DEBATERS debaters.
   useEffect(() => {
+    if (initialSelectedIds) {
+      const known = new Set(advisors.map((a) => a.id));
+      setSelectedIds(initialSelectedIds.filter((id) => known.has(id)));
+      // The founder already chose these seats on the table: a click here
+      // adjusts them rather than starting over from one advisor.
+      setHasInteracted(true);
+      return;
+    }
     setSelectedIds(aiAdvisors.slice(0, MAX_DEBATERS).map((a) => a.id));
-  }, [advisors]);
+  }, [advisors, initialSelectedIds]);
 
   // While positions form: the Chair's seat lights first (she opens), then
   // the debaters' in turn.
@@ -144,8 +148,12 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   }, [phase, pendingMeetingId]);
 
   const toggleAdvisor = (a) => {
-    if (!hasInteracted) { setSelectedIds([a.id]); setHasInteracted(true); }
-    else { setSelectedIds((prev) => prev.includes(a.id) ? prev.filter((id) => id !== a.id) : [...prev, a.id]); }
+    let next;
+    if (!hasInteracted) { next = [a.id]; setHasInteracted(true); }
+    else { next = selectedIds.includes(a.id) ? selectedIds.filter((id) => id !== a.id) : [...selectedIds, a.id]; }
+    setSelectedIds(next);
+    // Keep the Boardroom's table in step with changes made here.
+    onSelectionChange?.(next);
   };
 
   const selectedAiAdvisors = aiAdvisors.filter((a) => selectedIds?.includes(a.id));
@@ -313,7 +321,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
                   placeholder="Ask your board a strategic question…"
                   className="text-base resize-none bg-background rounded-2xl" />
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {PROMPTS.map((p) => (
+                  {SUGGESTED_QUESTIONS.map((p) => (
                     <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
                   ))}
                 </div>

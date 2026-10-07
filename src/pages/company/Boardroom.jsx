@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import BoardroomHome from "@/components/boardroom/BoardroomHome";
+import { chairOrBuiltIn, findChair } from "@/lib/chair";
+import { defaultAttendance, attendanceCounts } from "@/lib/boardroom";
 import BoardDebate from "@/components/boardroom/BoardDebate";
 
 export default function Boardroom() {
@@ -19,6 +21,8 @@ export default function Boardroom() {
   const [autoStart, setAutoStart] = useState(false);
   const [loadedMeeting, setLoadedMeeting] = useState(null);
   const [routeFromNoteId, setRouteFromNoteId] = useState(null);
+  // Who's seated for the next meeting, set on the table and carried into it.
+  const [attendingIds, setAttendingIds] = useState(null);
 
   // The Assistant routes a strategic-sized note here via navigate(..., {
   // state }) rather than a URL param — the note's raw text can be long and
@@ -37,6 +41,7 @@ export default function Boardroom() {
   useEffect(() => {
     base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then((advs) => {
       setAdvisors(advs);
+      setAttendingIds(defaultAttendance(advs, findChair(advs)));
     });
   }, [companyId]);
 
@@ -62,18 +67,19 @@ export default function Boardroom() {
   if (aiAdvisors.length < 1) {
     return (
       <div>
-        <PageHeader eyebrow="Your board" title="The Boardroom" />
+        <PageHeader eyebrow="Your board" title={<>The <em>Room.</em></>} />
         <EmptyState
-          title="Assemble your executive team first"
+          title="Choose your advisors first"
           description="Add at least one AI advisor to start using the Boardroom."
-          action={<Button onClick={() => navigate(`/company/${companyId}/team`)} variant="primary" className="px-6">Go to Executive Team</Button>}
+          action={<Button onClick={() => navigate(`/company/${companyId}/team`)} variant="primary" className="px-6">Go to Your advisors</Button>}
         />
       </div>
     );
   }
 
-  const startDebate = (q) => {
+  const startDebate = (q, ids) => {
     setQuestion(q);
+    if (ids) setAttendingIds(ids);
     setAutoStart(true);
     setMode("board_debate");
   };
@@ -86,13 +92,18 @@ export default function Boardroom() {
     setRouteFromNoteId(null);
   };
 
+  const chairName = chairOrBuiltIn(advisors).name.replace(/^Dr\.\s+/, "").split(" ")[0];
+  const counts = attendanceCounts(advisors, attendingIds || [], findChair(advisors));
+
   return (
     <div>
       <PageHeader
         eyebrow="Your board"
-        title="The Boardroom"
-        description="Bring a question to your board — they'll debate it and come back with a resolution."
-      />
+        title={<>The <em>Room.</em></>}
+        description={`Bring a question. They'll argue about it, and ${chairName} will write down what you should do.`}
+      >
+        {!mode && <span className="room-pill">{counts.attending} attending · {counts.debating} debating</span>}
+      </PageHeader>
 
       {mode ? (
         <div className="rise-in">
@@ -108,13 +119,21 @@ export default function Boardroom() {
             companyId={companyId}
             advisors={advisors}
             initialQuestion={question}
+            initialSelectedIds={attendingIds}
+            onSelectionChange={setAttendingIds}
             loadedMeeting={loadedMeeting}
             autoStart={autoStart}
             routeFromNoteId={routeFromNoteId}
           />
         </div>
       ) : (
-        <BoardroomHome onStartDebate={startDebate} companyId={companyId} />
+        <BoardroomHome
+          companyId={companyId}
+          advisors={advisors}
+          attendingIds={attendingIds || []}
+          onAttendingChange={setAttendingIds}
+          onStartDebate={startDebate}
+        />
       )}
     </div>
   );

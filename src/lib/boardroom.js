@@ -6,6 +6,36 @@ import { CHAIR_SEAT_ORDER } from "@/components/boardroom/BoardroomBanner";
 export const MAX_DEBATERS = 5;
 export const MIN_DEBATERS = 3;
 
+// AI seats on a board, the Chair included. A hard cap while pricing and
+// packaging are undecided: every advisor turn is a real API call.
+export const MAX_AI_ADVISORS = 6;
+
+// What a meeting is, as the engine runs it: Round 1 positions, then up to
+// two rounds of discussion (it stops early once nobody moves), then the
+// Chair's resolution.
+export const MEETING_HINT = "Plain words are fine. Up to three rounds, then a resolution.";
+
+// Questions a founder can start from.
+export const SUGGESTED_QUESTIONS = [
+  "Should we manufacture in Portugal or Vietnam?",
+  "Is now the right time to raise a funding round?",
+  "We have three months of runway. What do we stop doing?",
+];
+
+// Who's seated for a meeting by default: the whole board, up to
+// MAX_DEBATERS, without the Chair (she never debates) or people.
+export function defaultAttendance(advisors = [], chair = null) {
+  return advisors.filter((a) => a.type !== "human" && a.id !== chair?.id).slice(0, MAX_DEBATERS).map((a) => a.id);
+}
+
+// "6 attending · 5 debating": the Chair, the seated advisors and any seated
+// people attend; only the AI advisors debate.
+export function attendanceCounts(advisors = [], attendingIds = [], chair = null) {
+  const debating = advisors.filter((a) => a.type !== "human" && a.id !== chair?.id && attendingIds.includes(a.id)).length;
+  const people = advisors.filter((a) => a.type === "human" && attendingIds.includes(a.id)).length;
+  return { attending: 1 + debating + people, debating };
+}
+
 // Fixed for the duration of a meeting — called once when a meeting starts
 // so an advisor never jumps seats mid-discussion. The Chair takes the head
 // of the table; debaters fill centre-out from there (CHAIR_SEAT_ORDER
