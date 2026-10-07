@@ -41,6 +41,7 @@ import CompanySettings from '@/pages/company/CompanySettings';
 import AdvisorsIndex from '@/pages/advisors/AdvisorsIndex';
 import AdvisorPage from '@/pages/advisors/AdvisorPage';
 import { AdvisorProfileProvider } from '@/components/advisors/AdvisorProfilePanel';
+import AuthConfirm from '@/pages/AuthConfirm';
 // import CompanySettings from '@/pages/company/CompanySettings';
 
 const AuthenticatedApp = () => {
@@ -69,6 +70,7 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/auth/confirm" element={<AuthConfirm />} />
       <Route path="/subscription-confirmed" element={<SubscriptionConfirmed />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/privacy" element={<Privacy />} />
