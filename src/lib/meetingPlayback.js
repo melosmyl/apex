@@ -54,10 +54,13 @@ export function turnFlags(msg, participants = []) {
   const flags = [];
   const self = msg.advisor_name;
   const target = participantNamed(msg.reply_to_advisor, participants);
-  if (["challenge", "rebuttal"].includes(msg.message_type) && target && target !== self) {
-    flags.push({ tone: "disagree", label: `Disagrees with ${firstName(target)}` });
-  }
   const ally = participantNamed(msg.agrees_with, participants);
+  // The advisor's own label of the move ("challenge", "rebuttal"), worded as
+  // the move, not as a verdict: models label turns loosely, and a turn that
+  // also records agreeing with the same person isn't shown as a challenge.
+  if (["challenge", "rebuttal"].includes(msg.message_type) && target && target !== self && target !== ally) {
+    flags.push({ tone: "disagree", label: `${msg.message_type === "rebuttal" ? "Rebuts" : "Challenges"} ${firstName(target)}` });
+  }
   if (ally && ally !== self) flags.push({ tone: "agree", label: `Agrees with ${firstName(ally)}` });
   if (msg.changed_opinion) flags.push({ tone: "changed", label: "Changed position" });
   return flags;
@@ -66,7 +69,7 @@ export function turnFlags(msg, participants = []) {
 export function countsFor(items, participants = []) {
   const turns = items.filter((i) => i.kind === "turn" && !i.unavailable);
   return {
-    disagreements: turns.filter((m) => turnFlags(m, participants).some((f) => f.tone === "disagree")).length,
+    challenges: turns.filter((m) => turnFlags(m, participants).some((f) => f.tone === "disagree")).length,
     changed: turns.filter((m) => m.changed_opinion).length,
   };
 }

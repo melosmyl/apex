@@ -4,7 +4,7 @@ import { initialsOf } from "@/lib/advisorLibrary";
 import { turnFlags, countsFor } from "@/lib/meetingPlayback";
 
 // "Minutes, as they happen" (meeting mock): each turn as a speech bubble
-// beside the advisor's portrait, with what the turn did ("Disagrees with
+// beside the advisor's portrait, with what the turn did ("Challenges
 // Amara", "Changed position"), filling in as playback reaches it. Advisors
 // still writing show as a dashed bubble with their thinking line.
 
@@ -49,7 +49,7 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <span className="room-mono">Minutes, as they happen</span>
         <span className="room-mono">
-          {counts.disagreements} {counts.disagreements === 1 ? "disagreement" : "disagreements"} · {counts.changed} changed {counts.changed === 1 ? "position" : "positions"}
+          {counts.challenges} {counts.challenges === 1 ? "challenge" : "challenges"} · {counts.changed} changed {counts.changed === 1 ? "position" : "positions"}
         </span>
       </div>
 
