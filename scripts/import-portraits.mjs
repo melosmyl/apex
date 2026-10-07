@@ -38,6 +38,7 @@ const CROP_OVERRIDES = {
   'amara-vance': WIDER_SHOT, 'aris-chen': WIDER_SHOT, 'daniel-okoye': WIDER_SHOT, 'priya-nair': WIDER_SHOT,
   'tomas-berg': WIDER_SHOT, 'sofia-marchetti': WIDER_SHOT, 'marcus-delgado': WIDER_SHOT,
   'margaret-ashworth': WIDER_SHOT, 'grace-bennett': WIDER_SHOT,
+  'victor-hale': { side: 0.48, faceY: 0.41 },
 };
 
 const toSlug = (name) => name.replace(/^dr\.?\s+/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -54,10 +55,23 @@ function size(file) {
 fs.mkdirSync(OUT, { recursive: true });
 const imported = [];
 const skipped = [];
+// One source file per advisor. When there are two (an old and a new export),
+// the one already named by slug ("victor-hale.png") wins, else the newest.
+const chosen = new Map();
 for (const file of fs.readdirSync(SOURCE).sort()) {
   if (!/\.(png|jpe?g|heic|webp)$/i.test(file)) continue;
   const slug = toSlug(path.parse(file).name);
   if (!bySlug.has(slug)) { skipped.push(file); continue; }
+  const rank = (f) => [path.parse(f).name === slug ? 1 : 0, fs.statSync(path.join(SOURCE, f)).mtimeMs];
+  const current = chosen.get(slug);
+  if (current) {
+    const [a, b] = [rank(file), rank(current)];
+    const keep = a[0] !== b[0] ? (a[0] > b[0] ? file : current) : (a[1] > b[1] ? file : current);
+    console.log(`Two files for ${slug}: using "${keep}", ignoring "${keep === file ? current : file}".`);
+    chosen.set(slug, keep);
+  } else chosen.set(slug, file);
+}
+for (const [slug, file] of [...chosen].sort()) {
   const src = path.join(SOURCE, file);
   const { w, h } = size(src);
   const crop = { faceY: FACE_Y, side: AVATAR_SIDE, ...CROP_OVERRIDES[slug] };
