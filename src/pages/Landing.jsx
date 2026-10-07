@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ADVISOR_LIBRARY, getAdvisorByKey } from "@/lib/advisorLibrary";
 import { portraitFor } from "@/lib/portraits";
 import { OFF_DUTY } from "@/lib/offDuty";
+import { STARTING_BOARD_KEYS } from "@/lib/companyJourney";
 import { ADVISORS_ARE_AI, PRODUCT_NAME } from "@/lib/branding";
 import "@/styles/landing.css";
 
@@ -11,9 +12,11 @@ import "@/styles/landing.css";
 // and portraits all come from the advisor library, so a rename or a new
 // portrait shows up here without touching this file.
 
-// Who sits in the board strip, and who gets a card further down.
-const STRIP_KEYS = ["chair", "legal_advisor", "scientist", "supply_chain", "people_culture", "innovation_director"];
-const CARD_KEYS = ["investor", "legal_advisor", "scientist", "supply_chain", "people_culture", "innovation_director"];
+// The board strip is the board every new founder starts with (B3); the
+// cards below show the five debaters from it, plus one more of the
+// twenty-two, as the mock does.
+const STRIP_KEYS = STARTING_BOARD_KEYS;
+const CARD_KEYS = ["investor", ...STARTING_BOARD_KEYS.filter((k) => k !== "chair")];
 
 const pick = (keys) => keys.map(getAdvisorByKey).filter(Boolean);
 
