@@ -15,7 +15,7 @@ export const ADVISOR_HOUSE_RULES = [
 export const ADVISOR_LIBRARY = [
   {
     key: "visionary",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Amara is looking past the next quarter.",
     name: "Amara Vance",
     portrait_slug: "amara-vance",
@@ -38,7 +38,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "operator",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Daniel is working out who does it on Tuesday.",
     name: "Daniel Okoye",
     portrait_slug: "daniel-okoye",
@@ -61,7 +61,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "creative_director",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Sofia is crossing out the obvious version.",
     name: "Sofia Marchetti",
     portrait_slug: "sofia-marchetti",
@@ -84,7 +84,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "marketing_director",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Priya is checking what customers would actually say.",
     name: "Priya Nair",
     portrait_slug: "priya-nair",
@@ -107,7 +107,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "marcus-delgado",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Marcus is running the numbers.",
     name: "Marcus Delgado",
     portrait_slug: "marcus-delgado",
@@ -130,7 +130,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "investor",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Eleanor is trying to name the customer in one sentence.",
     name: "Eleanor Whitfield",
     portrait_slug: "eleanor-whitfield",
@@ -153,7 +153,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "product_strategist",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Tomas is working out what to cut.",
     name: "Tomas Berg",
     portrait_slug: "tomas-berg",
@@ -176,7 +176,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "customer_advocate",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Grace is reading this as someone about to cancel.",
     name: "Grace Bennett",
     portrait_slug: "grace-bennett",
@@ -199,7 +199,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "legal_advisor",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Julian is reading the small print.",
     name: "Julian Rhodes",
     portrait_slug: "julian-rhodes",
@@ -222,7 +222,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "scientist",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Lena is looking for what would prove this wrong.",
     name: "Dr. Lena Fisher",
     portrait_slug: "lena-fisher",
@@ -245,7 +245,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "supply_chain",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Rafael is tracing where the thing actually is.",
     name: "Rafael Duarte",
     portrait_slug: "rafael-duarte",
@@ -268,7 +268,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "people_culture",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Naomi is thinking about who has to live with this.",
     name: "Naomi Clarke",
     portrait_slug: "naomi-clarke",
@@ -291,7 +291,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "innovation_director",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Kai is sketching a one-day test.",
     name: "Kai Nakamura",
     portrait_slug: "kai-nakamura",
@@ -314,7 +314,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "risk_analyst",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Helena is writing down the worst case.",
     name: "Helena Vogt",
     portrait_slug: "helena-vogt",
@@ -337,7 +337,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "capital_allocator",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Warren is weighing where the money is worth more.",
     name: "Warren Bishop",
     portrait_slug: "warren-bishop",
@@ -360,7 +360,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "ai_expert",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Aris is imagining it on a bad day.",
     name: "Dr. Aris Chen",
     portrait_slug: "aris-chen",
@@ -383,7 +383,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "felix-hart",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Felix is checking whether it's actually impossible.",
     name: "Felix Hart",
     portrait_slug: "felix-hart",
@@ -406,7 +406,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "arthur-penrose",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Arthur is thinking past the fashion.",
     name: "Arthur Penrose",
     portrait_slug: "arthur-penrose",
@@ -429,7 +429,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "nathan-cole",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Nathan is describing the finished thing to a customer.",
     name: "Nathan Cole",
     portrait_slug: "nathan-cole",
@@ -452,7 +452,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "theo-lindqvist",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Theo is taking half of it away.",
     name: "Theo Lindqvist",
     portrait_slug: "theo-lindqvist",
@@ -475,7 +475,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "contrarian",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Victor is building the case against.",
     name: "Victor Hale",
     portrait_slug: "victor-hale",
@@ -498,7 +498,7 @@ export const ADVISOR_LIBRARY = [
   },
   {
     key: "chair",
-    // Shown on the meeting screen while this advisor writes (owner approval pending).
+    // Shown on the meeting screen while this advisor writes (owner-approved 2026-10-07).
     thinking_line: "Margaret is reading the minutes back.",
     name: "Margaret Ashworth",
     portrait_slug: "margaret-ashworth",
