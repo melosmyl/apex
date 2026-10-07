@@ -1,7 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
-import AdvisorAvatar from "@/components/AdvisorAvatar";
+import { portraitFor } from "@/lib/portraits";
+import { initialsOf } from "@/lib/advisorLibrary";
+import { findChair } from "@/lib/chair";
+import { MAX_AI_ADVISORS } from "@/lib/boardroom";
 
 // Health only renders once there's real activity behind it — otherwise
 // it's a number with nothing behind it, exactly the "unearned praise"
@@ -10,10 +13,50 @@ import AdvisorAvatar from "@/components/AdvisorAvatar";
 // showing a score.
 const HEALTH_GATE_MEETINGS = 3;
 
-// Matches the hard cap enforced in ExecutiveTeam.jsx — the row always
-// shows this many seats, filled or not, rather than a variable-length
-// list with a "+N more" overflow that can never actually trigger.
-const MAX_ADVISOR_SEATS = 6;
+// The AI seats on a board (the Chair included), as ExecutiveTeam caps them.
+// People someone invites sit on top of that, so the row shows at most this
+// many coins and counts any beyond them.
+const MAX_ADVISOR_SEATS = MAX_AI_ADVISORS;
+
+// The board as a row of coins: small round portraits with a cream edge
+// (a faint ink hairline outside it, so the cream reads against the cream
+// card), the Chair first. Spaced with a small gap rather than overlapped:
+// at 32px an overlap of a third hid part of every face but the first.
+// Custom advisors and people show their initials in the same circle; free
+// AI seats are a dashed circle.
+const COIN = "w-8 h-8 shrink-0 rounded-full";
+const COIN_FRAME = "border-2 border-card shadow-[0_0_0_1px_hsl(var(--foreground)/0.2)]";
+
+function Coin({ advisor }) {
+  const [failed, setFailed] = useState(false);
+  const p = advisor && !failed ? portraitFor({ libraryKey: advisor.library_key, name: advisor.name }) : null;
+  if (!advisor) {
+    return <span className={`${COIN} border-[1.5px] border-dashed border-foreground/40`} aria-hidden="true" />;
+  }
+  return (
+    <span
+      className={`${COIN} ${COIN_FRAME} overflow-hidden flex items-center justify-center font-mono text-[10px] text-foreground ${p ? "bg-card" : "bg-[hsl(var(--panel))]"}`}
+      title={advisor.name}
+      role="img"
+      aria-label={advisor.name}
+    >
+      {p ? (
+        <img src={p.avatar} srcSet={`${p.avatar} 1x, ${p.avatar2x} 2x`} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} className="w-full h-full object-cover" />
+      ) : (
+        <span aria-hidden="true">{initialsOf(advisor.name)}</span>
+      )}
+    </span>
+  );
+}
+
+// More members than the row has room for: the last coin counts the rest.
+function MoreCoin({ count, names }) {
+  return (
+    <span className={`${COIN} ${COIN_FRAME} flex items-center justify-center bg-[hsl(var(--panel))] font-mono text-[10px]`} title={names} role="img" aria-label={`and ${count} more: ${names}`}>
+      +{count}
+    </span>
+  );
+}
 
 function healthScore(stats) {
   return Math.min(100, Math.round(40 + (stats.advisors || 0) * 8 + (stats.meetings || 0) * 6 + (stats.decisions || 0) * 6));
@@ -51,7 +94,18 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
   const score = healthScore(stats);
   const completedMeetings = stats.completedMeetings || 0;
   const healthEarned = completedMeetings >= HEALTH_GATE_MEETINGS;
-  const seats = Array.from({ length: MAX_ADVISOR_SEATS }, (_, i) => advisors[i] || null);
+  const chair = findChair(advisors);
+  // The Chair, then the AI advisors, then any people invited.
+  const ordered = [
+    ...(chair ? [chair] : []),
+    ...advisors.filter((a) => a.type !== "human" && a.id !== chair?.id),
+    ...advisors.filter((a) => a.type === "human"),
+  ];
+  const aiCount = ordered.filter((a) => a.type !== "human").length;
+  const freeSeats = Math.max(0, MAX_ADVISOR_SEATS - aiCount);
+  const shown = ordered.length > MAX_ADVISOR_SEATS ? ordered.slice(0, MAX_ADVISOR_SEATS - 1) : ordered;
+  const hidden = ordered.slice(shown.length);
+  const empties = Math.max(0, Math.min(freeSeats, MAX_ADVISOR_SEATS - shown.length - (hidden.length ? 1 : 0)));
   const initials = company.name?.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "•";
 
   return (
@@ -91,18 +145,12 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 pt-4 border-t border-border/50">
-          {/* Six seats, always — filled with real advisors, empty tiles for
-              the rest, rather than a variable-length list with a "+N more"
-              that could never actually trigger once 6 is a hard cap. */}
-          <div className="flex items-center -space-x-1.5 min-w-0">
-            {seats.map((a, i) =>
-              a ? (
-                <AdvisorAvatar key={a.id || i} name={a.name} libraryKey={a.library_key} size="sm" />
-              ) : (
-                <AdvisorAvatar key={`empty-${i}`} empty size="sm" />
-              )
-            )}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-4 border-t border-border/50">
+          {/* The board's coins, then its free AI seats. */}
+          <div className="flex items-center gap-1 shrink-0">
+            {shown.map((a) => <Coin key={a.id} advisor={a} />)}
+            {hidden.length > 0 && <MoreCoin count={hidden.length} names={hidden.map((a) => a.name).join(", ")} />}
+            {Array.from({ length: empties }, (_, i) => <Coin key={`empty-${i}`} advisor={null} />)}
           </div>
           <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
             Enter
