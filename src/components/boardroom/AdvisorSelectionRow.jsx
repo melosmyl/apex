@@ -1,4 +1,5 @@
 import React from "react";
+import AdvisorAvatar from "@/components/AdvisorAvatar";
 
 // Replaces BoardTable's old click-a-seat-in-the-photo interaction — the
 // banner shows who has the floor, nothing else, so attendance toggling
@@ -10,8 +11,9 @@ export default function AdvisorSelectionRow({ advisors, selectedIds, onToggle, c
   return (
     <div className="flex flex-col items-center gap-3">
       {chair && (
-        <p className="text-sm text-muted-foreground text-center">
-          <span className="font-medium text-foreground">{chair.name}</span> · Chairing: opens and writes the resolution
+        <p className="inline-flex items-center gap-2 text-sm text-muted-foreground text-center">
+          <AdvisorAvatar name={chair.name} libraryKey={chair.library_key} size="xs" className="rounded-md" />
+          <span><span className="font-medium text-foreground">{chair.name}</span> · Chairing: opens and writes the resolution</span>
         </p>
       )}
       <div className="flex flex-wrap gap-2 justify-center">
@@ -23,14 +25,17 @@ export default function AdvisorSelectionRow({ advisors, selectedIds, onToggle, c
               type="button"
               onClick={() => onToggle(a)}
               aria-pressed={selected}
-              className={`px-3.5 py-2 rounded-lg text-sm font-medium border transition-colors ${
+              className={`inline-flex items-center gap-2 pl-1.5 pr-3.5 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                 selected
                   ? "bg-brand text-brand-foreground border-brand"
                   : "bg-card/50 text-muted-foreground border-border hover:border-border/70 hover:text-foreground"
               }`}
             >
-              {a.name}
-              <span className={selected ? "ml-1.5 text-xs opacity-80" : "ml-1.5 text-xs opacity-60"}>{a.role}</span>
+              <AdvisorAvatar name={a.name} libraryKey={a.library_key} size="xs" className="rounded-md" />
+              <span>
+                {a.name}
+                <span className={selected ? "ml-1.5 text-xs opacity-80" : "ml-1.5 text-xs opacity-60"}>{a.role}</span>
+              </span>
             </button>
           );
         })}

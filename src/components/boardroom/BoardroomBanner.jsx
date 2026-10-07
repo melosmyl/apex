@@ -49,6 +49,9 @@ const TAG_ANCHOR = {
 };
 
 const CROSSFADE_MS = 550;
+// The speaker's portrait above their name tag: the hero of the room while
+// they have the floor (viewBox units; the photo is 941 tall).
+const PORTRAIT_R = 85;
 
 /**
  * activeChairId: id from CHAIRS currently holding the floor, or null.
@@ -144,18 +147,18 @@ export default function BoardroomBanner({
               {portrait && (
                 <>
                   <clipPath id={`tag-portrait-${c.id}`}>
-                    <circle cx={x} cy={y - 58} r="34" />
+                    <circle cx={x} cy={y - PORTRAIT_R - 28} r={PORTRAIT_R} />
                   </clipPath>
                   <image
                     href={portrait.avatar2x}
-                    x={x - 34}
-                    y={y - 92}
-                    width="68"
-                    height="68"
+                    x={x - PORTRAIT_R}
+                    y={y - 2 * PORTRAIT_R - 28}
+                    width={2 * PORTRAIT_R}
+                    height={2 * PORTRAIT_R}
                     clipPath={`url(#tag-portrait-${c.id})`}
                     preserveAspectRatio="xMidYMid slice"
                   />
-                  <circle cx={x} cy={y - 58} r="34" fill="none" stroke="hsl(var(--brand))" strokeWidth="2" />
+                  <circle cx={x} cy={y - PORTRAIT_R - 28} r={PORTRAIT_R} fill="none" stroke="hsl(var(--brand))" strokeWidth="3" />
                 </>
               )}
             <text

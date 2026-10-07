@@ -76,7 +76,7 @@ export default function ExecutiveTeam() {
 
   return (
     <div>
-      <PageHeader eyebrow="The heart of the platform" title="Executive Team"
+      <PageHeader eyebrow="Your advisors" title="Executive Team"
       description="Assemble your executive team — add up to 6 specialist AI advisors, or invite real collaborators.">
         <div className="flex gap-2">
           <Button onClick={() => setAddOpen(true)} variant="primary" className="px-5"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>

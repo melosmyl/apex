@@ -62,7 +62,7 @@ export default function Boardroom() {
   if (aiAdvisors.length < 1) {
     return (
       <div>
-        <PageHeader eyebrow="The signature experience" title="The Boardroom" />
+        <PageHeader eyebrow="Your board" title="The Boardroom" />
         <EmptyState
           title="Assemble your executive team first"
           description="Add at least one AI advisor to start using the Boardroom."
@@ -89,7 +89,7 @@ export default function Boardroom() {
   return (
     <div>
       <PageHeader
-        eyebrow="The signature experience"
+        eyebrow="Your board"
         title="The Boardroom"
         description="Bring a question to your board — they'll debate it and come back with a resolution."
       />
