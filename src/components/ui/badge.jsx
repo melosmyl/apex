@@ -4,19 +4,20 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none",
+  // Workstream L: the mock's pill, a mono label with an ink edge.
+  "inline-flex items-center rounded-full border-[1.5px] px-2.5 py-0.5 font-mono text-[0.68rem] uppercase tracking-[0.12em] font-medium transition-colors focus:outline-none",
   {
     variants: {
       variant: {
         default:
-          "border-transparent bg-brand text-brand-foreground hover:bg-brand/85",
+          "border-brand bg-brand text-brand-foreground hover:bg-brand/85",
         primary:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/85",
+          "border-primary bg-primary text-primary-foreground hover:bg-primary/85",
         secondary:
-          "border border-border/50 bg-secondary/60 text-secondary-foreground hover:bg-secondary",
+          "border-foreground bg-card text-secondary-foreground",
         destructive:
-          "border-transparent bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/15",
-        outline: "border border-border/60 text-foreground",
+          "border-destructive bg-destructive/10 text-destructive",
+        outline: "border-foreground text-foreground",
       },
     },
     defaultVariants: {

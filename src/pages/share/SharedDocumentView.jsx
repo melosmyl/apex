@@ -32,7 +32,7 @@ export default function SharedDocumentView() {
   if (state === "unavailable") return <NotAvailable />;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-5 sm:px-8 py-12">
         <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
           {doc.company_name ? `From ${doc.company_name}` : "Shared document"} · {doc.document_type}

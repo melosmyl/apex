@@ -46,7 +46,7 @@ export default function Decisions() {
         : (
         <div className="space-y-3">
           {items.map((d) => (
-            <button key={d.id} onClick={() => openDecision(d)} className="w-full text-left bg-card border border-border/70 rounded-2xl p-5 hover:shadow-md transition-all rise-in">
+            <button key={d.id} onClick={() => openDecision(d)} className="w-full text-left bg-card border border-border/70 rounded-2xl p-5 hover:shadow-elevated transition-all rise-in">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <h3 className="font-display text-lg leading-snug">{d.question}</h3>

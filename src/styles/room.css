@@ -1,12 +1,14 @@
-/* Just Ask The Room's own look: palette C ("Manor") with the Comic treatment,
-   from the landing and app mocks. One set of tokens and components, meant to
-   become the whole app's style (Workstream L). Until then it only applies
-   inside an element with the .room class, so no other page changes.
-   Every token is prefixed --room- because the app's theme already uses
-   --muted and --accent for something else. The look is deliberately light
-   only, as the mocks are. */
+/* Just Ask The Room's own look (Workstream L): palette C ("Manor") with the
+   Comic treatment, from the owner's landing and app mocks. This is the one
+   shared set: tokens on :root, and the pieces (card, speech bubble, pill,
+   mono label, buttons, dotted panel, grain) usable on any page. The app's
+   Tailwind theme in src/index.css carries the same colours.
+   Tokens are prefixed --room- because the theme already uses --muted and
+   --accent for something else. Light only, as the mocks are.
+   .room sets the base type and paper for a page drawn entirely in this
+   style (the landing page). */
 
-.room {
+:root {
   --room-paper: #F6F2E8;
   --room-paper-2: #EDE7D8;
   --room-panel: #E5DEC9;
@@ -35,6 +37,9 @@
   --room-shadow: 4px 4px 0 var(--room-ink);
   --room-shadow-sm: 3px 3px 0 var(--room-ink);
 
+}
+
+.room {
   color-scheme: light;
   background: var(--room-paper);
   color: var(--room-ink);
@@ -43,16 +48,16 @@
 }
 
 /* Small uppercase label: section eyebrows, captions, counters. */
-.room .room-mono {
+.room-mono {
   font-family: var(--room-mono);
   font-size: 0.72rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--room-ink);
+  color: var(--room-label);
 }
 
 /* Outlined card: the thick ink edge and hard offset shadow. */
-.room .room-card {
+.room-card {
   background: var(--room-mat);
   border: var(--room-border);
   box-shadow: var(--room-shadow);
@@ -61,7 +66,7 @@
 
 /* Speech bubble. Add .room-bubble--tail-left for the tail pointing at a
    portrait on its left. */
-.room .room-bubble {
+.room-bubble {
   position: relative;
   background: var(--room-mat);
   border: var(--room-border);
@@ -72,8 +77,8 @@
   font-weight: 500;
   font-style: normal;
 }
-.room .room-bubble--tail-left::before,
-.room .room-bubble--tail-left::after {
+.room-bubble--tail-left::before,
+.room-bubble--tail-left::after {
   content: "";
   position: absolute;
   width: 0;
@@ -82,11 +87,11 @@
   border-color: transparent;
   border-left-width: 0;
 }
-.room .room-bubble--tail-left::before { left: -12px; top: 14px; border-width: 7px 12px 7px 0; border-right-color: var(--room-ink); }
-.room .room-bubble--tail-left::after { left: -8px; top: 16px; border-width: 5px 9px 5px 0; border-right-color: var(--room-mat); }
+.room-bubble--tail-left::before { left: -12px; top: 14px; border-width: 7px 12px 7px 0; border-right-color: var(--room-ink); }
+.room-bubble--tail-left::after { left: -8px; top: 16px; border-width: 5px 9px 5px 0; border-right-color: var(--room-mat); }
 
 /* Pill: a rounded mono tag, e.g. "6 attending · 5 debating". */
-.room .room-pill {
+.room-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -102,7 +107,7 @@
 }
 
 /* The main button: ink, with a burgundy offset shadow. */
-.room .room-btn {
+.room-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
@@ -119,14 +124,15 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
-.room .room-btn:hover { background: var(--room-accent); }
-.room .room-btn:focus-visible,
+.room-btn:hover { background: var(--room-accent); }
+.room-btn:focus-visible,
 .room a:focus-visible,
 .room button:focus-visible,
-.room [tabindex]:focus-visible { outline: 2px solid var(--room-accent); outline-offset: 3px; }
+.room [tabindex]:focus-visible,
+.room-btn:focus-visible { outline: 2px solid var(--room-accent); outline-offset: 3px; }
 
 /* The quieter button: outlined, no fill. */
-.room .room-btn-line {
+.room-btn-line {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -137,22 +143,22 @@
   padding: 0.6rem 1.1rem;
   white-space: nowrap;
 }
-.room .room-btn-line:hover { background: var(--room-mat); }
+.room-btn-line:hover { background: var(--room-mat); }
 
 /* Dotted panel: the Ben-Day dots behind the table and the board strip. */
-.room .room-dots {
+.room-dots {
   background-image: radial-gradient(circle, var(--room-dot) 1.2px, transparent 1.4px);
   background-size: 9px 9px;
 }
 
 /* Paper grain and the warm glows, fixed behind the whole page. */
-.room .room-grain {
+.room-grain {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
 }
-.room .room-grain::after {
+.room-grain::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -161,11 +167,38 @@
     radial-gradient(50rem 30rem at 92% 18%, var(--room-glow-2), transparent 60%),
     radial-gradient(70rem 40rem at 50% 110%, var(--room-glow-3), transparent 60%);
 }
-.room .room-grain::before {
+.room-grain::before {
   content: "";
   position: absolute;
   inset: 0;
   opacity: 0.11;
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Cards across the app (Workstream L). Anything drawn as a card — bg-card
+   with a large radius — gets the Comic edge and shadow, so the ~120 card
+   sites don't each need editing. Plain CSS, outside Tailwind's layers, so
+   Tailwind doesn't generate responsive copies of it.
+   The ink edge replaces the default hairline only: a card a page colours on
+   purpose (burgundy, blue, red, amber…, dashed or borderless) keeps it. */
+.bg-card:is(.rounded-xl, .rounded-2xl, .rounded-3xl):not([class^="border-brand"], [class*=" border-brand"], [class^="border-live"], [class*=" border-live"], [class^="border-destructive"], [class*=" border-destructive"], [class^="border-amber"], [class*=" border-amber"], [class^="border-red"], [class*=" border-red"], [class^="border-emerald"], [class*=" border-emerald"], [class^="border-green"], [class*=" border-green"], [class^="border-yellow"], [class*=" border-yellow"], [class^="border-orange"], [class*=" border-orange"], [class^="border-transparent"], [class*=" border-transparent"], .border-dashed, .border-0) {
+  border-width: 2px;
+  border-style: solid;
+  border-color: hsl(var(--foreground));
+}
+.bg-card:is(.rounded-xl, .rounded-2xl, .rounded-3xl):is([class^="border-brand"], [class*=" border-brand"], [class^="border-live"], [class*=" border-live"], [class^="border-destructive"], [class*=" border-destructive"]):not(.border-0) {
+  border-width: 2px;
+}
+/* The shadow has zero specificity, so any shadow or ring utility on a card
+   (importance, highlight, drag, hover lift) takes over. */
+:where(.bg-card):where(.rounded-xl, .rounded-2xl, .rounded-3xl):where(:not(.border-0, .border-dashed, [class^="border-brand"], [class*=" border-brand"], [class^="border-live"], [class*=" border-live"], [class^="border-destructive"], [class*=" border-destructive"])) {
+  box-shadow: var(--shadow-card);
+}
+/* A card inside a card is a part of it, not a second object. */
+.bg-card .bg-card:is(.rounded-xl, .rounded-2xl, .rounded-3xl):not(.border-0) {
+  border-width: 1.5px;
+}
+:where(.bg-card .bg-card):where(.rounded-xl, .rounded-2xl, .rounded-3xl) {
+  box-shadow: none;
 }

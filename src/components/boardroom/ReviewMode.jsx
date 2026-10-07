@@ -126,7 +126,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
           ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {documents.map((d) => (
-                <button key={d.id} onClick={() => setSelectedDocId(d.id)} className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedDocId === d.id ? "border-brand bg-brand-soft" : "border-border/70 bg-card hover:border-border"}`}>
+                <button key={d.id} onClick={() => setSelectedDocId(d.id)} className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedDocId === d.id ? "!border-2 border-foreground bg-brand-soft shadow-[3px_3px_0_hsl(var(--foreground))]" : "border-border/70 bg-card/60 hover:border-foreground/60 hover:bg-card"}`}>
                   <FileText className="w-4 h-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">{d.title}</div>
@@ -148,7 +148,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
         <Label className="mb-2.5 block text-sm">Reviewers ({selectedAdvisors.length}/3)</Label>
         <div className="flex flex-wrap gap-2">
           {advisors.map((a) => (
-            <button key={a.id} onClick={() => toggleAdvisor(a)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${selectedAdvisors.some((x) => x.id === a.id) ? "border-brand bg-brand-soft" : "border-border/70 bg-card hover:border-border"}`}>
+            <button key={a.id} onClick={() => toggleAdvisor(a)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${selectedAdvisors.some((x) => x.id === a.id) ? "!border-2 border-foreground bg-brand-soft shadow-[3px_3px_0_hsl(var(--foreground))]" : "border-border/70 bg-card/60 hover:border-foreground/60 hover:bg-card"}`}>
               <AdvisorAvatar name={a.name} accent={a.accent} libraryKey={a.library_key} size="sm" />
               <span className="text-sm">{a.name}</span>
             </button>

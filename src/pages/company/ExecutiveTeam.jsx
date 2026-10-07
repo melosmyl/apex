@@ -97,7 +97,7 @@ export default function ExecutiveTeam() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {advisors.map((a) => (
-            <div key={a.id} className="group bg-card border border-border/70 rounded-2xl p-5 hover:shadow-lg transition-all rise-in cursor-pointer" onClick={() => setSelected(a)}>
+            <div key={a.id} className="group bg-card border border-border/70 rounded-2xl p-5 hover:shadow-elevated transition-all rise-in cursor-pointer" onClick={() => setSelected(a)}>
                 <div className="flex items-start justify-between mb-3">
                   <AdvisorAvatar name={a.name} libraryKey={a.library_key} accent={a.accent} size="lg" />
                   {a.id === chair?.id ?

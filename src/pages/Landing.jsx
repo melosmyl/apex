@@ -4,7 +4,6 @@ import { ADVISOR_LIBRARY, getAdvisorByKey } from "@/lib/advisorLibrary";
 import { portraitFor } from "@/lib/portraits";
 import { OFF_DUTY } from "@/lib/offDuty";
 import { ADVISORS_ARE_AI, PRODUCT_NAME } from "@/lib/branding";
-import "@/styles/room.css";
 import "@/styles/landing.css";
 
 // The page logged-out visitors see at "/", built from jatr-landing-mock.html

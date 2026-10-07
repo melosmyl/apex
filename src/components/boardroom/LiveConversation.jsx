@@ -137,7 +137,7 @@ export default function LiveConversation({ company, companyId, advisors }) {
                   disabled={!selected && selectedAdvisors.length >= 3}
                   className={`flex flex-col items-center p-3 rounded-xl border transition-all ${
                     selected
-                      ? "border-brand bg-brand-soft"
+                      ? "!border-2 border-foreground bg-brand-soft shadow-[3px_3px_0_hsl(var(--foreground))]"
                       : "border-border/60 hover:border-border"
                   } disabled:opacity-40 disabled:cursor-not-allowed`}
                 >

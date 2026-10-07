@@ -106,7 +106,7 @@ export default function SharedMeetingView() {
   const conf = Math.round(meeting.overall_confidence_score || 0);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-3xl mx-auto px-5 sm:px-8 py-12 space-y-8">
         <div>
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{meeting.company_name ? `${meeting.company_name}'s board` : "A board meeting"}</p>

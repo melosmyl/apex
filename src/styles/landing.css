@@ -10,6 +10,7 @@
   overflow-x: clip;
 }
 .landing main { position: relative; z-index: 1; }
+.landing .room-mono { color: var(--room-ink); } /* Comic: labels in ink */
 .landing .wrap { max-width: 80rem; margin: 0 auto; padding-inline: clamp(1.25rem, 4vw, 3.5rem); }
 .landing h1,
 .landing h2,

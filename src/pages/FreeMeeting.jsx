@@ -143,7 +143,7 @@ export default function FreeMeeting() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-5 sm:px-8 py-12">
         {phase === "intro" && (
           <div className="text-center rise-in">
@@ -176,7 +176,7 @@ export default function FreeMeeting() {
               <label className="text-sm font-medium mb-1.5 block">Where are you right now?</label>
               <div className="grid grid-cols-2 gap-2">
                 {PROFILE_QUESTIONS.find((q) => q.id === "stage").options.map((opt) => (
-                  <button key={opt.value} onClick={() => set("stage", opt.value)} className={`text-left px-4 py-2.5 rounded-xl border text-sm transition-colors ${answers.stage === opt.value ? "border-brand bg-brand-soft" : "border-border/70 hover:bg-accent/40"}`}>
+                  <button key={opt.value} onClick={() => set("stage", opt.value)} className={`text-left px-4 py-2.5 rounded-xl border text-sm transition-colors ${answers.stage === opt.value ? "!border-2 border-foreground bg-brand-soft shadow-[3px_3px_0_hsl(var(--foreground))]" : "border-border/70 hover:bg-accent/40"}`}>
                     {opt.label}
                   </button>
                 ))}

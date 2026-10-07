@@ -9,7 +9,7 @@ import {
 
 const NAV = [
 { to: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-{ to: "team", label: "Executive Team", icon: Users },
+{ to: "team", label: "Your advisors", icon: Users },
 { to: "boardroom", label: "Boardroom", icon: Landmark },
 { to: "projects", label: "Projects", icon: FolderKanban },
 { to: "tasks", label: "Tasks", icon: CheckSquare },
@@ -21,12 +21,10 @@ const NAV = [
 { to: "meetings", label: "Meetings", icon: CalendarClock },
 { to: "settings", label: "Settings", icon: Settings }];
 
-// A single dark anchor is the highest-return fix for the app reading flat —
-// near-black, independent of the app's own (otherwise-unused) light/dark
-// theme, so it doesn't touch anything else. Text colour is inherited and
-// dimmed via opacity rather than the muted-foreground token, since that
-// token is tuned for light surfaces and would be unreadable here.
-const SIDEBAR_DARK = { background: "hsl(220 8% 7%)", color: "hsl(40 10% 92%)" };
+// The light sidebar from the Workstream L mocks: a warm panel a step below
+// the paper, the company in an outlined tile, and the current page drawn as
+// a small outlined card.
+const SIDEBAR = { background: "hsl(var(--side))", color: "hsl(var(--foreground))" };
 
 export default function CompanyLayout() {
   const { companyId } = useParams();
@@ -42,78 +40,63 @@ export default function CompanyLayout() {
   useEffect(() => {setOpen(false);}, [location.pathname]);
 
   const SidebarInner =
-  <div className="flex flex-col h-full" style={SIDEBAR_DARK}>
-      <div className="px-6 py-6 border-b border-white/10">
-        <button onClick={() => navigate("/companies")} className="flex items-center gap-2 opacity-60 hover:opacity-100 text-sm mb-4 transition-opacity">
-          <ChevronLeft className="w-4 h-4" /> My Companies
+  <div className="flex flex-col h-full border-r border-border" style={SIDEBAR}>
+      <div className="px-4 pt-5 pb-3">
+        <button onClick={() => navigate("/companies")} className="flex items-center gap-1 text-muted-foreground hover:text-foreground text-sm mb-3 transition-colors">
+          <ChevronLeft className="w-4 h-4" /> My companies
         </button>
-        <div className="flex items-center gap-3">
-          {/* Same inverted-tile treatment as CompanyCard.jsx, swapped for
-              this dark surface: white fill, near-black text. No more
-              hardcoded green. */}
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center font-display text-lg overflow-hidden"
-            style={{ background: "hsl(40 20% 97%)", color: "hsl(220 8% 10%)" }}
-          >
+        <div className="flex items-center gap-3 px-2 pb-4 border-b border-border">
+          <div className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center font-display text-lg overflow-hidden bg-card border-2 border-foreground shadow-[2px_2px_0_hsl(var(--foreground))]">
             {company?.logo_url ? <img src={company.logo_url} alt="" className="w-full h-full object-cover" /> : company?.name?.[0] || "•"}
           </div>
           <div className="min-w-0">
-            <div className="font-display text-base leading-tight truncate">{company?.name || "…"}</div>
-            <div className="text-xs opacity-60 truncate">{company?.industry}</div>
+            <div className="font-display font-medium text-[1.05rem] leading-tight truncate">{company?.name || "…"}</div>
+            <div className="text-xs text-muted-foreground truncate">{company?.industry}</div>
           </div>
         </div>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
         {NAV.map((item) =>
       <NavLink
         key={item.to}
         to={`/company/${companyId}/${item.to}`}
         className={({ isActive }) =>
-        // A left-edge marker rather than a full fill — a solid bg-brand pill
-        // was the loudest thing on screen against the dark sidebar, and it
-        // competed with orange's actual meaning ("the user caused this")
-        // elsewhere in the app. Active is now: the label brightens to full
-        // opacity, and a 3px orange bar marks the position — nothing about
-        // it is a fill the user might mistake for a call to attention.
-        `relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-        isActive ? "opacity-100 font-medium before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-4 before:w-[3px] before:rounded-full before:bg-brand" : "opacity-70 hover:opacity-100 hover:bg-white/5"}`
-
+        `flex items-center gap-3 px-2.5 py-2 rounded-lg text-[0.95rem] border-2 transition-colors ${
+        isActive ? "bg-card border-foreground shadow-[2px_2px_0_hsl(var(--foreground))] font-semibold" : "border-transparent hover:bg-foreground/5"}`
         }>
 
-            <item.icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+            <item.icon className="w-[18px] h-[18px] opacity-70" strokeWidth={1.75} />
             {item.label}
           </NavLink>
       )}
       </nav>
-      <div className="px-6 py-4 border-t border-white/10">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs opacity-60 font-display italic">Never build alone.</span>
-          <Link to="/pricing" className="text-xs opacity-60 hover:opacity-100 transition-opacity">Pricing</Link>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link to="/privacy" className="text-[11px] opacity-45 hover:opacity-80 transition-opacity">Privacy</Link>
-          <Link to="/terms" className="text-[11px] opacity-45 hover:opacity-80 transition-opacity">Terms</Link>
+      <div className="mx-4 py-4 border-t border-border text-muted-foreground">
+        <div className="text-[0.85rem] font-display italic mb-1">Never build alone.</div>
+        <div className="flex items-center gap-3 text-xs">
+          <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
+          <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
         </div>
       </div>
     </div>;
 
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <aside className="hidden lg:flex w-72 shrink-0 sticky top-0 h-screen">
+    <div className="min-h-screen flex">
+      <aside className="hidden lg:flex w-64 shrink-0 sticky top-0 h-screen">
         {SidebarInner}
       </aside>
 
       {open &&
       <div className="lg:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-foreground/20 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <aside className="relative w-72 h-full shadow-xl">{SidebarInner}</aside>
+          <aside className="relative w-72 max-w-[85vw] h-full shadow-[4px_0_0_hsl(var(--foreground))]">{SidebarInner}</aside>
         </div>
       }
 
       <div className="flex-1 min-w-0">
-        <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b border-border/60 bg-card/80 backdrop-blur">
-          <button onClick={() => setOpen(true)}><Menu className="w-6 h-6" /></button>
+        <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b-2 border-foreground bg-[hsl(var(--side))]">
+          <button onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="w-6 h-6" /></button>
           <span className="font-display">{company?.name}</span>
           <span className="w-6" />
         </header>

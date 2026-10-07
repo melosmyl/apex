@@ -8,8 +8,9 @@ const SIZES = { xs: "w-6 h-6 text-[10px]", sm: "w-9 h-9 text-xs", md: "w-12 h-12
 const LARGE = new Set(["lg", "xl"]);
 
 // The advisor's portrait when they have one (library advisors, found by key
-// or name), otherwise a small, sharp-cornered, near-black tile with mono
-// initials: custom advisors, people, and anyone whose portrait isn't in yet.
+// or name), otherwise a mat tile with ink mono initials: custom advisors,
+// people, and anyone whose portrait isn't in yet. Both get the ink outline
+// of the Workstream L style.
 // `empty` renders an unfilled seat (a dashed outline, no initials).
 export default function AdvisorAvatar({ name, libraryKey, size = "md", empty = false, className = "" }) {
   const [failed, setFailed] = useState(false);
@@ -25,8 +26,7 @@ export default function AdvisorAvatar({ name, libraryKey, size = "md", empty = f
   const portrait = failed ? null : portraitFor({ libraryKey, name });
   return (
     <div
-      className={`${SIZES[size]} ${className} rounded-lg flex items-center justify-center font-mono font-medium shrink-0 overflow-hidden`}
-      style={{ background: "hsl(220 8% 10%)", color: "hsl(40 20% 97%)" }}
+      className={`${SIZES[size]} ${className} rounded-lg flex items-center justify-center font-mono font-medium shrink-0 overflow-hidden bg-card text-foreground border-foreground ${size === "xs" ? "border" : "border-[1.5px]"}`}
       title={name}
     >
       {portrait ? (

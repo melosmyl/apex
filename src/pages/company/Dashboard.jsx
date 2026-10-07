@@ -169,7 +169,7 @@ export default function Dashboard() {
           { label: "Decisions", icon: Scale, path: "decisions" },
           { label: "Documents", icon: FileText, path: "documents" },
         ].map((item) => (
-          <button key={item.path} onClick={() => go(item.path)} className="bg-card border border-border/70 rounded-xl p-4 flex items-center gap-3 hover:border-border hover:shadow-soft transition-all text-left">
+          <button key={item.path} onClick={() => go(item.path)} className="bg-card border border-border/70 rounded-xl p-4 flex items-center gap-3 hover:border-border hover:shadow-elevated transition-all text-left">
             <item.icon className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
             <span className="text-sm font-medium">{item.label}</span>
             <ArrowRight className="w-3.5 h-3.5 text-muted-foreground ml-auto" />

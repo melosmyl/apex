@@ -55,7 +55,7 @@ export default function Meetings() {
           </div>
           <div className="space-y-3">
             {filtered.map((m) => (
-              <button key={m.id} onClick={() => setActive(m)} className="w-full text-left bg-card border border-border/70 rounded-2xl p-5 hover:shadow-md transition-all rise-in">
+              <button key={m.id} onClick={() => setActive(m)} className="w-full text-left bg-card border border-border/70 rounded-2xl p-5 hover:shadow-elevated transition-all rise-in">
                 <h3 className="font-display text-lg leading-snug">{m.question}</h3>
                 <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{m.recommendation}</p>
                 <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">

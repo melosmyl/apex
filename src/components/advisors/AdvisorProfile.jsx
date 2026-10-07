@@ -21,8 +21,7 @@ export default function AdvisorProfile({ profile, actions = null, headingLevel =
           />
         ) : (
           <div
-            className="w-full max-w-[320px] sm:max-w-none aspect-[4/5] rounded-xl flex items-center justify-center font-mono text-5xl"
-            style={{ background: "hsl(220 8% 10%)", color: "hsl(40 20% 97%)" }}
+            className="w-full max-w-[320px] sm:max-w-none aspect-[4/5] rounded-xl flex items-center justify-center font-mono text-5xl bg-card text-foreground border-2 border-foreground"
             aria-hidden="true"
           >
             {initialsOf(profile.name)}

@@ -220,7 +220,7 @@ export default function VoiceMeetingScreen({
           </div>
           {/* Founder card */}
           <div className={`flex flex-col items-center p-4 rounded-2xl border transition-all ${
-            isListening ? "border-brand bg-brand-soft" : "border-border/60 bg-card/50"
+            isListening ? "!border-2 border-foreground bg-brand-soft shadow-[3px_3px_0_hsl(var(--foreground))]" : "border-border/60 bg-card/50"
           }`}>
             <div className="relative">
               <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center font-display text-lg text-primary-foreground">

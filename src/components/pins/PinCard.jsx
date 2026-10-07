@@ -35,7 +35,7 @@ export default function PinCard({ pin, advisor, onEdit, onViewContext, onConvert
       onMouseLeave={() => setHovered(false)}
       className={`group bg-card border border-border/70 rounded-2xl p-4 transition-all rise-in ${IMPORTANCE_RING[pin.importance] || ""} ${
         isCritical ? "border-red-200" : ""
-      } ${hovered ? "shadow-md" : ""}`}
+      } ${hovered ? "shadow-elevated" : ""}`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">

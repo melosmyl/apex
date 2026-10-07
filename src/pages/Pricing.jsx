@@ -53,7 +53,7 @@ const TIERS = [
 
 export default function Pricing() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-20">
         <div className="text-center mb-14 fade-in">
           <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground mb-3">Pricing</div>
@@ -65,7 +65,7 @@ export default function Pricing() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {TIERS.map((t) => (
-            <div key={t.name} className={`relative flex flex-col bg-card border rounded-2xl p-6 rise-in ${t.highlight ? "border-foreground/20 ring-1 ring-foreground/10 shadow-lg" : "border-border/70"}`}>
+            <div key={t.name} className={`relative flex flex-col bg-card border rounded-2xl p-6 rise-in ${t.highlight ? "shadow-[6px_6px_0_hsl(var(--brand))]" : "border-border/70"}`}>
               {t.highlight && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="text-[10px] uppercase tracking-wider bg-foreground text-background px-3 py-1 rounded-full">Most popular</span>

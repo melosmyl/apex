@@ -7,7 +7,7 @@ export default function ParticipantCard({ advisor, isActive, isSpeaking, isMuted
     <div
       className={`relative flex flex-col items-center p-4 rounded-2xl border transition-all duration-300 ${
         isActive
-          ? "border-brand bg-brand-soft shadow-warm-glow"
+          ? "!border-2 border-foreground bg-brand-soft shadow-[3px_3px_0_hsl(var(--foreground))]"
           : "border-border/60 bg-card/50"
       }`}
     >

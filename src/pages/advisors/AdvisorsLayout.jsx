@@ -11,7 +11,7 @@ export default function AdvisorsLayout({ title, back = { to: "/", label: `Back t
     document.title = `${title} · ${PRODUCT_NAME}`;
   }, [title]);
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-4xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
         <Link to={back.to} className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 mb-10">
           <ArrowLeft className="w-4 h-4" /> {back.label}

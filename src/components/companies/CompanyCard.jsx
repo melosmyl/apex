@@ -61,12 +61,9 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
     >
       <div className="flex items-start justify-between gap-4 mb-5">
         <div className="flex items-center gap-4 min-w-0">
-          {/* Inverts with the surface rather than carrying its own colour —
-              near-black on this card's light surface; the sidebar version
-              (CompanyLayout.jsx) is the same pair swapped, white on dark. */}
+          {/* The same outlined tile as the sidebar's company mark (CompanyLayout.jsx). */}
           <div
-            className="w-14 h-14 rounded-lg flex items-center justify-center shrink-0 shadow-soft group-hover:scale-105 transition-transform duration-300"
-            style={{ background: "hsl(220 8% 10%)", color: "hsl(40 20% 97%)" }}
+            className="w-14 h-14 rounded-lg flex items-center justify-center shrink-0 bg-card text-foreground border-2 border-foreground shadow-[2px_2px_0_hsl(var(--foreground))] group-hover:scale-105 transition-transform duration-300"
           >
             <span className="font-display text-lg font-medium">{initials}</span>
           </div>
@@ -98,7 +95,7 @@ export default function CompanyCard({ company, stats, advisors = [] }) {
           {/* Six seats, always — filled with real advisors, empty tiles for
               the rest, rather than a variable-length list with a "+N more"
               that could never actually trigger once 6 is a hard cap. */}
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center -space-x-1.5 min-w-0">
             {seats.map((a, i) =>
               a ? (
                 <AdvisorAvatar key={a.id || i} name={a.name} libraryKey={a.library_key} size="sm" />

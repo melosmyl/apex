@@ -100,7 +100,7 @@ export default function DocumentCard({ doc, advisor, onClick, view = "grid" }) {
   return (
     <div
       onClick={onClick}
-      className="group bg-card border border-border/70 rounded-2xl p-5 cursor-pointer hover:shadow-md hover:border-border transition-all rise-in"
+      className="group bg-card border border-border/70 rounded-2xl p-5 cursor-pointer hover:shadow-elevated hover:border-border transition-all rise-in"
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center shrink-0">

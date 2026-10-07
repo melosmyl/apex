@@ -194,8 +194,8 @@ export default function ButtonDemoTest() {
 
       <div>
         <h2 className="font-display text-xl mb-4">Enforcement guard — try to bypass shape/colour</h2>
-        <p className="text-sm text-muted-foreground mb-4">This button is rendered with <code>className="rounded-full bg-brand"</code>. Open the console — it should log a warning and the classes should have no visible effect (still 6px corners, still steel).</p>
-        <Button variant="primary" className="rounded-full bg-brand">Should stay square and steel</Button>
+        <p className="text-sm text-muted-foreground mb-4">This button is rendered with <code>className="rounded-full bg-brand"</code>. Open the console — it should log a warning and the classes should have no visible effect (still an ink pill).</p>
+        <Button variant="primary" className="rounded-full bg-brand">Should stay an ink pill</Button>
       </div>
     </div>
   );

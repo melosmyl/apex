@@ -84,7 +84,7 @@ export default function Companies({ skipRedirect = false }) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
           <div className="flex flex-col items-center justify-center text-center py-20 rise-in">
             <h3 className="text-xl font-display mb-2">Connection interrupted</h3>
@@ -104,7 +104,7 @@ export default function Companies({ skipRedirect = false }) {
   const headlineText = user ? headline({ companies, decisionsWaiting, tasksCompletedOvernight, lastMeeting: meetings[0] }) : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-12 fade-in">
           <div>

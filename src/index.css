@@ -1,80 +1,76 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Bodoni+Moda:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Three real surface values: background sits a clear step below card,
-       so layering reads from value contrast, not just hairline borders. */
-    --background: 36 16% 87%;
-    --foreground: 220 8% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 220 8% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 8% 10%;
-    --primary: 220 8% 10%;
-    --primary-foreground: 40 20% 97%;
-    --secondary: 38 14% 92%;
-    --secondary-foreground: 220 8% 14%;
-    --muted: 38 12% 92%;
-    --muted-foreground: 60 4% 40%;
-    --accent: 38 16% 94%;
-    --accent-foreground: 220 8% 14%;
-    --destructive: 6 60% 45%;
-    --destructive-foreground: 40 20% 97%;
-    --border: 40 16% 74%;
-    --input: 40 16% 74%;
-    --ring: 18 80% 45%;
+    /* Workstream L: palette C ("Manor") with the Comic treatment, the same
+       values as src/styles/room.css. Paper, a warm mat for cards, ink for
+       text and outlines, burgundy as the one accent. Light only. */
+    --background: 43 44% 94%;      /* paper #F6F2E8 */
+    --foreground: 341 48% 11%;     /* ink #2B0F18 */
+    --card: 44 58% 96%;            /* mat #FBF8F0 */
+    --card-foreground: 341 48% 11%;
+    --popover: 44 58% 96%;
+    --popover-foreground: 341 48% 11%;
+    --primary: 341 48% 11%;
+    --primary-foreground: 43 44% 94%;
+    --secondary: 43 37% 89%;       /* paper-2 #EDE7D8 */
+    --secondary-foreground: 341 48% 11%;
+    --muted: 43 37% 89%;
+    --muted-foreground: 48 13% 37%; /* #6B6652, 5.2:1 on paper */
+    --accent: 43 37% 89%;          /* paper-2: muted text keeps 4.7:1 on hover fills */
+    --accent-foreground: 341 48% 11%;
+    --destructive: 5 72% 37%;
+    --destructive-foreground: 43 44% 94%;
+    --border: 43 25% 81%;          /* line #DAD3C1: hairlines and dividers */
+    --input: 41 21% 52%;           /* #9E8E6B, 3:1 against cards */
+    --ring: 344 69% 22%;
 
-    /* Signal orange — the one accent for anything the user did or needs to
-       attend to. Two tokens, one hue, different jobs:
-       --brand is the bright fill for marks (badges, dots, large numerals,
-       confidence bars) — never small text, so AA text-contrast doesn't
-       apply and it can stay vivid. --brand-text is a darker value of the
-       same hue for the rare case where orange has to *be* text; it clears
-       4.5:1 against both --background and --card (checked, not assumed).
-       Darkening the single accent itself to clear AA (~L36) reads as burnt
-       orange/rust — this split exists specifically to avoid that. */
-    --brand: 18 85% 52%;
-    --brand-foreground: 220 8% 10%;
-    --brand-soft: 18 75% 95%;
-    --brand-text: 18 85% 36%;
+    /* The one accent, burgundy, for anything the founder did or needs to
+       attend to: selections, marks, counts, confidence bars. It clears AA
+       as text (11.9:1 on paper), so --brand-text is the same value. */
+    --brand: 344 69% 22%;          /* #5E1125 */
+    --brand-foreground: 43 44% 94%;
+    --brand-soft: 351 35% 92%;
+    --brand-text: 344 69% 22%;
 
-    /* Deep indigo — reserved for live/positional state only: the product
-       doing something on its own right now (someone is speaking, you are
-       here, in progress). Never for buttons, never for anything the user
-       caused — that's orange. No separate text variant needed: this hue
-       clears AA as text directly (7.2:1+ against both surfaces). */
-    --live: 240 60% 45%;
-    --live-foreground: 40 20% 98%;
-    --live-soft: 240 45% 95%;
+    /* Live state (someone is speaking, in progress): the mocks' periwinkle
+       as a fill, a deeper blue where it has to be text. */
+    --live: 230 50% 46%;           /* #3B4FB0, 6.4:1 on paper */
+    --live-foreground: 43 44% 94%;
+    --live-soft: 228 87% 94%;
+    --live-fill: 228 87% 75%;      /* #8AA0F7 */
 
-    /* Hairline-first — shadows are a last resort, not the default */
-    --shadow-soft: 0 1px 2px rgba(20,20,15,0.04);
-    --shadow-card: 0 1px 2px rgba(20,20,15,0.05), 0 2px 8px rgba(20,20,15,0.03);
-    --shadow-elevated: 0 4px 16px rgba(20,20,15,0.07);
-    --shadow-warm-glow: 0 0 0 1px rgba(20,20,15,0.04);
+    /* Gold marks the Chair; sage is a quiet third colour. */
+    --gold: 46 47% 66%;            /* #D2BF81 */
+    --sage: 163 10% 64%;           /* #99ABA6 */
+    --panel: 45 35% 84%;
+    --side: 42 38% 90%;            /* #EFE9DB, the sidebar */
+
+    /* Comic: a hard ink offset instead of a soft blur. */
+    --shadow-soft: 0 1px 2px rgba(43,15,24,0.06);
+    --shadow-card: 3px 3px 0 hsl(341 48% 11%);
+    --shadow-elevated: 4px 4px 0 hsl(341 48% 11%);
+    --shadow-warm-glow: 0 0 0 1px rgba(43,15,24,0.05);
 
     --radius: 0.375rem;
-    --grid-line: rgba(20,20,15,0.05);
+    --grid-line: transparent;
 
-    /* Didone serif carries every heading and section title app-wide — one
-       typeface doing the identity work, per the landing page's own rule
-       extended through the product. Sans for body, mono for small labels. */
-    --font-heading: "Bodoni Moda", Didot, "Playfair Display", Georgia, serif;
-    --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Bodoni Moda", Didot, "Playfair Display", Georgia, serif;
+    /* Fraunces for headings, Figtree for body, Plex Mono for small labels. */
+    --font-heading: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "Figtree", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
     --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-    --sidebar-background: 40 14% 94%;
-    --sidebar-foreground: 220 8% 14%;
-    --sidebar-primary: 220 8% 10%;
-    --sidebar-primary-foreground: 40 20% 97%;
-    --sidebar-accent: 40 12% 90%;
-    --sidebar-accent-foreground: 220 8% 14%;
-    --sidebar-border: 42 16% 85%;
-    --sidebar-ring: 43 70% 40%;
+    --sidebar-background: 42 38% 90%;
+    --sidebar-foreground: 341 48% 11%;
+    --sidebar-primary: 341 48% 11%;
+    --sidebar-primary-foreground: 43 44% 94%;
+    --sidebar-accent: 44 58% 96%;
+    --sidebar-accent-foreground: 341 48% 11%;
+    --sidebar-border: 43 25% 81%;
+    --sidebar-ring: 344 69% 22%;
   }
 
   .dark {
@@ -135,14 +131,24 @@
 
   body {
     @apply bg-background text-foreground font-body;
-    background-image:
-      linear-gradient(var(--grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 24px 24px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    line-height: 1.65;
+    line-height: 1.6;
     font-feature-settings: "kern", "liga", "calt";
+  }
+
+  /* Paper grain over every page, as in the mocks. Fixed, behind content,
+     never catches a click. */
+  body { isolation: isolate; }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.09;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   }
 
   h1, h2, h3, h4 {
@@ -150,8 +156,8 @@
     letter-spacing: -0.01em;
     font-weight: 500;
   }
-  h1 { letter-spacing: -0.025em; }
-  h2 { letter-spacing: -0.02em; }
+  h1 { letter-spacing: -0.03em; font-weight: 300; }
+  h2 { letter-spacing: -0.02em; font-weight: 400; }
 
   ::selection {
     background: hsl(var(--brand) / 0.85);
@@ -199,133 +205,45 @@
 }
 
 @layer components {
-  /* Metal button — steel only. A dark indigo metal skin existed briefly
-     for a liveMetal variant; removed (product owner, 2026-08-13) — indigo
-     stays a token for live/positional state (speaking indicator, "you are
-     here", in-progress) but never appears on a button in any form. Buttons
-     are steel or bordered outline, nothing else.
-
-     The mechanic: a short, tight top-to-mid gradient (not an even wash —
-     that reads as a soft PNG sticker, not a machined surface), a hard 1px
-     border darker than the fill, a single-pixel inset highlight along the
-     top edge, and a tight low-opacity drop shadow. :active inverts the
-     gradient, swaps the drop shadow for an inset one, and (via
-     .btn-metal-label) drops the visible label 1px — the whole thing should
-     read as a physical button actually depressing, not a color swap.
-     Hover only ever brightens the existing stops; it never transitions the
-     gradient itself. Colour never touches this — accent tokens are for
-     marks and live-state elsewhere, not buttons. */
-  .btn-metal {
-    /* A real light-top/dark-bottom jump (L97 down to L53, ~44 points) held
-       across a short distance (32%) rather than an even wash — the first
-       pass here was L92→L69 (23 points), which read as grey, not metal. */
-    --metal-top: hsl(40 18% 97%);
-    --metal-mid: hsl(40 11% 87%);
-    --metal-bottom: hsl(40 9% 53%);
-    /* Firm enough to define the button's own edges against a plain cream
-       background with no backing stage behind it — the original 1px at
-       L30 read as a hairline once the hero's dark stage (that used to do
-       the real contrast work) was removed. */
-    --metal-border: hsl(40 14% 20%);
-    background-image: linear-gradient(180deg, var(--metal-top) 0%, var(--metal-mid) 32%, var(--metal-bottom) 100%);
-    border: 2px solid var(--metal-border);
-    color: hsl(220 8% 10%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
-      0 1px 3px rgba(20, 15, 10, 0.22),
-      0 1px 1px rgba(20, 15, 10, 0.12);
-    /* !important: defeats the shared transition-all utility from the cva
-       base classes, which sits in Tailwind's utilities layer and otherwise
-       wins over this components-layer rule regardless of source order —
-       without it, background-image (the gradient) would animate on hover,
-       which the brief explicitly rules out. */
-    transition: box-shadow 150ms ease !important;
+  /* Buttons (Workstream L): pills, as in the mocks.
+     .btn-room is the main action: ink, with the burgundy offset shadow;
+     hover turns it burgundy, pressing sinks it into its shadow.
+     .btn-room-line is the quieter one: an ink outline on no fill. */
+  .btn-room {
+    background-color: var(--room-ink);
+    color: var(--room-paper);
+    border: 2px solid var(--room-ink);
+    box-shadow: 3px 3px 0 var(--room-accent);
+    /* !important: the cva base's transition-all sits in Tailwind's
+       utilities layer and would otherwise animate the shadow offset. */
+    transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease !important;
   }
-  /* [data-force-state] is not a demo hack with its own values — it's the
-     literal same declaration block as the real pseudo-class, matched by an
-     extra selector. A review harness sets the attribute to show a state
-     without faking it in a separate style object; there is no second copy
-     of these numbers to drift out of sync. */
-  .btn-metal:hover:not(:disabled),
-  .btn-metal[data-force-state="hover"] {
-    --metal-top: hsl(40 20% 99%);
-    --metal-mid: hsl(40 13% 92%);
-    --metal-bottom: hsl(40 10% 58%);
-  }
-  .btn-metal:active:not(:disabled),
-  .btn-metal[data-force-state="active"] {
-    /* Fully inverted (dark where light was) plus a materially stronger
-       inset — the first pass's inset (0.32 alpha, 4px blur, no spread)
-       barely registered next to a weak rest-state shadow. This needs to
-       be unmistakable at a glance, not a subtle cue. */
-    background-image: linear-gradient(180deg, var(--metal-bottom) 0%, var(--metal-mid) 68%, var(--metal-top) 100%);
-    box-shadow:
-      inset 0 2px 5px rgba(20, 15, 10, 0.55),
-      inset 0 1px 3px rgba(20, 15, 10, 0.4);
-  }
-
-  /* Disabled must read as flatter and quieter than rest, not as a
-     lower-opacity copy of the same vivid surface — the first pass just
-     dropped the shadow and left the full-contrast gradient + the shared
-     disabled:opacity-50 utility to do the work, which read as *more*
-     solid (a flat pale block with no shadow to make it recede). This
-     replaces the gradient outright with a flat, low-contrast fill and
-     overrides that opacity utility so the flatness itself carries it. */
-  .btn-metal:disabled {
-    background-image: none;
-    background-color: hsl(40 8% 88%);
-    border-color: hsl(40 8% 78%);
-    color: hsl(40 6% 55%);
+  .btn-room:hover:not(:disabled),
+  .btn-room[data-force-state="hover"] { background-color: var(--room-accent); border-color: var(--room-accent); box-shadow: 3px 3px 0 var(--room-ink); }
+  .btn-room:active:not(:disabled),
+  .btn-room[data-force-state="active"] { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--room-accent); }
+  .btn-room:disabled {
+    background-color: var(--room-panel);
+    border-color: var(--room-line);
+    color: var(--room-muted);
     box-shadow: none;
     opacity: 1 !important;
   }
-  .btn-metal-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: transform 150ms ease;
-  }
-  .btn-metal:active:not(:disabled) .btn-metal-label,
-  .btn-metal[data-force-state="active"] .btn-metal-label {
-    transform: translateY(1px);
-  }
 
-  /* Secondary — no metal at all, per the brief: transparent fill, a firm
-     near-black border, same corners and mono label as primary so the two
-     read as one language. */
-  .btn-outline-secondary {
+  .btn-room-line {
     background-color: transparent;
-    border: 1px solid hsl(220 8% 15%);
-    color: hsl(220 8% 10%);
-    transition: background-color 150ms ease, border-color 150ms ease !important;
+    color: var(--room-ink);
+    border: 2px solid var(--room-ink);
+    transition: background-color 150ms ease, transform 150ms ease !important;
   }
-  .btn-outline-secondary:hover:not(:disabled),
-  .btn-outline-secondary[data-force-state="hover"] {
-    background-color: hsl(220 8% 10% / 0.05);
-  }
-  .btn-outline-secondary:active:not(:disabled),
-  .btn-outline-secondary[data-force-state="active"] {
-    background-color: hsl(220 8% 10% / 0.09);
-  }
-  .btn-outline-secondary:active:not(:disabled) .btn-metal-label,
-  .btn-outline-secondary[data-force-state="active"] .btn-metal-label {
-    transform: translateY(1px);
-  }
+  .btn-room-line:hover:not(:disabled),
+  .btn-room-line[data-force-state="hover"] { background-color: var(--room-mat); }
+  .btn-room-line:active:not(:disabled),
+  .btn-room-line[data-force-state="active"] { transform: translate(1px, 1px); background-color: var(--room-panel); }
+  .btn-room-line:disabled { border-color: var(--room-line); color: var(--room-muted); opacity: 1 !important; }
 
-  /* Landing: the cream hero fades into the top of the room photograph
-     instead of meeting it at a hard edge. The colour is the page's own
-     --background token rather than a hex, so the fade starts exactly on the
-     page colour (an eyedropped #e6e2db sat a few shades lighter and left a
-     faint band) and follows the theme. */
-  .hero-photo {
-    position: relative;
-  }
-  .hero-photo::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 40%;
-    background: linear-gradient(to bottom, hsl(var(--background)) 0%, hsl(var(--background) / 0) 100%);
-    pointer-events: none;
-  }
+  /* The shadow is the button's shape, so focus shows as an outline. */
+  .btn-room:focus-visible,
+  .btn-room-line:focus-visible { outline: 2px solid var(--room-accent); outline-offset: 3px; }
+
 }

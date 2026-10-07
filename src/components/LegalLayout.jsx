@@ -8,7 +8,7 @@ import { PRODUCT_NAME } from "@/lib/branding";
 // here rather than per-page.
 export default function LegalLayout({ title, updated, children }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-2xl mx-auto px-5 sm:px-8 py-12 lg:py-16">
         <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5 mb-10">
           <ArrowLeft className="w-4 h-4" /> Back to {PRODUCT_NAME}

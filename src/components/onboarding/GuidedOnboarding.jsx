@@ -189,8 +189,8 @@ export default function GuidedOnboarding({ open, onClose }) {
                         onClick={() => set(current.id, opt.value)}
                         className={`w-full text-left px-5 py-4 rounded-xl border transition-all duration-200 flex items-center justify-between ${
                           selected
-                            ? "border-brand bg-brand-soft text-foreground"
-                            : "border-border/70 bg-card hover:border-border hover:bg-accent/40"
+                            ? "!border-2 border-foreground bg-brand-soft shadow-[3px_3px_0_hsl(var(--foreground))] text-foreground"
+                            : "border-border/70 bg-card/60 hover:border-foreground/60 hover:bg-card"
                         }`}
                       >
                         <span className="text-[0.95rem]">{opt.label}</span>

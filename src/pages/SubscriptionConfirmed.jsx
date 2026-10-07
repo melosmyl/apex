@@ -7,7 +7,7 @@ export default function SubscriptionConfirmed() {
   const [params] = useSearchParams();
   const companyId = params.get("company");
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-6">
+    <div className="min-h-screen flex items-center justify-center px-6">
       <div className="max-w-md text-center rise-in">
         <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-5">
           <CheckCircle2 className="w-8 h-8 text-emerald-600" strokeWidth={1.5} />

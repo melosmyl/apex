@@ -40,7 +40,7 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
         : (
         <div className="grid sm:grid-cols-2 gap-4">
           {items.map((d) => (
-            <div key={d.id} className="group bg-card border border-border/70 rounded-2xl p-5 rise-in cursor-pointer hover:shadow-md transition-all" onClick={() => setView(d)}>
+            <div key={d.id} className="group bg-card border border-border/70 rounded-2xl p-5 rise-in cursor-pointer hover:shadow-elevated transition-all" onClick={() => setView(d)}>
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="font-display text-lg leading-snug">{d.title}</h3>
                 <button onClick={(e) => { e.stopPropagation(); remove(d); }} className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"><Trash2 className="w-4 h-4" /></button>
