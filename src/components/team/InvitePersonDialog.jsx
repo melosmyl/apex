@@ -33,7 +33,7 @@ export default function InvitePersonDialog({ open, onOpenChange, onInvite }) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl font-light">Invite a team member</DialogTitle>
-          <p className="text-sm text-muted-foreground">Invite a real person to collaborate on your executive team. They'll receive an email to join.</p>
+          <p className="text-sm text-muted-foreground">Invite someone you work with to join your board. They'll receive an email to join.</p>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4 pt-2">
           <div><Label className="mb-1.5 block">Full name</Label><Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Jane Smith" autoFocus /></div>

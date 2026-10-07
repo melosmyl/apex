@@ -131,7 +131,7 @@ export default function Companies({ skipRedirect = false }) {
         companies.length === 0 ?
         <EmptyState
           title="Establish your first company"
-          description="Create a workspace, assemble your AI executive team, and start making better decisions together."
+          description="Create a workspace, choose your advisors, and start making better decisions together."
           action={<Button onClick={() => setOnboarding(true)} variant="primary" className="px-6"><Plus className="w-4 h-4 mr-1.5" /> Create a company</Button>} /> :
 
         // This is the page — full-width, sized for the realistic 2-4
@@ -152,7 +152,7 @@ export default function Companies({ skipRedirect = false }) {
               </div>
               <div>
                 <div className="font-display text-lg">Create your next venture</div>
-                <p className="text-sm text-muted-foreground mt-0.5">A new workspace, a new executive team</p>
+                <p className="text-sm text-muted-foreground mt-0.5">A new workspace, a new board</p>
               </div>
             </button>
           </div>

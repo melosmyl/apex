@@ -14,7 +14,7 @@ export default function SubscriptionConfirmed() {
         </div>
         <h1 className="font-display text-3xl font-light mb-3">Payment received</h1>
         <p className="text-muted-foreground mb-8">
-          Your new advisor is being activated. Return to your executive team — they'll be ready shortly.
+          Your new advisor is being activated. Return to your advisors — they'll be ready shortly.
         </p>
         {companyId ? (
           <Button asChild variant="primary" className="px-6"><Link to={`/company/${companyId}/team`}>Back to your team</Link></Button>

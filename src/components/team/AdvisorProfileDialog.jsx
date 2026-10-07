@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { AdvisorProfileDialog as ProfilePanel } from "@/components/advisors/AdvisorProfilePanel";
 import { profileFor } from "@/lib/advisorProfiles";
 
-// Executive Team's profile window: the advisor's profile (K4) with the
+// Your advisors' profile window: the advisor's profile (K4) with the
 // board's own action on it (Remove from team), or a note when there's none
 // (the Chair can't be removed).
 export default function AdvisorProfileDialog({ advisor, open, onOpenChange, onAction, actionLabel, actionVariant = "default", actionNote = null }) {

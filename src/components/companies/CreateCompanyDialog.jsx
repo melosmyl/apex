@@ -52,7 +52,7 @@ export default function CreateCompanyDialog({ open, onOpenChange, onCreated }) {
           </div>
           <div>
             <Label className="mb-1.5 block">Context for your advisors</Label>
-            <Textarea value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Stage, goals, current challenges — anything your executive team should know." rows={4} />
+            <Textarea value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Stage, goals, current challenges — anything your advisors should know." rows={4} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

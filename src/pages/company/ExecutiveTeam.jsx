@@ -74,8 +74,8 @@ export default function ExecutiveTeam() {
 
   return (
     <div>
-      <PageHeader eyebrow="Your advisors" title="Executive Team"
-      description="Assemble your executive team — add up to 6 specialist AI advisors, or invite real collaborators.">
+      <PageHeader eyebrow="Your board" title="Your advisors"
+      description="Choose who sits on your board: up to six AI advisors, the Chair included, plus anyone you invite.">
         <div className="flex gap-2">
           <Button onClick={() => setAddOpen(true)} variant="primary" className="px-5"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
           <Button onClick={() => setInviteOpen(true)} variant="secondaryOutline" className="px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
@@ -90,7 +90,7 @@ export default function ExecutiveTeam() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{[0, 1, 2].map((i) => <div key={i} className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />)}</div> :
       advisors.length === 0 ?
       <EmptyState icon={Users} title="Your boardroom is empty"
-      description="Invite AI advisors from the library or bring in real collaborators to build your executive team."
+      description="Invite AI advisors from the library, or bring in people you work with."
       action={<div className="flex gap-2 justify-center"><Button onClick={() => setAddOpen(true)} variant="primary" className="px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button><Button onClick={() => setInviteOpen(true)} variant="secondaryOutline" className="px-6"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button></div>} /> :
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
