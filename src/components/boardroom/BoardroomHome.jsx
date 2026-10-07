@@ -5,7 +5,7 @@ import { MEETING_MODES } from "@/lib/meetingModes";
 import { useAssistant } from "@/lib/AssistantContext";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
 import { Link } from "react-router-dom";
-import { MAX_DEBATERS, MIN_DEBATERS, MAX_AI_ADVISORS, MEETING_HINT, SUGGESTED_QUESTIONS } from "@/lib/boardroom";
+import { MAX_DEBATERS, MIN_DEBATERS, MAX_AI_ADVISORS, MEETING_HINT, suggestedQuestionsFor } from "@/lib/boardroom";
 import BoardTable from "@/components/boardroom/BoardTable";
 import LastMeetingStrip from "@/components/boardroom/LastMeetingStrip";
 
@@ -21,7 +21,7 @@ import LastMeetingStrip from "@/components/boardroom/LastMeetingStrip";
 const OTHER_MODES = MEETING_MODES.filter((m) => m.key !== "board_debate");
 const ICONS = { Zap, MessagesSquare, FileText, ClipboardCheck, Radio };
 
-export default function BoardroomHome({ companyId, advisors, attendingIds, onAttendingChange, onStartDebate }) {
+export default function BoardroomHome({ company, companyId, advisors, attendingIds, onAttendingChange, onStartDebate }) {
   const [question, setQuestion] = useState("");
   const [showOtherModes, setShowOtherModes] = useState(false);
 
@@ -98,7 +98,7 @@ export default function BoardroomHome({ companyId, advisors, attendingIds, onAtt
         <div>
           <h3 className="mb-3 font-display text-[1.05rem] font-medium">Or start from one of these</h3>
           <div className="space-y-3 pl-3">
-            {SUGGESTED_QUESTIONS.map((p) => (
+            {suggestedQuestionsFor(company).map((p) => (
               <button
                 key={p}
                 type="button"

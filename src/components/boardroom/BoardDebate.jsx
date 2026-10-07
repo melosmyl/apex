@@ -11,7 +11,7 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
 import { usePin } from "@/components/pins/PinContext";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, SUGGESTED_QUESTIONS } from "@/lib/boardroom";
+import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
 import { useAdvisorProfile } from "@/components/advisors/AdvisorProfilePanel";
 import { useAssistant } from "@/lib/AssistantContext";
@@ -321,8 +321,8 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
               placeholder="Ask your board a strategic question…"
               className="text-base resize-none bg-background rounded-2xl" />
             <div className="flex flex-wrap gap-2 mt-3">
-              {SUGGESTED_QUESTIONS.map((p) => (
-                <button key={p} onClick={() => setQuestion(p)} className="text-xs text-muted-foreground bg-secondary hover:bg-accent rounded-full px-3 py-1.5 transition-colors">{p}</button>
+              {suggestedQuestionsFor(company).map((p) => (
+                <button key={p} onClick={() => setQuestion(p)} className="text-xs text-left text-muted-foreground bg-secondary hover:bg-accent rounded-2xl px-3 py-1.5 transition-colors">{p}</button>
               ))}
             </div>
             <Button onClick={start} disabled={!question.trim() || !debaterCountOk} variant="primary" className="w-full mt-4 h-11">

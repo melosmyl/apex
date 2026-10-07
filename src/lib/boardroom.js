@@ -17,12 +17,24 @@ export const MAX_AI_ADVISORS = 6;
 // 2m15s, middle half 1m40s–3m47s, longest 5m08s.
 export const MEETING_HINT = "Plain words are fine. Up to three rounds, then a resolution. Usually two to four minutes.";
 
-// Questions a founder can start from.
+// Questions a founder can start from when their company has none of its own.
 export const SUGGESTED_QUESTIONS = [
   "Should we manufacture in Portugal or Vietnam?",
   "Is now the right time to raise a funding round?",
   "We have three months of runway. What do we stop doing?",
 ];
+
+// The company's own first-meeting questions from onboarding (personal to
+// what the founder told us), or the generic three when there aren't any.
+// Generic questions can miss the business entirely ("manufacture in
+// Portugal or Vietnam?" for a booking service), so personal ones come first.
+export function suggestedQuestionsFor(company) {
+  const own = [...new Set((company?.onboarding_plan?.suggested_meetings || [])
+    .filter((q) => typeof q === "string" && q.trim())
+    .map((q) => q.trim()))]
+    .slice(0, 3);
+  return own.length ? own : SUGGESTED_QUESTIONS;
+}
 
 // Who's seated for a meeting by default: the whole board, up to
 // MAX_DEBATERS, without the Chair (she never debates) or people.

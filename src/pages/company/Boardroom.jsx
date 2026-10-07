@@ -131,6 +131,7 @@ export default function Boardroom() {
         </div>
       ) : (
         <BoardroomHome
+          company={company}
           companyId={companyId}
           advisors={advisors}
           attendingIds={attendingIds || []}
