@@ -4,9 +4,30 @@ import { dwellMs, playbackItems } from "@/lib/meetingPlayback";
 // Plays a meeting's turns back one at a time as they arrive (see
 // src/lib/meetingPlayback.js for why). Returns what's been revealed, who has
 // the floor right now, and a way to skip to the end.
+// A turn's identity: the opening, or who spoke in which round. Round 1
+// answers arrive one by one, in any order, and the transcript is replaced
+// as they do; keying by identity keeps the playback order fixed.
+const keyOf = (i) => (i.kind === "opening" ? "opening" : `${i.round}:${i.advisor_id || i.advisor_name}`);
+
 export default function useMeetingPlayback({ chairOpening, chairName, transcript, phase }) {
-  const items = useMemo(() => playbackItems(chairOpening, chairName, transcript), [chairOpening, chairName, transcript]);
+  // Append-only: a turn keeps its place once seen, so nothing already
+  // played back moves when new turns land.
+  const order = useRef([]);
+  const revealedRef = useRef(0);
+  const items = useMemo(() => {
+    const candidates = playbackItems(chairOpening, chairName, transcript);
+    const byKey = new Map(candidates.map((c) => [keyOf(c), c]));
+    for (const k of byKey.keys()) {
+      if (order.current.includes(k)) continue;
+      // An opening that lands after some Round 1 turns have played goes
+      // next in line, not to the back: the Chair still opens.
+      if (k === "opening") order.current.splice(Math.min(revealedRef.current, order.current.length), 0, k);
+      else order.current.push(k);
+    }
+    return order.current.map((k) => byKey.get(k)).filter(Boolean);
+  }, [chairOpening, chairName, transcript]);
   const [revealed, setRevealed] = useState(0);
+  revealedRef.current = revealed;
   // Whether the latest revealed turn still holds the floor.
   const [floor, setFloor] = useState(false);
   const latest = useRef({ items, phase });

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import useMeetingPlayback from "@/components/boardroom/live/useMeetingPlayback";
 import MeetingStage from "@/components/boardroom/live/MeetingStage";
 import SeatRow from "@/components/boardroom/live/SeatRow";
@@ -10,13 +10,35 @@ import { absenteesByRound } from "@/lib/boardroom";
 // A meeting in session, laid out as the owner's meeting mock, showing only
 // what the engine really does (option A, see src/lib/meetingPlayback.js).
 
+// How long Round 1 answers wait for the Chair's opening before playing.
+const OPENING_GRACE_MS = 8000;
+
 const whenFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 
 export default function LiveMeeting({
   phase, question, startedAt, chair, debaters, seatAssignment, transcript, chairOpening, advisors,
   maxRounds = MAX_ROUNDS, onOpenProfile, onPin, onFinished,
 }) {
-  const playback = useMeetingPlayback({ chairOpening, chairName: chair.name, transcript, phase });
+  // The opening plays first. Round 1 answers that arrive before it wait up
+  // to a few seconds for it, then play anyway (an opening that fails never
+  // holds the meeting up).
+  const [openingGrace, setOpeningGrace] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setOpeningGrace(false), OPENING_GRACE_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const shownTranscript = chairOpening || !openingGrace || phase !== "preparing" ? transcript : [];
+  const playback = useMeetingPlayback({ chairOpening, chairName: chair.name, transcript: shownTranscript, phase });
+
+  // How long Round 1 has been forming, for the "usually under a minute" line.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (phase !== "preparing") return undefined;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [phase]);
+  const elapsed = startedAt ? Math.max(0, Math.floor((now - startedAt.getTime()) / 1000)) : 0;
+  const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
   const { items, revealed, speaking, caughtUp } = playback;
   const chairFirst = firstName(chair.name);
 
@@ -76,8 +98,18 @@ export default function LiveMeeting({
       label: `${speaking.advisor_name} · Round ${speaking.round}${flag ? ` · ${flag.label.charAt(0).toLowerCase()}${flag.label.slice(1)}` : ""}`,
       text: excerpt(speaking.message),
     };
+  } else if (phase === "preparing" && !chairOpening && elapsed < 60) {
+    bubble = { label: `Opening · ${clock}`, text: `${chairFirst} is opening the meeting while the board writes its first positions. Round 1 usually takes under a minute.` };
+  } else if (phase === "preparing" && elapsed >= 60) {
+    const still = seats.filter((s) => s.state === "thinking").map((s) => s.shortName);
+    bubble = {
+      label: `Round 1 · ${clock}`,
+      text: still.length
+        ? `Taking longer than usual: ${still.join(" and ")} ${still.length === 1 ? "is" : "are"} still writing. Answers play here as they arrive.`
+        : "Taking longer than usual. Answers play here as they arrive.",
+    };
   } else if (phase === "preparing") {
-    bubble = { label: "Opening", text: `${chairFirst} is opening the meeting while the board forms its positions.` };
+    bubble = { label: `Round 1 · ${clock}`, text: "The board is writing its first positions, each on their own. Round 1 usually takes under a minute; answers play here as they arrive." };
   } else if (pendingRound) {
     bubble = { label: `Round ${pendingRound}`, text: "Everyone writes this round at the same time. Their turns play back here as they arrive." };
   } else if (phase === "resolution") {

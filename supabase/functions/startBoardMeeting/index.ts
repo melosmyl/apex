@@ -288,7 +288,12 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const db = createClient(supabaseUrl, serviceKey);
 
-    const { company_id, question, advisor_ids, attempt_id } = await req.json();
+    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId } = await req.json();
+    // The browser may choose the new meeting's id, so its live view can follow
+    // exactly this meeting while Round 1 forms. Only a well-formed UUID is
+    // accepted; a clash with an existing row simply fails the insert.
+    if (requestedId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(requestedId)))
+      return Response.json({ error: 'Invalid meeting id' }, { status: 400, headers: corsHeaders });
     if (!company_id || !question?.trim() || !advisor_ids?.length)
       return Response.json({ error: 'company_id, question and advisor_ids are required' }, { status: 400, headers: corsHeaders });
 
@@ -355,6 +360,7 @@ Deno.serve(async (req) => {
     };
 
     const { data: meeting, error: createErr } = await db.from('board_meetings').insert({
+      ...(requestedId ? { id: requestedId } : {}),
       company_id, created_by_id: user.id, question, participants: selectedAdvisors.map(a => a.name),
       participant_advisor_ids: selectedAdvisors.map(a => a.id),
       status: 'preparing', independent_responses: [], challenge_responses: [],
@@ -369,27 +375,12 @@ Deno.serve(async (req) => {
     // failed or superseded one never happened as far as the Chair knows.
     const previousMeeting = meetings?.[0] || null;
 
-    const [independentResults, chairOpening] = await Promise.all([
-      Promise.all(selectedAdvisors.map(advisor =>
-        callAdvisor(supabaseUrl, serviceKey, {
-          advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-          system_instructions: advisor.system_instructions, company_context: contextPackage,
-          user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
-          temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
-          personal_details: true, // nothing said yet in this meeting
-        }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
-      )),
-      buildChairOpening({
-        supabaseUrl, serviceKey, db, chair, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
-        meetingId: meeting.id, newQuestion: question, previousMeeting, debaterNames: selectedAdvisors.map(a => a.name), deadlineAt,
-      }).catch((e) => {
-        // The opening is never worth losing the meeting over.
-        console.error('Chair opening failed:', e.message);
-        return null;
-      }),
-    ]);
-
-    const independentResponses = independentResults.map(r => {
+    // Each Round 1 answer, and the Chair's opening, is saved the moment it's
+    // ready, so the founder's screen can show them as they arrive rather
+    // than waiting for the slowest advisor. Saves run one after another (no
+    // write overtakes another) and only while the meeting is still forming.
+    // While the meeting forms they're kept in arrival order.
+    const formatIndependent = (r: { advisor: any; data?: any; error?: string }) => {
       const d = r.data;
       if (r.error || !d?.response) {
         return {
@@ -406,10 +397,53 @@ Deno.serve(async (req) => {
         provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
         position: resp.position || '', recommendation: resp.recommendation || '',
         key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
-        risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m) => keepOpenProfileField(m, company)),
+        risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m: any) => keepOpenProfileField(m, company)),
         suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
       };
-    });
+    };
+    const arrived: any[] = [];
+    let saving: Promise<unknown> = Promise.resolve();
+    const saveProgress = (fields: Record<string, unknown>) => {
+      saving = saving
+        .then(async () => {
+          const { error } = await db.from('board_meetings').update(fields).eq('id', meeting.id).eq('status', 'preparing');
+          if (error) console.error('Round 1 progress save failed:', error.message);
+        })
+        .catch((e) => console.error('Round 1 progress save failed:', e?.message));
+    };
+
+    const [, chairOpening] = await Promise.all([
+      Promise.all(selectedAdvisors.map(advisor =>
+        callAdvisor(supabaseUrl, serviceKey, {
+          advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+          system_instructions: advisor.system_instructions, company_context: contextPackage,
+          user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
+          temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
+          personal_details: true, // nothing said yet in this meeting
+        }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
+          .then((r: { advisor: any; data?: any; error?: string }) => {
+            arrived.push(formatIndependent(r));
+            saveProgress({ independent_responses: [...arrived] });
+          })
+      )),
+      buildChairOpening({
+        supabaseUrl, serviceKey, db, chair, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
+        meetingId: meeting.id, newQuestion: question, previousMeeting, debaterNames: selectedAdvisors.map(a => a.name), deadlineAt,
+      }).then((opening) => {
+        if (opening) saveProgress({ chair_opening: opening });
+        return opening;
+      }).catch((e) => {
+        // The opening is never worth losing the meeting over.
+        console.error('Chair opening failed:', e.message);
+        return null;
+      }),
+    ]);
+    await saving;
+    // Saved for good in the board's own order, so later rounds don't always
+    // list the slowest advisors last. The live view follows turns by who
+    // gave them, not by position, so it isn't affected.
+    const rank = new Map(selectedAdvisors.map((a, i) => [a.id, i]));
+    const independentResponses = [...arrived].sort((a, b) => (rank.get(a.advisor_id) ?? 0) - (rank.get(b.advisor_id) ?? 0));
 
     await db.from('board_meetings').update({
       status: 'independent_complete', independent_responses: independentResponses,

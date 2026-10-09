@@ -49,6 +49,9 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [liveTranscript, setLiveTranscript] = useState([]);
   // When this meeting was convened, for the "Meeting in session" line.
   const [startedAt, setStartedAt] = useState(null);
+  // The id of the meeting being convened, chosen here before startMeeting
+  // runs, so the live view can follow exactly this meeting while it forms.
+  const [formingId, setFormingId] = useState(null);
   // A finished meeting's result shows once the live playback has caught up
   // (or the founder skips ahead); a loaded past meeting shows straight away.
   const [showResult, setShowResult] = useState(!!loadedMeeting);
@@ -122,6 +125,26 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     setSelectedIds(aiAdvisors.slice(0, MAX_DEBATERS).map((a) => a.id));
   }, [advisors, initialSelectedIds]);
 
+  // While Round 1 forms, the engine saves the Chair's opening and each
+  // advisor's answer as it arrives; show them as they come instead of
+  // waiting for the slowest advisor.
+  useEffect(() => {
+    if (phase !== "preparing" || !formingId) return;
+    let cancelled = false;
+    const poll = async () => {
+      const { data } = await supabase
+        .from("board_meetings")
+        .select("chair_opening, independent_responses")
+        .eq("id", formingId)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      if (data.chair_opening) setChairOpening((prev) => prev || data.chair_opening);
+      if (data.independent_responses?.length) growTranscript(toRoundOneMessages(data.independent_responses));
+    };
+    const t = setInterval(() => poll().catch(() => {}), 2000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [phase, formingId, growTranscript]);
+
   useEffect(() => {
     if (phase !== "discussion" || !pendingMeetingId) return;
     let cancelled = false;
@@ -182,11 +205,13 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     if (selectedAiAdvisors.length > MAX_DEBATERS) { setError(`Select at most ${MAX_DEBATERS} advisors to debate.`); return; }
     setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setChairOpening(null);
     setStartedAt(new Date()); setShowResult(false);
+    const meetingId = crypto.randomUUID();
+    setFormingId(meetingId);
     setSeatAssignment(assignChairs(selectedAiAdvisors, chair));
     try {
-      const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId });
+      const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId, meetingId });
       setPendingMeetingId(phase1.meeting_id);
-      setLiveTranscript(toRoundOneMessages(phase1.independent_responses));
+      growTranscript(toRoundOneMessages(phase1.independent_responses));
       setChairOpening(phase1.chair_opening || null);
       // The Assistant routed this question in from a captured note — the
       // note only learns its meeting_id now that a real meeting exists.

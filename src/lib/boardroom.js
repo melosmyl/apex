@@ -99,10 +99,13 @@ function meetingErrorMessage(e, fallback) {
   return fallback;
 }
 
-export async function startMeeting({ companyId, question, advisorIds, freeAttemptId }) {
+export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
       company_id: companyId, question, advisor_ids: advisorIds,
+      // Chosen here so the live view can follow exactly this meeting while
+      // Round 1 forms, before the call returns.
+      ...(meetingId ? { meeting_id: meetingId } : {}),
       ...(freeAttemptId ? { attempt_id: freeAttemptId } : {}),
     });
     if (res.data?.error) throw new Error(res.data.error);

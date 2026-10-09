@@ -117,6 +117,11 @@ export function progressSteps({ phase, items, revealed, speaking, pendingRound, 
   else if (shown.length) current = shown[shown.length - 1].kind === "opening" ? 0 : shown[shown.length - 1].round;
   else current = 0;
 
+  // Never step backwards: a late opening playing after Round 1 turns keeps
+  // the bar on Round 1.
+  const furthestShown = shown.reduce((m, i) => Math.max(m, i.kind === "opening" ? 0 : i.round), 0);
+  current = Math.max(current, Math.min(furthestShown, maxRounds));
+
   const steps = [{ key: "opening", label: "Opening", sub: chairName }];
   for (let r = 1; r <= maxRounds; r++) {
     let sub;

@@ -7,6 +7,9 @@ const PORT = 54399;
 const script: Record<string, string[]> = { anthropic: [], openai: [] };
 // Advisors (by name) who mention their book whenever it's offered to them.
 let mentionBy: string[] = [];
+// Extra time (ms) before a given speaker answers, to mimic a slow advisor:
+// { "Grace Bennett": 12000 }. Matched on the persona's "You are <name>".
+let delayBy: Record<string, number> = {};
 const log: any[] = [];
 
 function sample(s: any, key = '', book = ''): any {
@@ -53,6 +56,7 @@ async function anthropic(body: any): Promise<Response> {
     native: !!body.output_config?.format, pasted: String(body.system).includes('JSON structure'), temperature: body.temperature, stream: body.stream });
   if (mode === 'overload529') return Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 529, headers: { 'retry-after': '1' } });
   if (mode === 'reject400') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'output_config.format.schema: unsupported' } }, { status: 400 });
+  if (delayBy[sp.who]) await sleep(delayBy[sp.who]);
   const answer = JSON.stringify(sample(schema, '', sp.book));
   const input = Math.ceil((String(body.system).length + JSON.stringify(body.messages).length) / 4);
   const enc = new TextEncoder();
@@ -83,13 +87,14 @@ async function anthropic(body: any): Promise<Response> {
   return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'request-id': 'req_fake' } });
 }
 
-function openai(body: any): Response {
+async function openai(body: any): Promise<Response> {
   const mode = script.openai.shift() || 'ok';
   const rf = body.response_format;
   const schema = rf?.type === 'json_schema' ? rf.json_schema.schema : pastedSchema(String(body.messages?.[0]?.content));
   const sp = speaker(String(body.messages?.[0]?.content));
   log.push({ provider: 'openai', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, format: rf?.type, strict: rf?.json_schema?.strict, temperature: body.temperature });
   if (mode === 'overload529') return Response.json({ error: { message: 'busy', type: 'server_error' } }, { status: 503 });
+  if (delayBy[sp.who]) await sleep(delayBy[sp.who]);
   const content = mode === 'refusal' ? null : JSON.stringify(sample(schema, '', sp.book));
   return Response.json({
     choices: [{ message: { content, refusal: mode === 'refusal' ? 'fake refusal' : null }, finish_reason: 'stop' }],
@@ -99,7 +104,7 @@ function openai(body: any): Response {
 
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
-  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; log.length = 0; return Response.json({ ok: true }); }
+  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; log.length = 0; return Response.json({ ok: true }); }
   if (url.pathname === '/__log') return Response.json(log);
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);
