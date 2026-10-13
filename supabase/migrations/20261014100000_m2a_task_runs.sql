@@ -72,7 +72,10 @@ select cron.schedule(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')
     ),
-    body := '{"action":"sweep"}'::jsonb
+    body := '{"action":"sweep"}'::jsonb,
+    -- pg_net gives up after 5 seconds by default; the sweep answers in about
+    -- one (the work itself runs after the answer), so 10 is ample headroom.
+    timeout_milliseconds := 10000
   )
   where exists (
     select 1 from public.task_runs
