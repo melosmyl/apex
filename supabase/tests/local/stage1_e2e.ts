@@ -24,7 +24,8 @@ const fn = async (token: string, name: string, body: unknown) => {
   return { status: r.status, json };
 };
 const script = (s: unknown) => fetch(`${FAKE}/__script`, { method: 'POST', body: JSON.stringify(s) }).then((r) => r.json());
-const fakeLog = () => fetch(`${FAKE}/__log`).then((r) => r.json());
+// Model calls only: embeddings (board memory) go to the fake provider too.
+const fakeLog = () => fetch(`${FAKE}/__log`).then((r) => r.json()).then((l: any[]) => l.filter((x) => x.kind !== 'embedding'));
 
 const F = await user('founder');
 const { data: co } = await F.c.from('companies').insert({ name: `stage1 ${tag}`, created_by_id: F.id }).select().single();

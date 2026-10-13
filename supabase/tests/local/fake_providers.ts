@@ -174,6 +174,22 @@ async function openai(body: any): Promise<Response> {
   });
 }
 
+// Embeddings: each word lands in one of 1536 slots, so texts that share
+// words come out similar, as real embeddings would.
+function embeddings(body: any): Response {
+  const input = String(body.input ?? '');
+  const v = new Array(1536).fill(0);
+  for (const w of input.toLowerCase().match(/[a-z0-9£]+/g) || []) {
+    let h = 0;
+    for (const ch of w) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    v[h % 1536] += 1;
+  }
+  if (v.every((x) => x === 0)) v[0] = 1; // text with no words still gets a usable vector
+  const norm = Math.hypot(...v);
+  log.push({ kind: 'embedding', provider: 'openai', model: body.model, marked: marked(input), chars: input.length });
+  return Response.json({ object: 'list', model: body.model, data: [{ object: 'embedding', index: 0, embedding: v.map((x) => x / norm) }], usage: { prompt_tokens: 8, total_tokens: 8 } });
+}
+
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
   if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; fields = s.fields || {}; marks = s.marks || []; research = s.research || {}; log.length = 0; return Response.json({ ok: true }); }
@@ -181,5 +197,6 @@ Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);
   if (url.pathname.endsWith('/chat/completions')) return openai(body);
+  if (url.pathname.endsWith('/embeddings')) return embeddings(body);
   return new Response('not found', { status: 404 });
 });

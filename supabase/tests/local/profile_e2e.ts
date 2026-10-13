@@ -30,7 +30,8 @@ const { data: advs } = await F.from('advisors').insert([
 const stage = async (label: string, run: () => Promise<unknown>) => {
   await fetch(`${FAKE}/__script`, { method: 'POST', body: JSON.stringify({ marks: [MATERIAL, CHALLENGE, GENERATED, `Welcome aboard ${tag}`] }) });
   const res: any = await run();
-  const log = await (await fetch(`${FAKE}/__log`)).json();
+  // Model calls only: embeddings (board memory) carry no profile.
+  const log = (await (await fetch(`${FAKE}/__log`)).json()).filter((l: any) => l.kind !== 'embedding');
   const ok = res?.status === 200 && log.length > 0 && log.every((l: any) => l.marked.includes(MATERIAL) && l.marked.includes(CHALLENGE));
   check(ok, `${label}: every call is given the founder's profile (${log.length} calls)`, { status: res?.status, calls: log.map((l: any) => [l.who, l.marked]) });
   check(!log.some((l: any) => l.marked.includes(GENERATED) || l.marked.includes(`Welcome aboard ${tag}`)), `${label}: onboarding's generated type and tagline are not passed off as the founder's words`);

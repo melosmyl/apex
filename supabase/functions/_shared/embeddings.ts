@@ -12,7 +12,10 @@ export async function embedText(text: string): Promise<number[]> {
   const input = (text || '').trim().slice(0, MAX_EMBED_CHARS);
   if (!input) throw new Error('Cannot embed empty text');
 
-  const res = await fetch('https://api.openai.com/v1/embeddings', {
+  // OPENAI_BASE_URL is for the local test stack's fake provider, as in
+  // llmCall.ts; production leaves it unset.
+  const base = Deno.env.get('OPENAI_BASE_URL') || 'https://api.openai.com/v1';
+  const res = await fetch(`${base}/embeddings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
