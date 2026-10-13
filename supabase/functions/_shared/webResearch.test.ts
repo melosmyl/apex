@@ -1,6 +1,6 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { BLOCKED_DOMAINS, citedSources, codeRan, collectSources, reportText, researchTools, skippedSitesIn } from './webResearch.ts';
-import { finishResearch } from './taskRun.ts';
+import { PROFESSIONAL_NOTE_RELY, finishResearch } from './taskRun.ts';
 
 const blocks = [
   { type: 'server_tool_use', id: 's1', name: 'web_search', input: { query: 'q' } },
@@ -67,4 +67,8 @@ Deno.test('a finding survives only with a real source; none left means no result
   const legit: any = finishResearch('research', { findings: [{ finding: 'f', source: 1 }], legitimacy: [{ name: 'X', verdict: 'looks_legitimate', why: 'says so', source: 0 }] }, sources, {}, { title: 'T' });
   assertEquals([legit.legitimacy[0].verdict, legit.legitimacy[0].why], ['unclear', 'No source checked this.']);
   assertEquals(finishResearch('calculate', { answer: '', workings: [] }, sources, {}, { title: 'T' }), null);
+  // Research and calculations are relied on, not signed or sent.
+  const checked: any = finishResearch('research', { findings: [{ finding: 'f', source: 1 }], professional_check: true }, sources, {}, { title: 'T' });
+  assertEquals(checked.professional_note, PROFESSIONAL_NOTE_RELY);
+  assert(PROFESSIONAL_NOTE_RELY.includes('before you rely on it'));
 });

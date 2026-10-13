@@ -73,12 +73,14 @@ function researchStream(body: any, mode: string): Response {
   const cite = mode === 'nosources' ? [] : (research.cite || results.map((r: any) => r.url));
   const pausing = (research.pause || 0) > 0;
   if (pausing) research.pause -= 1;
-  const usage = { input_tokens: 4000, output_tokens: 800, server_tool_use: { web_search_requests: 1, web_fetch_requests: results.length ? 1 : 0 } };
+  const cached = !!body.cache_control;
+  const usage = { input_tokens: 4000, output_tokens: 800, server_tool_use: { web_search_requests: 1, web_fetch_requests: results.length ? 1 : 0 },
+    cache_creation_input_tokens: cached ? 1000 : 0, cache_read_input_tokens: cached ? 20000 : 0 };
   const stream = new ReadableStream({
     async start(ctl) {
       const put = (e: any) => ctl.enqueue(enc.encode(sse(e)));
       let i = 0;
-      put({ type: 'message_start', message: { id: 'msg_fake_research', type: 'message', role: 'assistant', model: body.model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: usage.input_tokens, output_tokens: 1 } } });
+      put({ type: 'message_start', message: { id: 'msg_fake_research', type: 'message', role: 'assistant', model: body.model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: usage.input_tokens, output_tokens: 1, cache_creation_input_tokens: usage.cache_creation_input_tokens, cache_read_input_tokens: usage.cache_read_input_tokens } } });
       put({ type: 'content_block_start', index: i, content_block: { type: 'server_tool_use', id: `srvtoolu_${i}`, name: 'web_search', input: {} } });
       put({ type: 'content_block_delta', index: i, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ query: 'fake query' }) } });
       put({ type: 'content_block_stop', index: i }); i++;
@@ -115,7 +117,8 @@ async function anthropic(body: any): Promise<Response> {
   if ((body.tools || []).some((t: any) => String(t.type).startsWith('web_search'))) {
     log.push({ provider: 'anthropic', kind: 'research', mode, model: body.model, marked: marked(String(body.system) + JSON.stringify(body.messages)),
       tools: body.tools.map((t: any) => ({ type: t.type, max_uses: t.max_uses ?? null, blocked: (t.blocked_domains || []).length, callers: t.allowed_callers ?? null })),
-      turns: (body.messages || []).length, thinking: body.thinking, effort: body.output_config?.effort, format: !!body.output_config?.format });
+      turns: (body.messages || []).length, thinking: body.thinking, effort: body.output_config?.effort, format: !!body.output_config?.format,
+      cache: { auto: !!body.cache_control, system: Array.isArray(body.system) && !!body.system[body.system.length - 1]?.cache_control } });
     if (mode === 'overload529') return Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 529 });
     return researchStream(body, mode);
   }

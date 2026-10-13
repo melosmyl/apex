@@ -83,6 +83,10 @@ const costs = await rows(`select request_type, model, estimated_cost from ai_usa
 check(costs.length === 2 && costs[0].request_type === 'task_research' && Number(costs[0].estimated_cost) >= 0.01 && costs[1].request_type === 'task_structure' && costs[1].model === 'claude-sonnet-5-5',
   "each step's cost is logged against the run, the search fee included", costs);
 check(Number(run1?.cost_usd) > 0.01, 'the run carries the total cost', run1?.cost_usd);
+check(pass1?.cache?.auto && pass1?.cache?.system, 'the research turn is cached: the instructions and the growing turn', pass1?.cache);
+// Fake usage per request: 4,000 input, 1,000 cache writes, 20,000 cache reads, 800 output, 1 search.
+const expected = 4000 * 4e-6 + 1000 * 4e-6 * 1.25 + 20000 * 4e-6 * 0.05 + 800 * 20e-6 + 0.01;
+check(Math.abs(Number(costs[0].estimated_cost) - expected) < 1e-6, 'cache writes and reads are priced at 1.25x and 0.05x', { got: costs[0].estimated_cost, expected });
 
 // ---- 2. Calculate: code runs the numbers, figures say where they came from.
 console.log('\n== calculate');
@@ -121,6 +125,7 @@ const turns = pauseLog.map((l: any) => l.turns);
 check(run3?.status === 'done' && JSON.stringify(turns) === '[1,2]', 'the paused turn is sent back and finished', { status: run3?.status, turns, error: run3?.error });
 const capsAfter = pauseLog[1]?.tools?.filter((t: any) => t.type.startsWith('web_')).map((t: any) => t.max_uses);
 check(JSON.stringify(capsAfter) === '[4,7]', 'the continued turn only gets what is left of the 5 searches and 8 pages', capsAfter);
+check(pauseLog.every((l: any) => l.cache?.auto && l.cache?.system), 'the continued turn is cached too', pauseLog.map((l: any) => l.cache));
 
 // ---- 4. No sources: sent back once, then a plain failure.
 console.log('\n== no sources');

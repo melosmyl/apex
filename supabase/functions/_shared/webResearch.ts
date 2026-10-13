@@ -20,6 +20,14 @@ export const CAPS: Record<string, { searches: number; pages: number }> = {
 // execution alongside it cost only the tokens.
 export const SEARCH_COST_USD = 0.01;
 
+// Prompt caching: each step of the search loop re-reads what came before,
+// so the turn is cached. Writes cost 1.25x the input price. Reads cost 0.05x
+// on Opus 5.5 ($0.20 per million) but 0.1x on most other models, so check
+// this if RESEARCH_MODEL changes. A continued or retried turn gets smaller
+// search limits, which may mean that request starts its cache afresh.
+export const CACHE_WRITE_FACTOR = 1.25;
+export const CACHE_READ_FACTOR = RESEARCH_MODEL.model === 'claude-opus-5-5' ? 0.05 : 0.1;
+
 // Sites whose terms forbid automated reading. They're never searched or
 // read; the founder gets a short guide to checking them by hand instead.
 // Each one's terms were checked before it was added.
@@ -144,6 +152,7 @@ export function codeRan(blocks: any[]): boolean {
 export type ResearchPass = {
   blocks: any[]; sources: Source[]; report: string; codeUsed: boolean;
   inputTokens: number; outputTokens: number; searches: number; pagesRead: number; costUsd: number;
+  cacheWriteTokens: number; cacheReadTokens: number;
   stopReason: string | null; continuations: number; error: string | null; incomplete: boolean; ms: number;
 };
 
@@ -159,7 +168,12 @@ export async function runResearchPass(args: {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   const out: ResearchPass = {
     blocks: [], sources: [], report: '', codeUsed: false, inputTokens: 0, outputTokens: 0, searches: 0, pagesRead: 0,
-    costUsd: 0, stopReason: null, continuations: 0, error: null, incomplete: false, ms: 0,
+    costUsd: 0, cacheWriteTokens: 0, cacheReadTokens: 0, stopReason: null, continuations: 0, error: null, incomplete: false, ms: 0,
+  };
+  const addUsage = (u: any) => {
+    out.inputTokens += u?.input_tokens || 0;
+    out.cacheWriteTokens += u?.cache_creation_input_tokens || 0;
+    out.cacheReadTokens += u?.cache_read_input_tokens || 0;
   };
   const cap = CAPS[args.type] || CAPS.research;
   const left = () => ({
@@ -178,7 +192,11 @@ export async function runResearchPass(args: {
       if (remaining < 5_000) { out.error = 'Ran out of time while researching.'; break; }
       const caps = left();
       stream = client.messages.stream({
-        model: RESEARCH_MODEL.model, max_tokens: args.maxTokens ?? 16_000, system: args.system, messages,
+        model: RESEARCH_MODEL.model, max_tokens: args.maxTokens ?? 16_000, messages,
+        // Cached: the advisor's instructions (a fixed point), and the turn
+        // as it grows (automatic), which the search loop reads at each step.
+        system: [{ type: 'text', text: args.system, cache_control: { type: 'ephemeral' } }],
+        cache_control: { type: 'ephemeral' },
         tools: researchTools(args.type, caps) as any,
         ...(container ? { container } : {}),
         ...(settings.thinking ? { thinking: settings.thinking } : {}),
@@ -188,7 +206,7 @@ export async function runResearchPass(args: {
       let msg: any;
       try { msg = await stream.finalMessage(); } finally { clearTimeout(timer); }
       stream = null;
-      out.inputTokens += msg.usage?.input_tokens || 0;
+      addUsage(msg.usage);
       out.outputTokens += msg.usage?.output_tokens || 0;
       out.searches += msg.usage?.server_tool_use?.web_search_requests || 0;
       out.pagesRead += msg.usage?.server_tool_use?.web_fetch_requests || 0;
@@ -206,7 +224,7 @@ export async function runResearchPass(args: {
     // A call cut off mid-way was still billed for what it generated.
     const partial = stream?.currentMessage;
     if (partial?.usage) {
-      out.inputTokens += partial.usage.input_tokens || 0;
+      addUsage(partial.usage);
       // The SDK only updates output tokens at the end of a call: estimate
       // what was written before the cut from the text itself.
       const written = (partial.content || []).reduce((n: number, b: any) => n + (typeof b?.text === 'string' ? b.text.length : 0) + (typeof b?.thinking === 'string' ? b.thinking.length : 0), 0);
@@ -218,7 +236,8 @@ export async function runResearchPass(args: {
     out.error = (e as Error)?.name === 'APIUserAbortError' || /abort/i.test(String((e as Error)?.message)) ? 'Ran out of time while researching.' : `Research failed: ${String((e as Error)?.message || e).slice(0, 200)}`;
   }
   const r = ratesFor(RESEARCH_MODEL.provider, RESEARCH_MODEL.model);
-  out.costUsd = Math.round((out.inputTokens * r.input + out.outputTokens * r.output + out.searches * SEARCH_COST_USD) * 1e6) / 1e6;
+  out.costUsd = Math.round((out.inputTokens * r.input + out.cacheWriteTokens * r.input * CACHE_WRITE_FACTOR
+    + out.cacheReadTokens * r.input * CACHE_READ_FACTOR + out.outputTokens * r.output + out.searches * SEARCH_COST_USD) * 1e6) / 1e6;
   out.sources = collectSources(out.blocks);
   out.report = reportText(out.blocks, out.sources);
   out.codeUsed = codeRan(out.blocks);

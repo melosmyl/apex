@@ -186,9 +186,10 @@ async function researchTask(db: Any, { run, task, advisor, context, prompt, star
   const log = (pass: Any) => insertUsageLog(db, {
     user_id: run.created_by_id, company_id: run.company_id, meeting_id: task.source_meeting_id || null, advisor_id: advisor.id,
     provider: RESEARCH_MODEL.provider, model: RESEARCH_MODEL.model, request_type: `task_${run.task_type}`,
-    input_size: pass.inputTokens, output_size: pass.outputTokens, estimated_cost: pass.costUsd,
+    input_size: pass.inputTokens + pass.cacheWriteTokens + pass.cacheReadTokens, output_size: pass.outputTokens, estimated_cost: pass.costUsd,
     latency_ms: pass.ms, status: pass.error ? 'error' : 'success', error_code: pass.error,
-    attempts: [{ searches: pass.searches, pages_read: pass.pagesRead, continuations: pass.continuations, stop_reason: pass.stopReason, sources: pass.sources.length, code_used: pass.codeUsed }],
+    attempts: [{ searches: pass.searches, pages_read: pass.pagesRead, continuations: pass.continuations, stop_reason: pass.stopReason, sources: pass.sources.length, code_used: pass.codeUsed,
+      input_tokens: pass.inputTokens, cache_write_tokens: pass.cacheWriteTokens, cache_read_tokens: pass.cacheReadTokens }],
     task_run_id: run.id,
   });
 

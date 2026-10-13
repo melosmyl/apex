@@ -14,6 +14,8 @@ export const RESEARCH_TYPES = ['research', 'calculate'];
 export const TASK_MODEL = { provider: 'anthropic', model: 'claude-sonnet-5-5' };
 
 export const PROFESSIONAL_NOTE = "Have this checked by a lawyer or accountant before you sign or send it. It's written for the UK.";
+// Research and calculations aren't signed or sent; they're relied on.
+export const PROFESSIONAL_NOTE_RELY = "Have this checked by a lawyer or accountant before you rely on it. It's written for the UK.";
 
 // Documents and dealings that need a professional's eye. Matched against
 // what the task is (its title and brief, and the result's title), not the
@@ -203,7 +205,7 @@ export function finishResearch(type: string, r: any, sources: { url: string; tit
   const manual_checks = (extra.skipped || []).map((s) => ({ site: s.name, how: s.guide }));
   const stats = { searches: extra.searches || 0, pages: extra.pages || 0 };
   const base = { title: str(r?.title, 200) || str(task?.title, 200), unsure: list(r?.unsure, 6, 400), manual_checks, stats, incomplete: !!extra.incomplete, professional_note: '' };
-  if (r?.professional_check === true || needsProfessionalCheck(task?.title, task?.description, base.title)) base.professional_note = PROFESSIONAL_NOTE;
+  if (r?.professional_check === true || needsProfessionalCheck(task?.title, task?.description, base.title)) base.professional_note = PROFESSIONAL_NOTE_RELY;
 
   if (type === 'calculate') {
     const answer = str(r?.answer, 600);
