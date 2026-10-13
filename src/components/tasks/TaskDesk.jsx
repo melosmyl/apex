@@ -15,6 +15,13 @@ const firstName = (name = "") => String(name).replace(/^Dr\.?\s+/, "").split(" "
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
 const day = (iso) => { try { return dayFmt.format(new Date(`${iso}T12:00:00`)); } catch { return iso; } };
 
+// Plain names for the models a result can come from.
+const MODEL_NAMES = {
+  "claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-sonnet-5": "Claude Sonnet 5", "claude-opus-5-5": "Claude Opus 5.5",
+  "gpt-4o": "GPT-4o", "gpt-4o-mini": "GPT-4o mini", "gpt-6.1-sol": "GPT-6.1 Sol",
+};
+const modelName = (m) => MODEL_NAMES[m] || m;
+
 const failed = (e) => toast({ title: "That didn't go through", description: e?.message || "Please try again in a moment." });
 
 async function copy(text) {
@@ -89,6 +96,9 @@ function Finished({ task, run, onChanged }) {
   return (
     <div className="space-y-4">
       <p className="text-sm"><span className="font-medium">{who} finished this.</span> <span className="text-muted-foreground">Cost {formatCost(run.cost_usd)}{run.earlier ? ` · ${run.earlier} earlier ${run.earlier === 1 ? "attempt" : "attempts"} kept` : ""}</span></p>
+      {r.written_by?.fallback && r.written_by.model && r.written_by.model !== r.written_by.intended && (
+        <p className="text-sm text-muted-foreground">Written by {modelName(r.written_by.model)} instead of {modelName(r.written_by.intended || "claude-sonnet-5-5")}.</p>
+      )}
       {run.task_type === "plan" ? <PlanResult r={r} /> : <DraftResult r={r} />}
       {r.professional_note && <p className="rounded-md border-l-4 border-foreground bg-secondary/60 px-3 py-2 text-sm font-medium">{r.professional_note}</p>}
       {redoing ? (
