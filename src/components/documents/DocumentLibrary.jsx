@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import AdvisorWorkDialog, { isAdvisorWork } from "@/components/documents/AdvisorWorkDialog";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 
@@ -20,7 +21,9 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
   const [view, setView] = useState(null);
   const [form, setForm] = useState({ title: "", category: "Other", content: "", file_url: "", file_name: "" });
 
-  const load = () => base44.entities.Document.filter({ company_id: companyId, kind }, "-created_date", 200).then(setItems);
+  // Archived items leave the library (the board stops reading them too).
+  const load = () => base44.entities.Document.filter({ company_id: companyId, kind }, "-created_date", 200)
+    .then((docs) => setItems(docs.filter((d) => d.status !== "archived")));
   useEffect(() => { load(); }, [companyId, kind]);
 
   const create = async () => {
@@ -86,7 +89,9 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!view} onOpenChange={(o)=>!o&&setView(null)}>
+      {view && isAdvisorWork(view) && <AdvisorWorkDialog key={view.id} doc={view} onClose={() => setView(null)} onChanged={load} />}
+
+      <Dialog open={!!view && !isAdvisorWork(view)} onOpenChange={(o)=>!o&&setView(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           {view && <>
             <DialogHeader><DialogTitle className="font-display text-2xl font-light">{view.title}</DialogTitle></DialogHeader>

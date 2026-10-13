@@ -10,7 +10,9 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import TaskCard from "@/components/tasks/TaskCard";
 import DocumentDetailDialog from "@/components/documents/DocumentDetailDialog";
+import AdvisorWorkDialog, { isAdvisorWork } from "@/components/documents/AdvisorWorkDialog";
 import { useTaskRuns } from "@/lib/taskRuns";
+import { toast } from "@/components/ui/use-toast";
 
 const COLUMNS = [
   { key: "todo", label: "To Do" },
@@ -31,6 +33,9 @@ export default function Tasks() {
   const [open, setOpen] = useState(false);
   const [acknowledgingId, setAcknowledgingId] = useState(null);
   const [viewDoc, setViewDoc] = useState(null);
+  // A "Do this for me" result opens in its own clean view, not the old
+  // deliverable viewer.
+  const [workDoc, setWorkDoc] = useState(null);
   const EMPTY_FORM = { title: "", assigned_to: "", project_id: "", task_type: "", brief: "" };
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -130,8 +135,9 @@ export default function Tasks() {
                       onCompleteFounder={completeForFounder}
                       onMove={move}
                       onOpenDocument={async (docId) => {
-                        const d = await base44.entities.Document.get(docId);
-                        setViewDoc(d);
+                        const d = await base44.entities.Document.get(docId).catch(() => null);
+                        if (!d) { toast({ title: "That result isn't there any more", description: "It may have been deleted from Knowledge." }); return; }
+                        if (isAdvisorWork(d)) { setViewDoc(null); setWorkDoc(d); } else { setWorkDoc(null); setViewDoc(d); }
                       }}
                       canBack={COLUMNS.findIndex((c) => c.key === col.key) > 0}
                       canForward={COLUMNS.findIndex((c) => c.key === col.key) < COLUMNS.length - 1}
@@ -183,6 +189,8 @@ export default function Tasks() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {workDoc && <AdvisorWorkDialog key={workDoc.id} doc={workDoc} advisors={advisors} onClose={() => setWorkDoc(null)} />}
 
       {viewDoc && (
         <DocumentDetailDialog
