@@ -42,8 +42,9 @@ export default function Tasks() {
   const load = () => base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200).then(setItems);
   useEffect(() => { load(); base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then((a) => { setAdvisors(a); setAdvisorsLoaded(true); }); base44.entities.Project.filter({ company_id: companyId }, "-created_date", 100).then(setProjects); }, [companyId]);
 
-  // A hand-made task can be one an advisor does for you (Draft or Plan, so
-  // "Do this for me" works on it), which needs one of your AI advisors.
+  // A hand-made task can be one an advisor does for you (Draft, Plan,
+  // Research or Calculate, so "Do this for me" works on it), which needs one
+  // of your AI advisors.
   const assignee = advisors.find((a) => a.name === form.assigned_to);
   const aiAssignee = assignee && assignee.type !== "human" ? assignee : null;
   const needsAdvisor = !!form.task_type && !aiAssignee;
@@ -160,6 +161,8 @@ export default function Tasks() {
                 <option value="">A to-do you do yourself</option>
                 <option value="draft">Draft: an advisor writes it for you to send</option>
                 <option value="plan">Plan: an advisor writes a dated checklist</option>
+                <option value="research">Research: an advisor finds out, with sources</option>
+                <option value="calculate">Calculate: an advisor works out the numbers</option>
               </select>
             </div>
             <div><Label htmlFor="task-assignee" className="mb-1.5 block">{form.task_type ? "Which advisor does it" : "Assign to"}</Label>
@@ -182,7 +185,7 @@ export default function Tasks() {
             </div>
             {needsAdvisor && advisorsLoaded && (
               <p className="text-sm text-muted-foreground">
-                {advisors.some((a) => a.type !== "human") ? "Choose which advisor does it." : "Draft and Plan need one of your advisors; add one on Your advisors first."}
+                {advisors.some((a) => a.type !== "human") ? "Choose which advisor does it." : "An advisor task needs one of your advisors; add one on Your advisors first."}
               </p>
             )}
             <div className="flex justify-end gap-2"><Button variant="ghost" onClick={()=>{ setOpen(false); setForm(EMPTY_FORM); }}>Cancel</Button><Button onClick={create} disabled={!form.title.trim() || needsAdvisor}>Create</Button></div>

@@ -136,8 +136,10 @@ check(disc.status === 200 && openTask.status === 'todo', 'discard leaves the tas
 
 // ---- 4. What can't be run, and who can't run it.
 console.log('\n== refusals');
+// Research runs too since Stage 3 (tested in m2b_e2e.ts); here it only
+// has to start.
 const res = await A.fn('taskRun', { action: 'start', task_id: researchTask.id });
-check(res.status === 400, 'research waits for web search (Stage 3)', res.json);
+check(res.status === 200, 'research can be started (Stage 3)', res.json);
 const B = await founder('m2aother');
 const steal = await B.fn('taskRun', { action: 'start', task_id: planTask.id });
 check(steal.status === 403 || steal.status === 404, "another founder can't run my task", steal);

@@ -15,7 +15,7 @@ export default function TaskCard({ task, advisors, run, onRunChanged, acknowledg
   // A finished "Do this for me" result waits for Accept / Redo / Discard;
   // "Done" here would skip saving it.
   const awaitingDecision = run?.status === "done";
-  const isAdvisorTask = task.task_type === "draft" || task.task_type === "plan";
+  const isAdvisorTask = ["draft", "plan", "research", "calculate"].includes(task.task_type);
   const canComplete = !isDone && !awaitingDecision && (isDelegated || isFounderTask || task.status === "review");
   const hasDocument = !!task.document_id;
   const isCommitment = !!task.source_meeting_id;

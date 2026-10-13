@@ -325,3 +325,90 @@ export const TASK_PLAN_SCHEMA = {
   },
   required: ['title', 'summary', 'steps', 'helper', 'professional_check'],
 };
+
+// Research and Calculate (Stage 3): the advisor's web research, put into
+// shape. Every finding, figure and check names its source by number from
+// the list of pages the search actually returned; the server drops any
+// that don't.
+const SOURCE_REF = { type: 'integer', description: 'The number of the source in the list you were given. 0 if none.' };
+
+export const TASK_RESEARCH_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'A short name for the research.' },
+    summary: { type: 'string', description: 'Two or three sentences: what was found, in plain English.' },
+    findings: {
+      type: 'array',
+      description: 'The findings as rows of a table, most useful first. Only things a source supports.',
+      items: {
+        type: 'object',
+        properties: {
+          finding: { type: 'string', description: 'The fact, in one line.' },
+          detail: { type: 'string', description: 'A little more: a price, a condition, a date. Empty if none.' },
+          source: SOURCE_REF,
+        },
+        required: ['finding', 'detail', 'source'],
+      },
+    },
+    legitimacy: {
+      type: 'array',
+      description: 'For each business, supplier or offer the research names: does it look real and trustworthy?',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          verdict: { type: 'string', enum: ['looks_legitimate', 'unclear', 'warning_signs'] },
+          why: { type: 'string', description: 'What the verdict rests on, in one line.' },
+          source: SOURCE_REF,
+        },
+        required: ['name', 'verdict', 'why', 'source'],
+      },
+    },
+    risks: {
+      type: 'array',
+      description: 'Risks a good advisor would flag (counterfeits, scams, regulated or illegal activity, legal or tax issues), each with what to do. Empty if none.',
+      items: {
+        type: 'object',
+        properties: { risk: { type: 'string' }, what_to_do: { type: 'string' } },
+        required: ['risk', 'what_to_do'],
+      },
+    },
+    unsure: stringList("What the research couldn't establish, in plain words. Empty if nothing."),
+    professional_check: { type: 'boolean', description: 'True if anything here has legal or tax consequences.' },
+  },
+  required: ['title', 'summary', 'findings', 'legitimacy', 'risks', 'unsure', 'professional_check'],
+};
+
+export const TASK_CALCULATE_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'A short name for the calculation.' },
+    answer: { type: 'string', description: 'The result in one plain sentence, with the number.' },
+    workings: {
+      type: 'array',
+      description: 'The steps, in order, each explained in plain English with its result.',
+      items: {
+        type: 'object',
+        properties: { step: { type: 'string' }, result: { type: 'string' } },
+        required: ['step', 'result'],
+      },
+    },
+    inputs: {
+      type: 'array',
+      description: 'Every figure the calculation used, and where it came from.',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          value: { type: 'string' },
+          source: SOURCE_REF,
+          from_founder: { type: 'boolean', description: 'True if the founder or their company record gave this figure.' },
+        },
+        required: ['name', 'value', 'source', 'from_founder'],
+      },
+    },
+    unsure: stringList("What the calculation couldn't pin down. Empty if nothing."),
+    professional_check: { type: 'boolean', description: 'True if this bears on tax, legal or financial commitments.' },
+  },
+  required: ['title', 'answer', 'workings', 'inputs', 'unsure', 'professional_check'],
+};

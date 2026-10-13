@@ -76,6 +76,137 @@ function PlanResult({ r }) {
   );
 }
 
+const VERDICTS = {
+  looks_legitimate: { label: "Looks legitimate", tone: "border-[hsl(var(--sage))] bg-[hsl(var(--sage)/0.25)]" },
+  unclear: { label: "Unclear", tone: "border-border bg-secondary" },
+  warning_signs: { label: "Warning signs", tone: "border-destructive/60 bg-destructive/10" },
+};
+
+function SourceLink({ source }) {
+  if (!source?.url) return null;
+  let host = "";
+  try { host = new URL(source.url).hostname.replace(/^www\./, ""); } catch { /* not a URL */ }
+  return (
+    <a href={source.url} target="_blank" rel="noreferrer" className="underline underline-offset-2" title={source.title}
+      aria-label={`Source: ${source.title || host} (opens in a new tab)`}>{host || "source"}</a>
+  );
+}
+
+function Unsure({ items, label }) {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <p className="room-mono mb-1">{label}</p>
+      <ul className="space-y-1 text-sm text-muted-foreground">{items.map((u, i) => <li key={i}><span aria-hidden="true">— </span>{u}</li>)}</ul>
+    </div>
+  );
+}
+
+function ManualChecks({ items }) {
+  if (!items?.length) return null;
+  return (
+    <div className="rounded-md border border-border bg-secondary/50 p-3 text-sm">
+      <p className="room-mono mb-1">Check by hand</p>
+      {items.map((m, i) => <p key={i}><span className="font-medium">{m.site}:</span> {m.how}</p>)}
+    </div>
+  );
+}
+
+function Stats({ r }) {
+  const s = r.stats || {};
+  if (!s.searches && !s.pages) return null;
+  return <p className="text-xs text-muted-foreground">{s.searches || 0} {s.searches === 1 ? "search" : "searches"}, {s.pages || 0} {s.pages === 1 ? "page" : "pages"} read.</p>;
+}
+
+function Incomplete({ r }) {
+  if (!r.incomplete) return null;
+  return <p className="rounded-md border-l-4 border-foreground bg-secondary/60 px-3 py-2 text-sm">This was cut short before the research finished, so it may be incomplete. Redo it if you need more.</p>;
+}
+
+function ResearchResult({ r }) {
+  return (
+    <div className="space-y-4">
+      <Incomplete r={r} />
+      {r.summary && <p className="text-[0.95rem] leading-relaxed">{r.summary}</p>}
+      <div className="overflow-x-auto rounded-md border border-border">
+        <table className="w-full text-sm">
+          <caption className="sr-only">Findings, each with the page it came from</caption>
+          <thead className="bg-secondary/60 text-left">
+            <tr><th className="px-3 py-2 font-medium">Finding</th><th className="px-3 py-2 font-medium">Detail</th><th className="px-3 py-2 font-medium">Source</th></tr>
+          </thead>
+          <tbody>
+            {(r.findings || []).map((f, i) => (
+              <tr key={i} className="border-t border-border align-top">
+                <td className="px-3 py-2">{f.finding}</td>
+                <td className="px-3 py-2 text-muted-foreground">{f.detail}</td>
+                <td className="px-3 py-2 whitespace-nowrap"><SourceLink source={f.source} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {r.legitimacy?.length > 0 && (
+        <div>
+          <p className="room-mono mb-2">Who looks legitimate</p>
+          <ul className="space-y-2">
+            {r.legitimacy.map((l, i) => {
+              const v = VERDICTS[l.verdict] || VERDICTS.unclear;
+              return (
+                <li key={i} className="flex flex-wrap items-baseline gap-2 text-sm">
+                  <span className="font-medium">{l.name}</span>
+                  <span className={`rounded-full border px-2 py-px text-xs ${v.tone}`}>{v.label}</span>
+                  <span className="min-w-0 text-muted-foreground">{l.why}</span>
+                  {l.source && <SourceLink source={l.source} />}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {r.risks?.length > 0 && (
+        <div>
+          <p className="room-mono mb-1">Risks</p>
+          <ul className="space-y-1.5 text-sm">{r.risks.map((x, i) => <li key={i}><span className="font-medium">{x.risk}</span> {x.what_to_do && <span className="text-muted-foreground">What to do: {x.what_to_do}</span>}</li>)}</ul>
+        </div>
+      )}
+      <Unsure items={r.unsure} label="Couldn't establish" />
+      <ManualChecks items={r.manual_checks} />
+      <Stats r={r} />
+    </div>
+  );
+}
+
+function CalculateResult({ r }) {
+  return (
+    <div className="space-y-4">
+      <Incomplete r={r} />
+      <p className="font-display text-lg leading-snug">{r.answer}</p>
+      <ol className="space-y-1.5 text-sm">
+        {(r.workings || []).map((w, i) => (
+          <li key={i} className="flex gap-3"><span className="w-5 shrink-0 text-muted-foreground tabular-nums">{i + 1}.</span><span className="min-w-0">{w.step}{w.result && <span className="font-medium">: {w.result}</span>}</span></li>
+        ))}
+      </ol>
+      {r.inputs?.length > 0 && (
+        <div>
+          <p className="room-mono mb-1">Figures used</p>
+          <ul className="space-y-1 text-sm">
+            {r.inputs.map((x, i) => (
+              <li key={i}>
+                {x.name}: <span className="font-medium">{x.value}</span>{" "}
+                <span className="text-muted-foreground">({x.from_founder ? "your figure" : x.source ? <SourceLink source={x.source} /> : "assumed"})</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">{r.code_used ? "Worked out by running the numbers, not estimated." : "Worked out step by step."}</p>
+      <Unsure items={r.unsure} label="Couldn't pin down" />
+      <ManualChecks items={r.manual_checks} />
+      <Stats r={r} />
+    </div>
+  );
+}
+
 // The advisor's finished work and the founder's three choices.
 function Finished({ task, run, onChanged, onAccepted }) {
   const [redoing, setRedoing] = useState(false);
@@ -96,10 +227,16 @@ function Finished({ task, run, onChanged, onAccepted }) {
   return (
     <div className="space-y-4">
       <p className="text-sm"><span className="font-medium">{who} finished this.</span> <span className="text-muted-foreground">Cost {formatCost(run.cost_usd)}{run.earlier ? ` · ${run.earlier} earlier ${run.earlier === 1 ? "attempt" : "attempts"} kept` : ""}</span></p>
+      {r.written_by?.structured_fallback && r.written_by.structured_by && (
+        <p className="text-sm text-muted-foreground">Put into shape by {modelName(r.written_by.structured_by)} instead of Claude Sonnet 5.5.</p>
+      )}
       {r.written_by?.fallback && r.written_by.model && r.written_by.model !== r.written_by.intended && (
         <p className="text-sm text-muted-foreground">Written by {modelName(r.written_by.model)} instead of {modelName(r.written_by.intended || "claude-sonnet-5-5")}.</p>
       )}
-      {run.task_type === "plan" ? <PlanResult r={r} /> : <DraftResult r={r} />}
+      {run.task_type === "plan" ? <PlanResult r={r} />
+        : run.task_type === "research" ? <ResearchResult r={r} />
+        : run.task_type === "calculate" ? <CalculateResult r={r} />
+        : <DraftResult r={r} />}
       {r.professional_note && <p className="rounded-md border-l-4 border-foreground bg-secondary/60 px-3 py-2 text-sm font-medium">{r.professional_note}</p>}
       {redoing ? (
         <div className="space-y-2">

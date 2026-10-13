@@ -18,6 +18,10 @@ let fields: Record<string, any[]> = {};
 // Marker strings to look for in each prompt: GET /__log says which ones a
 // request contained (to check what a model was, or wasn't, told).
 let marks: string[] = [];
+// Research turns (requests with web search): which pages the search finds,
+// the answer's text and which pages it cites, and how many times to pause
+// the turn first. { results: [{url,title}], text, cite: [url], pause: 1 }
+let research: any = {};
 const marked = (text: string) => marks.filter((m) => text.includes(m));
 
 function sample(s: any, key = '', book = ''): any {
@@ -57,8 +61,64 @@ function speaker(system: string) {
 
 const sse = (e: any) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`;
 
+// A research turn with web search (and code execution when asked for):
+// the server-tool blocks Claude's API returns, with real citations.
+function researchStream(body: any, mode: string): Response {
+  const enc = new TextEncoder();
+  const hasCode = (body.tools || []).some((t: any) => String(t.type).startsWith('code_execution'));
+  const results = mode === 'nosources' ? [] : (research.results || [
+    { url: 'https://example.org/suppliers', title: 'UK coat suppliers list' },
+    { url: 'https://example.net/reviews', title: 'Supplier reviews' },
+  ]);
+  const cite = mode === 'nosources' ? [] : (research.cite || results.map((r: any) => r.url));
+  const pausing = (research.pause || 0) > 0;
+  if (pausing) research.pause -= 1;
+  const usage = { input_tokens: 4000, output_tokens: 800, server_tool_use: { web_search_requests: 1, web_fetch_requests: results.length ? 1 : 0 } };
+  const stream = new ReadableStream({
+    async start(ctl) {
+      const put = (e: any) => ctl.enqueue(enc.encode(sse(e)));
+      let i = 0;
+      put({ type: 'message_start', message: { id: 'msg_fake_research', type: 'message', role: 'assistant', model: body.model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: usage.input_tokens, output_tokens: 1 } } });
+      put({ type: 'content_block_start', index: i, content_block: { type: 'server_tool_use', id: `srvtoolu_${i}`, name: 'web_search', input: {} } });
+      put({ type: 'content_block_delta', index: i, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ query: 'fake query' }) } });
+      put({ type: 'content_block_stop', index: i }); i++;
+      put({ type: 'content_block_start', index: i, content_block: { type: 'web_search_tool_result', tool_use_id: 'srvtoolu_0', content: results.map((r: any) => ({ type: 'web_search_result', url: r.url, title: r.title, encrypted_content: 'enc', page_age: 'October 2026' })) } });
+      put({ type: 'content_block_stop', index: i }); i++;
+      if (pausing) {
+        put({ type: 'message_delta', delta: { stop_reason: 'pause_turn', stop_sequence: null }, usage: { output_tokens: 200, server_tool_use: usage.server_tool_use } });
+        put({ type: 'message_stop' }); ctl.close(); return;
+      }
+      if (hasCode) {
+        put({ type: 'content_block_start', index: i, content_block: { type: 'server_tool_use', id: `srvtoolu_${i}`, name: 'bash_code_execution', input: {} } });
+        put({ type: 'content_block_delta', index: i, delta: { type: 'input_json_delta', partial_json: JSON.stringify({ command: 'python -c "print(45-12)"' }) } });
+        put({ type: 'content_block_stop', index: i }); i++;
+        put({ type: 'content_block_start', index: i, content_block: { type: 'bash_code_execution_tool_result', tool_use_id: `srvtoolu_${i - 1}`, content: { type: 'bash_code_execution_result', stdout: '33', stderr: '', return_code: 0, content: [] } } });
+        put({ type: 'content_block_stop', index: i }); i++;
+      }
+      put({ type: 'content_block_start', index: i, content_block: { type: 'text', text: '', citations: [] } });
+      put({ type: 'content_block_delta', index: i, delta: { type: 'text_delta', text: research.text || 'Two UK suppliers sell secondhand coats in bulk.' } });
+      for (const url of cite) {
+        const r = results.find((x: any) => x.url === url) || { url, title: url };
+        put({ type: 'content_block_delta', index: i, delta: { type: 'citations_delta', citation: { type: 'web_search_result_location', url: r.url, title: r.title, cited_text: 'fake cited text', encrypted_index: 'enc' } } });
+      }
+      put({ type: 'content_block_stop', index: i });
+      put({ type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: usage.output_tokens, server_tool_use: usage.server_tool_use } });
+      put({ type: 'message_stop' });
+      ctl.close();
+    },
+  });
+  return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'request-id': 'req_fake' } });
+}
+
 async function anthropic(body: any): Promise<Response> {
   const mode = script.anthropic.shift() || 'ok';
+  if ((body.tools || []).some((t: any) => String(t.type).startsWith('web_search'))) {
+    log.push({ provider: 'anthropic', kind: 'research', mode, model: body.model, marked: marked(String(body.system) + JSON.stringify(body.messages)),
+      tools: body.tools.map((t: any) => ({ type: t.type, max_uses: t.max_uses ?? null, blocked: (t.blocked_domains || []).length, callers: t.allowed_callers ?? null })),
+      turns: (body.messages || []).length, thinking: body.thinking, effort: body.output_config?.effort, format: !!body.output_config?.format });
+    if (mode === 'overload529') return Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 529 });
+    return researchStream(body, mode);
+  }
   const schema = body.output_config?.format?.schema ?? pastedSchema(String(body.system));
   const sp = speaker(String(body.system));
   log.push({ marked: marked(String(body.system) + JSON.stringify(body.messages)), provider: 'anthropic', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, thinking: body.thinking, effort: body.output_config?.effort,
@@ -113,7 +173,7 @@ async function openai(body: any): Promise<Response> {
 
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
-  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; fields = s.fields || {}; marks = s.marks || []; log.length = 0; return Response.json({ ok: true }); }
+  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; fields = s.fields || {}; marks = s.marks || []; research = s.research || {}; log.length = 0; return Response.json({ ok: true }); }
   if (url.pathname === '/__log') return Response.json(log);
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);

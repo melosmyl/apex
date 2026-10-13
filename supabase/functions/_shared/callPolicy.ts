@@ -64,6 +64,12 @@ const POLICIES: Record<string, CallPolicy> = {
     maxTokens: { anthropic: 16_000, openai: 8_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 30_000,
   },
+  // Research and Calculate (Stage 3): putting the advisor's web research
+  // into shape. The research itself runs in _shared/webResearch.ts.
+  task_structure: {
+    maxTokens: { anthropic: 16_000, openai: 8_000 },
+    thinking: 'adaptive', effort: 'medium', nativeFormat: true, fallbackReserveMs: 15_000,
+  },
   task_acknowledgment: {
     maxTokens: { anthropic: 4_000, openai: 1_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 15_000,

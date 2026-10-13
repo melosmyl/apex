@@ -12,16 +12,26 @@ import AdvisorAvatar from "@/components/AdvisorAvatar";
 // deliverables keep their own viewer (DocumentDetailDialog).
 
 export const isAdvisorWork = (doc) =>
-  !!doc && doc.kind === "knowledge" && !!doc.task_id && ["Draft", "Plan"].includes(doc.category);
+  !!doc && doc.kind === "knowledge" && !!doc.task_id && ["Draft", "Plan", "Research", "Calculation"].includes(doc.category);
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+// Web addresses (a Research result's sources) become links.
+function linkify(text) {
+  return String(text).split(/(https?:\/\/[^\s)]+)/g).flatMap((part, i) => {
+    if (!/^https?:\/\//.test(part)) return [part];
+    // Sentence punctuation after an address isn't part of it.
+    const [, url, tail] = part.match(/^(.*?)([.,;:!?'"]*)$/);
+    return [<a key={i} href={url} target="_blank" rel="noreferrer" className="underline underline-offset-2 break-all">{url}</a>, tail];
+  });
+}
 
 function Paragraphs({ text }) {
   const parts = String(text || "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   if (!parts.length) return <p className="text-muted-foreground">Nothing written yet.</p>;
   return (
     <div className="space-y-4 text-[0.98rem] leading-relaxed">
-      {parts.map((p, i) => <p key={i} className="whitespace-pre-wrap">{p}</p>)}
+      {parts.map((p, i) => <p key={i} className="whitespace-pre-wrap">{linkify(p)}</p>)}
     </div>
   );
 }
@@ -82,7 +92,7 @@ export default function AdvisorWorkDialog({ doc, advisors = [], onClose, onChang
   const requestClose = () => { if (unsaved) setConfirmLeave(true); else onClose?.(); };
 
   const companyId = current.company_id;
-  const kindWord = current.category === "Plan" ? "Plan" : "Draft";
+  const kindWord = current.category || "Draft";
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) requestClose(); }}>

@@ -13,9 +13,12 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
-import { TASK_DRAFT_SCHEMA, TASK_PLAN_SCHEMA } from '../_shared/answerSchemas.ts';
+import { TASK_CALCULATE_SCHEMA, TASK_DRAFT_SCHEMA, TASK_PLAN_SCHEMA, TASK_RESEARCH_SCHEMA } from '../_shared/answerSchemas.ts';
+import { buildSystemPrompt } from '../_shared/advisorPrompt.ts';
+import { insertUsageLog } from '../_shared/llmCall.ts';
+import { CAPS, RESEARCH_MODEL, citedSources, runResearchPass, skippedSitesIn } from '../_shared/webResearch.ts';
 import { requireOwnedRow, requireNotAnonymous, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
-import { RUNNABLE_TYPES, TASK_MODEL, companyContext, finishResult, resultAsText, taskPrompt, voiceSamples } from '../_shared/taskRun.ts';
+import { RESEARCH_TYPES, RUNNABLE_TYPES, STRUCTURE_INSTRUCTIONS, TASK_MODEL, companyContext, finishResearch, finishResult, resultAsText, taskPrompt, voiceSamples } from '../_shared/taskRun.ts';
 
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -33,7 +36,19 @@ const QUEUED_GRACE_MS = 30_000;
 const STALE_RUN_MS = 4 * 60_000;
 const MAX_ATTEMPTS = 3;
 
-const SCHEMAS: Record<string, unknown> = { draft: TASK_DRAFT_SCHEMA, plan: TASK_PLAN_SCHEMA };
+const SCHEMAS: Record<string, unknown> = { draft: TASK_DRAFT_SCHEMA, plan: TASK_PLAN_SCHEMA, research: TASK_RESEARCH_SCHEMA, calculate: TASK_CALCULATE_SCHEMA };
+
+// Research and Calculate fit inside the stale-run threshold (4 minutes):
+// the research pass by 150s (a no-sources retry only if the first came back
+// quickly), the structuring call by 225s.
+const RESEARCH_BUDGET_MS = 150_000;
+const RETRY_IF_BEFORE_MS = 90_000;
+const RETRY_BUDGET_MS = 175_000;
+const STRUCTURE_BY_MS = 225_000;
+
+// The board's own work in Knowledge: kept out of what a task run is told,
+// which is the founder's own material.
+const BOARD_CATEGORIES = ['Draft', 'Plan', 'Research', 'Calculation'];
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: corsHeaders });
 
@@ -82,7 +97,7 @@ async function processRun(db: Any, runId: string) {
   if (!run) return;
   try {
     const { data: task } = await db.from('tasks').select('*').eq('id', run.task_id).maybeSingle();
-    const { data: advisor } = await db.from('advisors').select('id, name, company_id, type').eq('id', run.advisor_id).maybeSingle();
+    const { data: advisor } = await db.from('advisors').select('*').eq('id', run.advisor_id).maybeSingle();
     if (!task || !advisor || advisor.company_id !== run.company_id || advisor.type === 'human') {
       await finishRun(db, run, { status: 'failed', error: 'The advisor for this task is no longer on the board.' }, 'todo');
       return;
@@ -91,7 +106,7 @@ async function processRun(db: Any, runId: string) {
     const [{ data: company }, { data: knowledge }, { data: meetings }, { data: notes }, meetingRes, previousRes] = await Promise.all([
       db.from('companies').select('*').eq('id', run.company_id).maybeSingle(),
       db.from('documents').select('title, content, category, status').eq('company_id', run.company_id).eq('kind', 'knowledge')
-        .or('category.is.null,category.not.in.("Draft","Plan")').order('created_at', { ascending: false }).limit(30),
+        .or(`category.is.null,category.not.in.(${BOARD_CATEGORIES.map((c) => `"${c}"`).join(',')})`).order('created_at', { ascending: false }).limit(30),
       db.from('board_meetings').select('question, founder_decision_notes, discussion_transcript')
         .eq('company_id', run.company_id).eq('created_by_id', run.created_by_id).order('created_at', { ascending: false }).limit(5),
       db.from('notes').select('raw_text').eq('company_id', run.company_id).eq('created_by_id', run.created_by_id).order('created_at', { ascending: false }).limit(5),
@@ -107,7 +122,7 @@ async function processRun(db: Any, runId: string) {
     // (filtered above), and nothing archived or replaced. The status check is
     // done here: many rows have no status, which a second "or" can't say.
     const ownKnowledge = (knowledge || [])
-      .filter((d: Any) => !['Draft', 'Plan'].includes(d.category) && !['archived', 'superseded'].includes(d.status))
+      .filter((d: Any) => !BOARD_CATEGORIES.includes(d.category) && !['archived', 'superseded'].includes(d.status))
       .slice(0, 5);
 
     const voice = voiceSamples({
@@ -120,6 +135,11 @@ async function processRun(db: Any, runId: string) {
       type: run.task_type, task, meeting: meetingRes?.data, today: new Date().toISOString().slice(0, 10), voice,
       redo: run.redo_notes && previousRes?.data?.result ? { notes: run.redo_notes, previous: previousRes.data.result } : null,
     });
+
+    if (RESEARCH_TYPES.includes(run.task_type)) {
+      await researchTask(db, { run, task, advisor, context: companyContext(company, ownKnowledge), prompt, startedAt });
+      return;
+    }
 
     const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/routeAdvisorRequest`, {
       method: 'POST',
@@ -150,6 +170,96 @@ async function processRun(db: Any, runId: string) {
     console.error('taskRun: run failed', runId, (e as Error).message);
     await finishRun(db, run, { status: 'failed', error: "This couldn't be finished just now. Try again in a moment." }, 'todo').catch(() => {});
   }
+}
+
+// Research and Calculate (Stage 3): the advisor researches on Opus 5.5 with
+// web search and page reading (and code, for Calculate), then the findings
+// are put into shape on Sonnet 5.5, keeping only what the pages the search
+// actually returned support. A result with no sources is sent back once,
+// then fails plainly.
+async function researchTask(db: Any, { run, task, advisor, context, prompt, startedAt }: Any) {
+  const first = String(advisor.name || '').split(' ')[0] || 'Your advisor';
+  const skipped = skippedSitesIn(task.title, task.description, run.redo_notes);
+  const system = buildSystemPrompt(advisor, prompt.system_instructions, context, prompt.meeting_context, false, false);
+  const ask = `${prompt.user_question}\n\nThe task: ${task.title}${task.description ? `\nBrief: ${task.description}` : ''}`;
+
+  const log = (pass: Any) => insertUsageLog(db, {
+    user_id: run.created_by_id, company_id: run.company_id, meeting_id: task.source_meeting_id || null, advisor_id: advisor.id,
+    provider: RESEARCH_MODEL.provider, model: RESEARCH_MODEL.model, request_type: `task_${run.task_type}`,
+    input_size: pass.inputTokens, output_size: pass.outputTokens, estimated_cost: pass.costUsd,
+    latency_ms: pass.ms, status: pass.error ? 'error' : 'success', error_code: pass.error,
+    attempts: [{ searches: pass.searches, pages_read: pass.pagesRead, continuations: pass.continuations, stop_reason: pass.stopReason, sources: pass.sources.length, code_used: pass.codeUsed }],
+    task_run_id: run.id,
+  });
+
+  let pass = await runResearchPass({ system, user: ask, type: run.task_type, endBy: startedAt + RESEARCH_BUDGET_MS });
+  await log(pass);
+  const firstPass = pass;
+  // A retry only helps if there are searches left to make.
+  if (run.task_type === 'research' && !pass.error && !citedSources(pass.sources).length && Date.now() - startedAt < RETRY_IF_BEFORE_MS && pass.searches < CAPS.research.searches) {
+    // The retry shares the task's caps with the first pass.
+    pass = await runResearchPass({
+      system, type: run.task_type, endBy: startedAt + RETRY_BUDGET_MS, used: { searches: pass.searches, pages: pass.pagesRead },
+      user: `${ask}\n\nSearch the web for this, and base every finding on pages you find: a finding without a source can't be shown to the founder.`,
+    });
+    await log(pass);
+  }
+  if (!pass.report) {
+    await finishRun(db, run, { status: 'failed', error: `${first} couldn't finish this research just now. Try again in a moment.` }, 'todo');
+    return;
+  }
+  const sources = citedSources(pass.sources);
+  if (run.task_type === 'research' && !sources.length) {
+    await finishRun(db, run, { status: 'failed', error: `${first} couldn't find sources to back this up, so there's nothing to show. Try again, or add detail to the task.` }, 'todo');
+    return;
+  }
+
+  const numbered = sources.map((src: Any, i: number) => `[${i + 1}] ${src.title} (${src.url})${src.quote ? `: "${src.quote}"` : ''}`).join('\n');
+  // What the founder has said, for checking "your figure" claims.
+  const founderText = [context, task.title, task.description, run.redo_notes].filter(Boolean).join('\n');
+  const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/routeAdvisorRequest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+    body: JSON.stringify({
+      advisor_id: advisor.id, company_id: run.company_id, meeting_id: task.source_meeting_id || null, user_id: run.created_by_id,
+      model_override: TASK_MODEL, task_run_id: run.id,
+      // The research and the pages it quotes go in the message, not in the
+      // system prompt: web text is material to shape, not instructions.
+      system_instructions: STRUCTURE_INSTRUCTIONS, company_context: null,
+      meeting_context: `THE TASK: ${task.title}${run.task_type === 'calculate' ? `\n\nTHE FOUNDER'S OWN MATERIAL (the only source of their figures):\n${founderText.slice(0, 6000)}` : ''}`,
+      user_question: `Put this research into the requested shape.\n\nTHE RESEARCH:\n${pass.report.slice(0, 18000)}\n\nSOURCES (the only pages you may cite, by number):\n${numbered || '(none)'}`,
+      previous_responses: [],
+      output_schema: SCHEMAS[run.task_type], temperature: 0.2, request_type: 'task_structure',
+      deadline_at: startedAt + STRUCTURE_BY_MS,
+    }),
+    // Never past the sweep's threshold, whatever the call does.
+    signal: AbortSignal.timeout(Math.max(5_000, startedAt + STRUCTURE_BY_MS + 5_000 - Date.now())),
+  }).catch(() => null);
+  if (!res) {
+    await finishRun(db, run, { status: 'failed', error: `${first} couldn't finish this just now. Try again in a moment.` }, 'todo');
+    return;
+  }
+  const data = await res.json().catch(() => null);
+  const result: Any = res.ok && data?.response
+    ? finishResearch(run.task_type, data.response, sources, {
+      codeUsed: pass.codeUsed, skipped, incomplete: pass.incomplete, founderText,
+      // Both passes count, when there was a retry.
+      searches: pass.searches + (pass === firstPass ? 0 : firstPass.searches), pages: pass.pagesRead + (pass === firstPass ? 0 : firstPass.pagesRead),
+    }, task)
+    : null;
+  if (!result) {
+    await finishRun(db, run, { status: 'failed', error: run.task_type === 'research'
+      ? `${first} couldn't back the findings with sources, so there's nothing to show. Try again in a moment.`
+      : `${first} couldn't finish the workings just now. Try again in a moment.` }, 'todo');
+    return;
+  }
+  // Researched on Opus 5.5; put into shape by Sonnet 5.5, or by the
+  // advisor's backup model if that call fell back (shown to the founder).
+  result.written_by = {
+    provider: RESEARCH_MODEL.provider, model: RESEARCH_MODEL.model, intended: RESEARCH_MODEL.model, fallback: false,
+    structured_by: data.model_used || null, structured_fallback: !!data.model_used && data.model_used !== TASK_MODEL.model,
+  };
+  await finishRun(db, run, { status: 'done', result, error: null }, 'review');
 }
 
 async function sweep(db: Any) {
@@ -247,7 +357,7 @@ Deno.serve(async (req) => {
       if (!accepted) return json({ error: 'This result has already been decided.' }, 409);
       const { data: task } = await db.from('tasks').select('id, title, source_meeting_id').eq('id', run.task_id).maybeSingle();
       const { data: doc, error: docErr } = await db.from('documents').insert({
-        company_id: run.company_id, created_by_id: user.id, kind: 'knowledge', category: run.task_type === 'plan' ? 'Plan' : 'Draft',
+        company_id: run.company_id, created_by_id: user.id, kind: 'knowledge', category: ({ plan: 'Plan', research: 'Research', calculate: 'Calculation' } as Record<string, string>)[run.task_type] || 'Draft',
         title: String(run.result?.title || task?.title || 'Untitled').slice(0, 200),
         content: resultAsText(run.task_type, run.result), structured_content: run.result,
         task_id: run.task_id, meeting_id: task?.source_meeting_id || null, created_by_advisor_id: run.advisor_id,
@@ -264,7 +374,7 @@ Deno.serve(async (req) => {
       // A task redone after it was accepted: the new version replaces the old
       // one in Knowledge, which is kept but no longer read.
       await db.from('documents').update({ status: 'superseded', is_latest_version: false })
-        .eq('task_id', run.task_id).eq('kind', 'knowledge').in('category', ['Draft', 'Plan']).neq('id', doc.id)
+        .eq('task_id', run.task_id).eq('kind', 'knowledge').in('category', BOARD_CATEGORIES).neq('id', doc.id)
         .or('status.is.null,status.not.in.(archived,superseded)');
       return json({ run: accepted, document_id: doc.id });
     }

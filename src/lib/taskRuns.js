@@ -4,9 +4,8 @@ import { base44, supabase } from "@/api/base44Client";
 // "Do this for me" (Workstream M2a): the advisor who owns a task does it in
 // the background (taskRun); the founder accepts, redoes or discards it.
 
-// What can be done for the founder today; Research and Calculate arrive
-// with web search (Stage 3).
-export const RUNNABLE_TYPES = new Set(["draft", "plan"]);
+// What can be done for the founder: all four task types.
+export const RUNNABLE_TYPES = new Set(["draft", "plan", "research", "calculate"]);
 
 export const DOING = { draft: "is drafting this", plan: "is planning this", research: "is researching this", calculate: "is working this out" };
 
