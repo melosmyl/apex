@@ -12,6 +12,7 @@ export default function PinDialog({ open, onOpenChange, companyId, pinData, exis
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(null);
   const [relatedPins, setRelatedPins] = useState([]);
+  const [confidence, setConfidence] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function PinDialog({ open, onOpenChange, companyId, pinData, exis
         importance: "normal",
       });
       setRelatedPins([]);
+      setConfidence(null);
       runAnalysis();
     }
   }, [open, existingPin, pinData]);
@@ -69,6 +71,7 @@ export default function PinDialog({ open, onOpenChange, companyId, pinData, exis
         importance: result.importance || f.importance,
       }));
       setRelatedPins(result.related_pin_ids || []);
+      setConfidence(typeof result.category_confidence === "number" ? result.category_confidence : null);
     } catch (e) {
       setError("Could not auto-analyse — you can fill in details manually.");
     } finally {
@@ -90,6 +93,7 @@ export default function PinDialog({ open, onOpenChange, companyId, pinData, exis
           status: "active",
           created_by: "Founder",
           related_pin_ids: relatedPins,
+          ...(confidence !== null ? { category_confidence: confidence } : {}),
         });
       }
       onSaved?.();

@@ -74,6 +74,12 @@ const POLICIES: Record<string, CallPolicy> = {
     maxTokens: { anthropic: 4_000, openai: 1_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 15_000,
   },
+  // Filling in a new pin (cheap tier): short filing work, no thinking, so
+  // a Claude fallback can't spend the small budget before it answers.
+  pin_analysis: {
+    maxTokens: { anthropic: 2_000, openai: 1_000 },
+    thinking: 'off', effort: 'low', nativeFormat: true, fallbackReserveMs: 10_000, attemptTimeoutMs: 25_000,
+  },
   onboarding_plan: {
     maxTokens: { anthropic: 8_000, openai: 8_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 40_000,
