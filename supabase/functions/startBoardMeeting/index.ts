@@ -314,7 +314,9 @@ Deno.serve(async (req) => {
     if (!user.is_anonymous) await checkUserLimit(db, user.id, 'board_meeting');
 
     const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
-      db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(20),
+      // Archived and replaced documents stay out of the meeting.
+      db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id)
+        .or('status.is.null,status.not.in.(archived,superseded)').order('created_at', { ascending: false }).limit(20),
       db.from('board_meetings').select('*').eq('company_id', company_id).eq('created_by_id', user.id).eq('status', 'complete').order('created_at', { ascending: false }).limit(5),
       db.from('projects').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(10),
       db.from('advisors').select('*').eq('company_id', company_id).eq('created_by_id', user.id).limit(100),

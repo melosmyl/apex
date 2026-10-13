@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
       advisor_id ? db.from('advisors').select('*').eq('id', advisor_id).single().then((r) => r.data) : Promise.resolve(null),
       db.from('decisions').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
       db.from('projects').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
-      db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).eq('kind', 'knowledge').order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
+      db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id).eq('kind', 'knowledge').or('status.is.null,status.not.in.(archived,superseded)').order('created_at', { ascending: false }).limit(5).then((r) => r.data || []),
     ]);
 
     if (!company) return Response.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
