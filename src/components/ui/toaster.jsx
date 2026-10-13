@@ -13,9 +13,9 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
+      {toasts.filter((t) => t.open !== false).map(function ({ id, title, description, action, open: _open, onOpenChange, duration: _duration, ...props }) {
         return (
-          <Toast key={id} {...props}>
+          <Toast key={id} role="status" aria-live="polite" {...props}>
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
@@ -23,7 +23,7 @@ export function Toaster() {
               )}
             </div>
             {action}
-            <ToastClose />
+            <ToastClose aria-label="Close" onClick={() => onOpenChange?.(false)} />
           </Toast>
         );
       })}

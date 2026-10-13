@@ -1,8 +1,10 @@
 // Inspired by react-hot-toast library
 import { useState, useEffect } from "react";
 
-const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+// A few at most, each closing by itself after a moment (or on its ×).
+const TOAST_LIMIT = 3;
+const TOAST_REMOVE_DELAY = 1000;
+const TOAST_DURATION = 4000;
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -133,6 +135,9 @@ function toast({ ...props }) {
       },
     },
   });
+
+  // These toasts aren't Radix ones, so nothing else would ever close them.
+  if (props.duration !== Infinity) setTimeout(dismiss, props.duration ?? TOAST_DURATION);
 
   return {
     id,
