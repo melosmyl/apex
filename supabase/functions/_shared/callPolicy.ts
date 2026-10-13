@@ -49,6 +49,12 @@ const POLICIES: Record<string, CallPolicy> = {
     maxTokens: { anthropic: 64_000, openai: 16_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 45_000,
   },
+  // Rewording a vague action or fix (M1): short, so it fits what's left of
+  // the synthesis deadline.
+  chair_repair: {
+    maxTokens: { anthropic: 8_000, openai: 4_000 },
+    thinking: 'adaptive', effort: 'medium', nativeFormat: true, fallbackReserveMs: 10_000,
+  },
   task_acknowledgment: {
     maxTokens: { anthropic: 4_000, openai: 1_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 15_000,

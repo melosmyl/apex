@@ -43,8 +43,8 @@ export default function Tasks() {
     setForm({ title: "", assigned_to: "", project_id: "" }); setOpen(false); load();
   };
 
-  // A task with source_meeting_id is a real commitment the founder selected
-  // from a board resolution — see FounderDecisionControls. Only those get an
+  // A task with source_meeting_id is a real commitment from a board
+  // resolution's next-24-hours actions (runChairSynthesis). Only those get an
   // advisor acknowledgment; ad-hoc tasks completing is not a board moment.
   const acknowledgeCompletion = async (task) => {
     if (!task.source_meeting_id) return;

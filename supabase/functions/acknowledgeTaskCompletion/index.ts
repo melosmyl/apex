@@ -54,7 +54,11 @@ Deno.serve(async (req) => {
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', task.company_id).eq('created_by_id', user.id).neq('type', 'human');
     if (!advisors?.length) return Response.json({ error: 'No advisors available to speak' }, { status: 400, headers: corsHeaders });
 
-    const speaker = resolveAdvisor(task.assigned_to, advisors, meeting?.participants);
+    // The task's own advisor when it has one (M1); a founder's own task is
+    // acknowledged by someone from the meeting, never by whichever advisor
+    // happens to have "Founder" in their role.
+    const owner = task.advisor_id ? advisors.find((a) => a.id === task.advisor_id) : null;
+    const speaker = owner || resolveAdvisor(/^founder$/i.test(String(task.assigned_to || '').trim()) ? null : task.assigned_to, advisors, meeting?.participants);
     if (!speaker) return Response.json({ error: 'Could not resolve an advisor to speak' }, { status: 400, headers: corsHeaders });
 
     let prompt = `The founder just marked this task as done: "${String(task.title).slice(0, 300)}"\n`;

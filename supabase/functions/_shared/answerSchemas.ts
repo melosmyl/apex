@@ -105,6 +105,39 @@ export const FOLLOWUP_SCHEMA = {
 
 const stringList = (description?: string) => ({ type: 'array', items: { type: 'string' }, ...(description ? { description } : {}) });
 
+// The results standard's actions and issues (Workstream M1): the actions
+// become tasks the owning advisor can do for the founder in Stage 2.
+const PRIORITY_ACTIONS = {
+  type: 'array',
+  description: 'Exactly the things to do in the next 24 hours, ranked: at most 3, small, concrete and doable. These become the tasks created from this meeting.',
+  items: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'The action itself: who to contact, what to write, which number to find. Never a category of work.' },
+      assigned_to: { type: 'string', description: 'The advisor in this meeting best placed to do it for the founder, or "Founder" when only the founder can (a call, a signature, a decision).' },
+      task_type: { type: 'string', enum: ['research', 'draft', 'calculate', 'plan', 'founder'], description: 'research: find and check facts, with sources. draft: write an email, message, listing or document for the founder to edit and send. calculate: work out numbers. plan: a dated step-by-step checklist. founder: only the founder can do it.' },
+      brief: { type: 'string', description: 'What the advisor needs to do it: one to three sentences with the specifics from this meeting. Empty for founder actions.' },
+      done_when: { type: 'string', description: 'How the founder will know it is done, in a few words.' },
+      why_first: { type: 'string', description: 'Why this has to happen in the next 24 hours, before more time or money goes into the question.' },
+    },
+    required: ['title', 'assigned_to', 'task_type', 'brief', 'done_when', 'why_first'],
+  },
+};
+
+const TOP_ISSUES = {
+  type: 'array',
+  description: 'The top issues with the founder\'s current plan, most serious first: at most 5.',
+  items: {
+    type: 'object',
+    properties: {
+      problem: { type: 'string', description: 'The problem, in one line.' },
+      why_it_matters: { type: 'string', description: 'What it costs the founder if ignored, in one line.' },
+      fix: { type: 'string', description: 'The concrete fix, in one line.' },
+    },
+    required: ['problem', 'why_it_matters', 'fix'],
+  },
+};
+
 // The Chair's resolution.
 export const RESOLUTION_SCHEMA = {
   type: 'object',
@@ -120,21 +153,13 @@ export const RESOLUTION_SCHEMA = {
     assumptions: stringList(),
     missing_information: stringList('Empty if none'),
     recommended_experiment: { type: 'string', description: 'An empty string if no experiment is worth running' },
-    priority_frame: { type: 'string', description: 'One sentence naming the explicit criterion: what has to happen before spending more time or money on this question. Not a generic "these are worth doing."' },
-    priority_actions: {
-      type: 'array',
-      description: 'At most 3 items — the ranked things to do before spending more time or money on this, not every next-step anyone mentioned. These become the real tasks created from this meeting.',
-      items: {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          assigned_to: { type: 'string', description: 'The advisor who raised it, or "Founder"' },
-          why_first: { type: 'string', description: 'Why this specific item has to happen before spending more time or money, per priority_frame.' },
-        },
-        required: ['title', 'assigned_to', 'why_first'],
-      },
-    },
+    verdict: { type: 'string', description: "The room's answer to the question in one plain sentence." },
+    priority_actions: PRIORITY_ACTIONS,
+    top_issues: TOP_ISSUES,
+    founder_questions: stringList('Decisions only the founder can make, each a short question answerable yes or no. At most 4. Empty if none.'),
+    disagreements: stringList('Where the room genuinely disagreed and it was not settled: at most 3, one line each naming who disagreed about what. Empty if the room agreed.'),
     overall_confidence_score: { type: 'number', description: 'A whole number from 0 to 100, never a 0-1 fraction' },
+    confidence_reason: { type: 'string', description: 'One line: why the confidence is what it is.' },
     discussion_evaluation: {
       type: 'object',
       properties: {
@@ -152,8 +177,41 @@ export const RESOLUTION_SCHEMA = {
   },
   required: ['executive_summary', 'decision_question', 'recommended_direction', 'reasoning', 'areas_of_agreement',
     'areas_of_disagreement', 'main_risks', 'minority_opinion', 'assumptions', 'missing_information', 'recommended_experiment',
-    'priority_frame', 'priority_actions', 'overall_confidence_score', 'discussion_evaluation'],
+    'verdict', 'priority_actions', 'top_issues', 'founder_questions', 'disagreements',
+    'overall_confidence_score', 'confidence_reason', 'discussion_evaluation'],
   'x-core': ['executive_summary', 'recommended_direction', 'reasoning', 'overall_confidence_score'],
+};
+
+// The Chair's second pass when an action or fix came back too vague to act
+// on: just those items, reworded, each named by its number.
+export const RESULTS_REPAIR_SCHEMA = {
+  type: 'object',
+  properties: {
+    actions: {
+      type: 'array',
+      description: 'Only the actions you were asked to reword, each with its number.',
+      items: {
+        type: 'object',
+        properties: {
+          number: { type: 'integer', description: 'The action number you were given.' },
+          title: { type: 'string' },
+          brief: { type: 'string' },
+          done_when: { type: 'string' },
+        },
+        required: ['number', 'title', 'brief', 'done_when'],
+      },
+    },
+    fixes: {
+      type: 'array',
+      description: 'Only the fixes you were asked to reword, each with its issue number.',
+      items: {
+        type: 'object',
+        properties: { number: { type: 'integer', description: 'The issue number you were given.' }, fix: { type: 'string' } },
+        required: ['number', 'fix'],
+      },
+    },
+  },
+  required: ['actions', 'fixes'],
 };
 
 // An advisor acknowledging a finished task.

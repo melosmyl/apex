@@ -102,6 +102,16 @@ Deno.serve(async (req: Request) => {
       // No chair_opening: it's built from the founder's private decision notes
       // and task titles, which a public link shouldn't carry.
       chair_opening: null,
+      // The results, in the principles' order (M1). The founder's own call
+      // and answers stay private; the questions are shown without them.
+      verdict: resolution.verdict || null,
+      priority_actions: (resolution.priority_actions || []).map((a: any) => ({
+        title: a.title, assigned_to: a.assigned_to, task_type: a.task_type || null, done_when: a.done_when || null,
+      })),
+      top_issues: resolution.top_issues || [],
+      founder_questions: resolution.founder_questions || [],
+      disagreements: resolution.disagreements || [],
+      confidence_reason: resolution.confidence_reason || null,
       executive_summary: resolution.executive_summary || meeting.executive_summary || null,
       recommended_direction: resolution.recommended_direction || meeting.recommendation || null,
       reasoning: resolution.reasoning || null,

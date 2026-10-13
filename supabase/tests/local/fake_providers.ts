@@ -11,9 +11,14 @@ let mentionBy: string[] = [];
 // { "Grace Bennett": 12000 }. Matched on the persona's "You are <name>".
 let delayBy: Record<string, number> = {};
 const log: any[] = [];
+// Answers to give for a field, in order, one per request that asks for it:
+// { "priority_actions": [[...], [...]] } returns the first list to the first
+// answer with that field and the second to the next.
+let fields: Record<string, any[]> = {};
 
 function sample(s: any, key = '', book = ''): any {
   if (!s || typeof s !== 'object') return null;
+  if (key && fields[key]?.length) return fields[key].shift();
   if (Array.isArray(s.enum)) return key === 'profile_field' ? 'business_model' : s.enum.find((e: any) => e !== null);
   const type = Array.isArray(s.type) ? s.type.find((t: string) => t !== 'null') : s.type;
   if (type === 'object' || s.properties) {
@@ -104,7 +109,7 @@ async function openai(body: any): Promise<Response> {
 
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
-  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; log.length = 0; return Response.json({ ok: true }); }
+  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; fields = s.fields || {}; log.length = 0; return Response.json({ ok: true }); }
   if (url.pathname === '/__log') return Response.json(log);
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);

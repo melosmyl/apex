@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Gavel, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, CornerDownRight, RefreshCw } from "lucide-react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
+import { Section, Actions, Issues, Disagreements } from "@/components/boardroom/ResultSections";
+import { actionsHeading, resultSections } from "@/lib/meetingResult";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/getSharedMeeting`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -89,6 +91,7 @@ export default function SharedMeetingView() {
   const [state, setState] = useState("loading"); // loading | ok | unavailable
   const [meeting, setMeeting] = useState(null);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [fullOpen, setFullOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +107,9 @@ export default function SharedMeetingView() {
 
   const rounds = [...new Set((meeting.discussion_transcript || []).map((m) => m.round))].sort((a, b) => a - b);
   const conf = Math.round(meeting.overall_confidence_score || 0);
+  // The same order as the founder's own results page (M1), without their
+  // call, their answers or anything to press.
+  const sections = resultSections(meeting);
 
   return (
     <div className="min-h-screen">
@@ -114,6 +120,43 @@ export default function SharedMeetingView() {
           {meeting.participants?.length > 0 && <p className="text-sm text-muted-foreground mt-2">{meeting.participants.join(", ")}</p>}
         </div>
 
+        <section className="room-card p-6 sm:p-8">
+          <span className="room-mono">The verdict</span>
+          <p className="mt-2 font-display text-[1.5rem] font-light leading-tight text-balance sm:text-[1.9rem]">{sections.verdict}</p>
+        </section>
+
+        {sections.actions.length > 0 && (
+          <Section label={sections.legacy ? "Before spending more time on this" : "Next 24 hours"} title={sections.legacy ? null : actionsHeading(sections.actions.length)}>
+            <div className={sections.legacy ? "mt-3" : ""}><Actions actions={sections.actions} founderLabel="The founder" /></div>
+          </Section>
+        )}
+        {sections.issues.length > 0 && (
+          <Section label={sections.legacy ? "Main risks" : "Top issues"} title={sections.legacy ? "The main risks the room raised" : "What could sink the current plan"}>
+            <Issues issues={sections.issues} />
+          </Section>
+        )}
+        {sections.questions.length > 0 && (
+          <Section label="The founder's decisions" title="Decisions only the founder can make">
+            <ul className="space-y-2">{sections.questions.map((q, i) => <li key={i} className="flex gap-2 text-[0.95rem]"><span className="text-muted-foreground">—</span><span className="min-w-0">{q}</span></li>)}</ul>
+          </Section>
+        )}
+        {sections.disagreements.length > 0 && (
+          <Section label="Disagreement" title="Where the room disagreed">
+            <Disagreements items={sections.disagreements} />
+          </Section>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setFullOpen((v) => !v)}
+          aria-expanded={fullOpen}
+          className="flex w-full items-center justify-between gap-3 rounded-md border-[1.5px] border-foreground bg-card px-5 py-3.5 text-left hover:bg-secondary"
+        >
+          <span className="font-display text-lg">{fullOpen ? "Hide the full meeting" : "Open the full meeting"}</span>
+          {fullOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {fullOpen && <>
         {meeting.chair_opening && (
           <div className="bg-secondary/40 rounded-2xl p-5 flex gap-3">
             <Gavel className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -123,12 +166,13 @@ export default function SharedMeetingView() {
 
         <div className="bg-card border border-border/70 rounded-2xl p-6 sm:p-8">
           <div className="flex items-start justify-between gap-4 mb-5">
-            <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-primary" /><h3 className="font-display text-2xl">Board Resolution</h3></div>
+            <div className="flex items-center gap-2"><Gavel className="w-5 h-5 text-primary" /><h3 className="font-display text-2xl">The Chair's reasoning</h3></div>
             <div className="text-center shrink-0">
               <div className="font-display text-3xl">{conf}<span className="text-lg text-muted-foreground">%</span></div>
               <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Confidence</div>
             </div>
           </div>
+          {meeting.confidence_reason && <p className="text-sm text-muted-foreground mb-4">{meeting.confidence_reason}</p>}
           <p className="text-[15px] leading-relaxed mb-6">{meeting.executive_summary}</p>
           <div className="bg-accent/50 rounded-xl p-5 mb-6">
             <div className="text-[11px] uppercase tracking-widest text-muted-foreground mb-1.5">Recommended Direction</div>
@@ -182,6 +226,8 @@ export default function SharedMeetingView() {
             )}
           </div>
         )}
+
+        </>}
 
         <p className="text-center text-xs text-muted-foreground pt-4">A real board meeting, unedited. Advisors were free to disagree — and did.</p>
       </div>

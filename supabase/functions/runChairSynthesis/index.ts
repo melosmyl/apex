@@ -1,25 +1,15 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { resolveAdvisor } from '../_shared/advisorResolution.ts';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
-import { RESOLUTION_SCHEMA } from '../_shared/answerSchemas.ts';
+import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, chairCallFields } from '../_shared/chair.ts';
+import { mergeRepair, normalizeResults, vagueParts } from '../_shared/resultsStandard.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
 
-// A priority_action's assigned_to is either a genuine self-assignment ("Founder"
-// — no advisor raised it, so there's no advisor to attribute it to or to
-// notice when it's done) or something raised during the meeting (a real
-// advisor's name, a role, or occasionally a fabricated team that doesn't
-// exist in this product). Only the latter goes through resolveAdvisor.
-const FOUNDER_LABEL = 'Founder';
-
-function resolveTaskAssignee(rawAssignedTo, advisors, participantNames) {
-  if (!rawAssignedTo || rawAssignedTo.trim().toLowerCase() === 'founder') return FOUNDER_LABEL;
-  const advisor = resolveAdvisor(rawAssignedTo, advisors, participantNames);
-  return advisor?.name || FOUNDER_LABEL;
-}
+// The vague-action repair only runs with this much of the deadline left.
+const REPAIR_MIN_MS = 25_000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,11 +43,23 @@ SPECIFICITY — this is a hard requirement:
 - If you genuinely cannot name a concrete next action, say so and explain what information would make one possible. That is a useful contribution. A vague recommendation is not.
 - Prefer the smallest real action over the most impressive-sounding one. "Call the six people who enquired last month and ask what stopped them" beats "conduct customer discovery research."
 
-PRIORITY CLOSE — this is a hard requirement, not an optional extra:
-- The board's job includes telling the founder what matters most, not just what's possible. A flat list of five recommendations with no ranking leaves her exactly where she started.
-- Close with at most 3 ranked priority_actions — the things that actually have to happen before spending any more time or money on this question. Not "everything worth doing eventually." If genuinely only 1 or 2 things clear that bar, give 1 or 2 — do not pad to 3.
-- State the ranking criterion explicitly in priority_frame: one sentence naming what has to be true, or what has to happen, before it's worth spending further time or money here. Not a generic "these are worth doing."
-- Every priority_action must say, in why_first, why THIS specific item clears the bar named in priority_frame — not just that it's a good idea.`;
+THE RESULTS — the founder reads these first, in this order, so each must stand on its own:
+1. verdict: the room's answer to the question in one plain sentence. Not a summary of the discussion.
+2. priority_actions: the things to do in the next 24 hours, ranked, at most 3. Small, concrete and doable today or tomorrow. If only 1 or 2 clear that bar, give 1 or 2; do not pad.
+   - Give each to the advisor in this meeting best placed to do it for the founder, with its type: research (find and check facts), draft (an email, message, listing or document the founder edits and sends), calculate (work out numbers), or plan (a dated checklist). Write a brief with the specifics they would need.
+   - Give it to "Founder" with type founder only when no advisor can do it for them: a phone call, a signature, a decision, a conversation.
+   - Advisors never send, post, buy, sign or sign up for anything; the founder does. A draft is something the founder sends.
+   - done_when says how the founder will know it's finished. why_first says why it can't wait.
+3. top_issues: the top issues with the founder's current plan, most serious first, at most 5: the problem, why it matters, and the fix, one line each.
+   - Name plainly any risk a good advisor would flag: counterfeit or grey-market goods, scams, regulated or illegal activity, contracts that need a lawyer, tax that needs an accountant. Give the legal alternative as the fix.
+4. founder_questions: decisions only the founder can make, each a short question answerable yes or no. At most 4. Empty if none.
+5. disagreements: where the room genuinely disagreed and it wasn't settled, at most 3, one line each naming who disagreed about what. Real disagreements only; empty if the room agreed. Don't invent one.
+Then confidence_reason: one line on why the confidence is what it is.
+Everything else (reasoning, agreement, assumptions, the minority view) is the full record the founder can open; keep it accurate and don't repeat the results there word for word.`;
+
+const REPAIR_INSTRUCTIONS = `You are The Chair. Some of the actions and fixes you wrote are categories of work, not things the founder can actually do. Reword only the numbered items listed, so each names the specific thing to do: who to contact, what to write, which number to find, which customer to ask.
+Use only what was said in this meeting. Never invent a name, number, customer, supplier or fact that isn't in the meeting. If the meeting doesn't give you enough to name a concrete action, write the smallest concrete step that would get that information (for example, which question to ask whom).
+Return each reworded item with its number. The owner and type of each action stay as they are.`;
 
 function formatTranscriptForChair(transcript) {
   const byRound = {};
@@ -236,21 +238,35 @@ Deno.serve(async (req) => {
 
     ensureConvergenceNamed(resolution, convergence, independentResponses);
 
-    // Capped defensively here too, not just by prompt — the schema asks for
-    // "at most 3" but nothing in structured-output enforces that, and the
-    // whole point of the priority close is that it's a small ranked set,
-    // not a flat dump of every next-step anyone mentioned.
-    const priorityActions = (resolution.priority_actions || []).slice(0, 3);
-    resolution.priority_actions = priorityActions;
-    // Resolve each action's assignee to a real advisor name (or the literal
-    // "Founder" for genuine self-assignments) before this is stored or
-    // returned — one resolution pass feeds both the displayed resolution
-    // and the tasks created below, so the two can never show different
-    // names for the same commitment.
+    // The results standard: lists capped (structured output doesn't enforce
+    // "at most"), and each action's owner resolved to a real advisor on this
+    // board, or the founder, before anything is stored. One pass feeds both
+    // the displayed resolution and the tasks created below, so the two can
+    // never name different owners for the same commitment.
     const nonHumanAdvisors = (advisors || []).filter(a => a.type !== 'human');
-    priorityActions.forEach(a => {
-      a.assigned_to = resolveTaskAssignee(a.assigned_to, nonHumanAdvisors, meeting.participants);
-    });
+    normalizeResults(resolution, nonHumanAdvisors);
+
+    // Nothing vague survives: an action or fix that names a category of work
+    // ("validate demand") goes back to the Chair once, if there's time left
+    // to wait for it. A failed or late repair keeps the original wording.
+    const vague = vagueParts(resolution);
+    const repairDeadline = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
+    if (vague.length && repairDeadline - Date.now() > REPAIR_MIN_MS) {
+      try {
+        const repair = await callAdvisor(supabaseUrl, serviceKey, {
+          ...chairCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+          system_instructions: REPAIR_INSTRUCTIONS, company_context: null,
+          meeting_context: `${meetingContext}\n\n=== YOUR RESULTS ===\nActions:\n${resolution.priority_actions.map((a, i) => `${i + 1}. ${a.title} (${a.assigned_to})`).join('\n')}\nIssues and fixes:\n${resolution.top_issues.map((x, i) => `${i + 1}. ${x.problem}: fix: ${x.fix}`).join('\n')}\n\nReword only these, which are too vague to act on:\n${vague.map((v) => `- ${v}`).join('\n')}`,
+          user_question: meeting.question, previous_responses: [],
+          output_schema: RESULTS_REPAIR_SCHEMA, temperature: 0.3, request_type: 'chair_repair',
+          deadline_at: repairDeadline,
+        });
+        if (repair?.response) mergeRepair(resolution, repair.response);
+      } catch (repairErr) {
+        console.error('runChairSynthesis: vague-action repair failed, keeping the original wording:', repairErr.message);
+      }
+    }
+    const priorityActions = resolution.priority_actions;
     const discussionField = discussionTranscript.length > 0
       ? discussionTranscript.map(m => ({ advisor: m.advisor_name, role: m.role, message: m.message, stance: m.message_type }))
       : [
@@ -300,6 +316,10 @@ Deno.serve(async (req) => {
             created_by_id: user.id,
             title: a.title,
             assigned_to: a.assigned_to,
+            advisor_id: a.advisor_id,
+            task_type: a.task_type,
+            description: a.brief || null,
+            done_when: a.done_when || null,
             created_by: 'Boardroom',
             status: 'todo',
             source_meeting_id: meeting.id,

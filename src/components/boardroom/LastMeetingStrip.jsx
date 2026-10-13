@@ -30,7 +30,7 @@ export default function LastMeetingStrip({ companyId }) {
 
   if (!meeting) return null;
 
-  const resolved = meeting.recommendation || meeting.board_resolution?.recommended_direction;
+  const resolved = meeting.board_resolution?.verdict || meeting.recommendation || meeting.board_resolution?.recommended_direction;
   const open = tasks ? tasks.filter((t) => t.status !== "done").length : null;
   const meta = [
     tasks?.length ? `${open} of ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"} open` : null,

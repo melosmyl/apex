@@ -250,9 +250,13 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     await continueToDiscussion(pendingMeetingId, []);
   };
 
+  // A meeting just run carries meeting_id; one opened from a link (?meeting=)
+  // is the stored row, which carries id.
+  const resultMeetingId = result?.meeting_id || result?.id;
+
   const recordDecision = async () => {
     const d = await base44.entities.Decision.create({
-      company_id: companyId, meeting_id: result?.meeting_id, question,
+      company_id: companyId, meeting_id: resultMeetingId, question,
       participants: result?.independent_responses?.map((r) => r.advisor_name) || [],
       summary: result?.board_resolution?.executive_summary,
       final_recommendation: result?.board_resolution?.recommended_direction,
@@ -265,8 +269,8 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   };
 
   const handleFollowup = async (message) => {
-    if (!result?.meeting_id) return;
-    const res = await runFounderFollowup(result.meeting_id, message);
+    if (!resultMeetingId) return;
+    const res = await runFounderFollowup(resultMeetingId, message);
     setResult((prev) => ({ ...prev, discussion_transcript: res.discussion_transcript }));
   };
 
