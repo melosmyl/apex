@@ -275,3 +275,53 @@ export const ADMIN_TEST_SCHEMA = {
   required: ['position', 'recommendation', 'key_arguments', 'confidence_score'],
   'x-core': ['position', 'recommendation', 'confidence_score'],
 };
+
+// "Do this for me" (M2a). Draft: something the founder edits and sends
+// themselves; nothing is ever sent for them.
+export const TASK_DRAFT_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'A short name for the piece, e.g. "Message to the two charity shops".' },
+    kind: { type: 'string', enum: ['email', 'message', 'listing', 'post', 'document', 'other'] },
+    subject: { type: 'string', description: 'The email subject line. Empty unless it is an email.' },
+    body: { type: 'string', description: "The full text, ready for the founder to edit and send, in the founder's own voice. Plain text with line breaks. Anything you don't know goes in [square brackets], e.g. [price]." },
+    placeholders: stringList('Each [square bracket] in the text and what to fill in. Empty if none.'),
+    check_before_sending: stringList('At most 3 things the founder should check before sending. Empty if none.'),
+    professional_check: { type: 'boolean', description: 'True for a contract, NDA, terms, lease, company paperwork, or anything with legal or tax consequences.' },
+  },
+  required: ['title', 'kind', 'subject', 'body', 'placeholders', 'check_before_sending', 'professional_check'],
+};
+
+// Plan: a dated, step-by-step checklist, with a helper where it's useful.
+export const TASK_PLAN_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'A short name for the plan.' },
+    summary: { type: 'string', description: 'One sentence: what the plan gets done and by when.' },
+    steps: {
+      type: 'array',
+      description: 'Between 3 and 10 steps, in order.',
+      items: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'The day to do it, as YYYY-MM-DD, starting from today.' },
+          step: { type: 'string', description: 'The step itself, small and concrete.' },
+          detail: { type: 'string', description: 'One line of how, or empty.' },
+        },
+        required: ['date', 'step', 'detail'],
+      },
+    },
+    helper: {
+      type: 'object',
+      description: 'One ready-made thing that makes the plan easier, such as a call script or an email. Kind none if nothing would help.',
+      properties: {
+        kind: { type: 'string', enum: ['call_script', 'email', 'message', 'checklist', 'none'] },
+        title: { type: 'string' },
+        body: { type: 'string' },
+      },
+      required: ['kind', 'title', 'body'],
+    },
+    professional_check: { type: 'boolean', description: 'True if any step has legal or tax consequences (a contract, company paperwork, tax).' },
+  },
+  required: ['title', 'summary', 'steps', 'helper', 'professional_check'],
+};

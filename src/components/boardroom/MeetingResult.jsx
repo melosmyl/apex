@@ -16,6 +16,8 @@ import { base44 } from "@/api/base44Client";
 import { toast } from "@/components/ui/use-toast";
 import { SITE_URL } from "@/lib/branding";
 import { actionsHeading, resultSections } from "@/lib/meetingResult";
+import TaskDesk from "@/components/tasks/TaskDesk";
+import { useTaskRuns } from "@/lib/taskRuns";
 
 // A finished meeting, in the order the product principles set (M1): the
 // verdict with the founder's call, the next-24-hours actions, the top
@@ -104,6 +106,23 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
     }).catch(() => {}).finally(() => { if (!cancelled) setFreshLoaded(true); });
     return () => { cancelled = true; };
   }, [meetingId]);
+  // The tasks the actions became, for "Do this for me": matched by title, or,
+  // if the founder renamed it, by the one task with the same advisor and
+  // type. Never by position: tasks created together share a timestamp.
+  const [meetingTasks, setMeetingTasks] = useState([]);
+  const loadTasks = () => {
+    if (!meetingId || isAnonymous || sections.legacy) return;
+    base44.entities.Task.filter({ source_meeting_id: meetingId }, "created_date", 10).then(setMeetingTasks).catch(() => {});
+  };
+  useEffect(loadTasks, [meetingId, isAnonymous, sections.legacy]);
+  const { runs, put } = useTaskRuns(meetingTasks.map((t) => t.id), loadTasks);
+  const taskFor = (a) => {
+    const byTitle = meetingTasks.find((t) => t.title === a.title);
+    if (byTitle) return byTitle;
+    const same = a.advisor_id && a.task_type ? meetingTasks.filter((t) => t.advisor_id === a.advisor_id && t.task_type === a.task_type) : [];
+    return same.length === 1 ? same[0] : null;
+  };
+
   // Only a finished meeting takes a call.
   const decidable = (result.status || result.meeting?.status || "complete") === "complete";
   const meetingTitle = result.question || "Board Meeting";
@@ -135,7 +154,14 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         <Section label={sections.legacy ? "Before spending more time on this" : "Next 24 hours"} title={sections.legacy ? null : actionsHeading(sections.actions.length)}>
           {sections.legacy && resolution.priority_frame && <p className="mb-4 mt-1 text-sm text-muted-foreground">{resolution.priority_frame}</p>}
           <div className={sections.legacy ? "mt-3" : ""}>
-            <Actions actions={sections.actions} advisorsByName={advisorsByName} />
+            <Actions
+              actions={sections.actions}
+              advisorsByName={advisorsByName}
+              renderAfter={(a) => {
+                const task = taskFor(a);
+                return task ? <TaskDesk task={task} run={runs[task.id]} onChanged={(run) => { if (run) put(run); loadTasks(); }} /> : null;
+              }}
+            />
           </div>
           {!isAnonymous && companyId && (
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">

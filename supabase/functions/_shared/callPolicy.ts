@@ -55,6 +55,15 @@ const POLICIES: Record<string, CallPolicy> = {
     maxTokens: { anthropic: 8_000, openai: 4_000 },
     thinking: 'adaptive', effort: 'medium', nativeFormat: true, fallbackReserveMs: 10_000,
   },
+  // "Do this for me" (M2a): a draft or a plan, written in the background.
+  task_draft: {
+    maxTokens: { anthropic: 16_000, openai: 8_000 },
+    thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 30_000,
+  },
+  task_plan: {
+    maxTokens: { anthropic: 16_000, openai: 8_000 },
+    thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 30_000,
+  },
   task_acknowledgment: {
     maxTokens: { anthropic: 4_000, openai: 1_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 15_000,

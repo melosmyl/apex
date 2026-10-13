@@ -1,16 +1,21 @@
 import React, { useState } from "react";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2, Undo2, Check, ChevronDown, ChevronUp, FileText, MessageCircle } from "lucide-react";
+import { Undo2, Check, ChevronDown, ChevronUp, FileText, MessageCircle } from "lucide-react";
+import TaskDesk from "@/components/tasks/TaskDesk";
 
-export default function TaskCard({ task, advisors, executing, acknowledging, onExecute, onCompleteFounder, onMove, canBack, canForward, onOpenDocument }) {
+// "Do this for me" (TaskDesk) replaces the old Execute button, which ran the
+// cheap model with no web access and wrote its own "sources" (Workstream M).
+export default function TaskCard({ task, advisors, run, onRunChanged, acknowledging, onCompleteFounder, onMove, canBack, canForward, onOpenDocument }) {
   const [expanded, setExpanded] = useState(false);
-  const advisor = advisors.find((a) => a.name === task.assigned_to);
+  const advisor = advisors.find((a) => a.id === task.advisor_id) || advisors.find((a) => a.name === task.assigned_to);
   const isDelegated = task.delegated_back;
   const isDone = task.status === "done";
   const isFounderTask = task.assigned_to === "Founder";
-  const canExecute = advisor && !isDone && !isDelegated && !executing && task.status !== "review";
-  const canComplete = !isDone && (isDelegated || isFounderTask || task.status === "review");
+  // A finished "Do this for me" result waits for Accept / Redo / Discard;
+  // "Done" here would skip saving it.
+  const awaitingDecision = run?.status === "done";
+  const canComplete = !isDone && !awaitingDecision && (isDelegated || isFounderTask || task.status === "review");
   const hasDocument = !!task.document_id;
   const isCommitment = !!task.source_meeting_id;
   const acknowledgingAdvisor = advisors.find((a) => a.name === task.advisor_acknowledgment_by);
@@ -66,7 +71,9 @@ export default function TaskCard({ task, advisors, executing, acknowledging, onE
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2">
+      <TaskDesk task={task} run={run} onChanged={onRunChanged} compact />
+
+      <div className="mt-2 flex items-center justify-between gap-2">
         {task.assigned_to ? (
           <div className="flex items-center gap-1.5 min-w-0">
             <AdvisorAvatar name={task.assigned_to} accent={advisor?.accent || "#7a5c3e"} size="sm" />
@@ -75,19 +82,13 @@ export default function TaskCard({ task, advisors, executing, acknowledging, onE
         ) : <span className="text-[11px] text-muted-foreground">Unassigned</span>}
 
         <div className="flex items-center gap-1 shrink-0">
-          {executing ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-          ) : canExecute ? (
-            <button onClick={() => onExecute(task)} title="Advisor executes this task" className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 px-1.5 py-0.5 rounded-md hover:bg-accent transition-colors">
-              <Sparkles className="w-3 h-3" /> Execute
-            </button>
-          ) : canComplete ? (
+          {canComplete ? (
             <button onClick={() => onCompleteFounder(task)} title="Mark complete" className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-800 px-1.5 py-0.5 rounded-md hover:bg-emerald-50 transition-colors">
               <Check className="w-3 h-3" /> Done
             </button>
           ) : null}
           {canBack && <button onClick={() => onMove(task, "back")} className="text-xs text-muted-foreground hover:text-foreground px-1">‹</button>}
-          {canForward && <button onClick={() => onMove(task, "forward")} className="text-xs text-muted-foreground hover:text-foreground px-1">›</button>}
+          {canForward && !awaitingDecision && <button onClick={() => onMove(task, "forward")} className="text-xs text-muted-foreground hover:text-foreground px-1">›</button>}
         </div>
       </div>
     </div>

@@ -1,0 +1,175 @@
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "@/components/ui/use-toast";
+import { Copy, Loader2 } from "lucide-react";
+import { DOING, acceptRun, discardRun, isActive, isRunnable, startRun } from "@/lib/taskRuns";
+import { formatCost } from "@/lib/money";
+
+// "Do this for me" on one task (Workstream M2a): the button, the advisor at
+// work, and what they hand back, with Accept / Redo with notes / Discard.
+// Inline on the meeting's results page; compact on the Tasks board, where
+// the result opens in a dialog.
+
+const firstName = (name = "") => String(name).replace(/^Dr\.?\s+/, "").split(" ")[0];
+const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
+const day = (iso) => { try { return dayFmt.format(new Date(`${iso}T12:00:00`)); } catch { return iso; } };
+
+const failed = (e) => toast({ title: "That didn't go through", description: e?.message || "Please try again in a moment." });
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast({ title: "Copied" }); }
+  catch { toast({ title: "Couldn't copy", description: "Select the text and copy it instead." }); }
+}
+
+function DraftResult({ r }) {
+  // A subject line belongs to an email only.
+  const subject = r.kind === "email" ? r.subject : "";
+  const full = [subject ? `Subject: ${subject}` : "", r.body].filter(Boolean).join("\n\n");
+  return (
+    <div className="space-y-3">
+      {subject && <p className="text-sm"><span className="room-mono mr-2">Subject</span>{subject}</p>}
+      <div className="relative rounded-md border border-border bg-background p-4">
+        <button type="button" onClick={() => copy(full)} className="absolute right-2 top-2 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">
+          <Copy className="h-3.5 w-3.5" /> Copy
+        </button>
+        <p className="whitespace-pre-wrap pr-14 text-[0.95rem] leading-relaxed">{r.body}</p>
+      </div>
+      {r.placeholders?.length > 0 && <p className="text-sm text-muted-foreground">Fill in: {r.placeholders.join(", ")}</p>}
+      {r.check_before_sending?.length > 0 && (
+        <ul className="space-y-1 text-sm text-muted-foreground">{r.check_before_sending.map((c, i) => <li key={i}>— {c}</li>)}</ul>
+      )}
+      <p className="text-sm text-muted-foreground">You send it; we never send anything for you.</p>
+    </div>
+  );
+}
+
+function PlanResult({ r }) {
+  return (
+    <div className="space-y-3">
+      {r.summary && <p className="text-[0.95rem]">{r.summary}</p>}
+      <ol className="space-y-2">
+        {(r.steps || []).map((s, i) => (
+          <li key={i} className="flex gap-3 text-[0.95rem] leading-snug">
+            <span className="w-24 shrink-0 font-mono text-xs uppercase tracking-wider text-muted-foreground tabular-nums pt-0.5">{s.date ? day(s.date) : `Step ${i + 1}`}</span>
+            <span className="min-w-0">{s.step}{s.detail && <span className="block text-sm text-muted-foreground">{s.detail}</span>}</span>
+          </li>
+        ))}
+      </ol>
+      {r.helper && (
+        <div className="relative rounded-md border border-border bg-background p-4">
+          <button type="button" onClick={() => copy(r.helper.body)} className="absolute right-2 top-2 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">
+            <Copy className="h-3.5 w-3.5" /> Copy
+          </button>
+          <p className="room-mono mb-1.5">{r.helper.title || "Helper"}</p>
+          <p className="whitespace-pre-wrap pr-14 text-sm leading-relaxed">{r.helper.body}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The advisor's finished work and the founder's three choices.
+function Finished({ task, run, onChanged }) {
+  const [redoing, setRedoing] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(null);
+  const who = firstName(run.advisor_name || task.assigned_to);
+  const r = run.result || {};
+
+  const act = async (kind) => {
+    setBusy(kind);
+    try {
+      if (kind === "accept") { const d = await acceptRun(run.id); onChanged?.(d.run); toast({ title: "Saved to Knowledge", description: "Your board will use it in the next meeting." }); }
+      if (kind === "discard") { const d = await discardRun(run.id); onChanged?.(d.run); }
+      if (kind === "redo") { const d = await startRun(task.id, notes.trim()); setRedoing(false); setNotes(""); onChanged?.(d.run); }
+    } catch (e) { failed(e); } finally { setBusy(null); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm"><span className="font-medium">{who} finished this.</span> <span className="text-muted-foreground">Cost {formatCost(run.cost_usd)}{run.earlier ? ` · ${run.earlier} earlier ${run.earlier === 1 ? "attempt" : "attempts"} kept` : ""}</span></p>
+      {run.task_type === "plan" ? <PlanResult r={r} /> : <DraftResult r={r} />}
+      {r.professional_note && <p className="rounded-md border-l-4 border-foreground bg-secondary/60 px-3 py-2 text-sm font-medium">{r.professional_note}</p>}
+      {redoing ? (
+        <div className="space-y-2">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            maxLength={1000}
+            rows={3}
+            autoFocus
+            placeholder={`What should ${who} change?`}
+            aria-label={`What should ${who} change?`}
+            className="block w-full rounded-md border border-input bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="primary" disabled={!notes.trim() || !!busy} onClick={() => act("redo")}>{busy === "redo" ? "Sending…" : `Ask ${who} to redo it`}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setRedoing(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="primary" disabled={!!busy} onClick={() => act("accept")}>{busy === "accept" ? "Saving…" : "Accept"}</Button>
+          <Button size="sm" variant="secondaryOutline" disabled={!!busy} onClick={() => setRedoing(true)}>Redo with notes</Button>
+          <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => act("discard")}>{busy === "discard" ? "Discarding…" : "Discard"}</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The line for the task's current state, and the button that goes with it.
+function Status({ task, run, onChanged, onOpen }) {
+  const [busy, setBusy] = useState(false);
+  const who = firstName(run?.advisor_name || task.assigned_to);
+  const start = async () => {
+    setBusy(true);
+    try { const d = await startRun(task.id); onChanged?.(d.run); } catch (e) { failed(e); } finally { setBusy(false); }
+  };
+
+  if (isActive(run)) {
+    return <p className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{who} {DOING[task.task_type] || "is on it"}…</p>;
+  }
+  if (run?.status === "done") {
+    return onOpen ? <button type="button" onClick={onOpen} className="text-sm font-medium underline underline-offset-2">{who} finished this: see it</button> : null;
+  }
+  if (run?.status === "accepted") return <p className="text-sm text-muted-foreground">Accepted and saved to Knowledge.</p>;
+  if (!isRunnable(task)) return run?.status === "failed" ? <p className="text-sm text-muted-foreground">{run.error}</p> : null;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <Button size="sm" variant="secondaryOutline" disabled={busy} onClick={start}>{busy ? "Asking…" : run?.status === "failed" ? "Try again" : "Do this for me"}</Button>
+      {run?.status === "failed" && <span className="text-sm text-muted-foreground">{run.error}</span>}
+      {run?.status === "discarded" && <span className="text-sm text-muted-foreground">You set the last attempt aside.</span>}
+    </div>
+  );
+}
+
+export default function TaskDesk({ task, run, onChanged, compact = false }) {
+  const [open, setOpen] = useState(false);
+  if (!task) return null;
+  const done = run?.status === "done";
+
+  if (!compact) {
+    // One live region that stays put, so "Grace finished this" is announced.
+    return (
+      <div aria-live="polite">
+        {done
+          ? <div className="mt-3 rounded-md border-[1.5px] border-foreground bg-card p-4"><Finished task={task} run={run} onChanged={onChanged} /></div>
+          : <div className="mt-2"><Status task={task} run={run} onChanged={onChanged} /></div>}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mt-2" aria-live="polite"><Status task={task} run={run} onChanged={onChanged} onOpen={() => setOpen(true)} /></div>
+      <Dialog open={open && done} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle className="font-display text-xl font-normal">{run?.result?.title || task.title}</DialogTitle></DialogHeader>
+          {done && <Finished task={task} run={run} onChanged={(r) => { onChanged?.(r); setOpen(false); }} />}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

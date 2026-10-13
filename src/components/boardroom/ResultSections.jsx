@@ -17,7 +17,9 @@ export function Section({ label, title, children }) {
 
 // The next-24-hours actions: each with its owner and what kind of work it
 // is. These became the meeting's tasks (see runChairSynthesis).
-export function Actions({ actions, advisorsByName = {}, founderLabel = "You" }) {
+// renderAfter adds something under an action (the results page puts "Do
+// this for me" there); the share page passes nothing.
+export function Actions({ actions, advisorsByName = {}, founderLabel = "You", renderAfter }) {
   return (
     <ol className="space-y-4">
       {actions.map((a, i) => {
@@ -39,6 +41,7 @@ export function Actions({ actions, advisorsByName = {}, founderLabel = "You" }) 
                 {a.done_when && <span>Done when: {a.done_when}</span>}
               </div>
               {a.why_first && <p className="mt-1 text-sm text-muted-foreground">{a.why_first}</p>}
+              {renderAfter?.(a, i)}
             </div>
           </li>
         );

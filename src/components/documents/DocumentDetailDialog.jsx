@@ -33,6 +33,9 @@ export default function DocumentDetailDialog({
   const [showRevision, setShowRevision] = useState(false);
   const [busy, setBusy] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  // Knowledge (including an advisor's accepted "Do this for me" result) is
+  // read here, never fed back through the old deliverable generator.
+  const generated = doc?.kind !== "knowledge";
   const [sharingBusy, setSharingBusy] = useState(false);
 
   const copyToClipboard = (url, description) => {
@@ -183,15 +186,17 @@ export default function DocumentDetailDialog({
               <RefreshCw className="w-3.5 h-3.5 mr-1" /> Request Revision
             </Button>
           )}
-          <Button variant="ghost" size="sm" disabled={regenerating} onClick={async () => {
-            setRegenerating(true);
-            try {
-              await regenerateDeliverable({ companyId: doc.company_id, documentId: doc.id });
-              onRefresh(); onClose();
-            } catch { setRegenerating(false); }
-          }}>
-            <GitBranch className="w-3.5 h-3.5 mr-1" /> New Version
-          </Button>
+          {generated && (
+            <Button variant="ghost" size="sm" disabled={regenerating} onClick={async () => {
+              setRegenerating(true);
+              try {
+                await regenerateDeliverable({ companyId: doc.company_id, documentId: doc.id });
+                onRefresh(); onClose();
+              } catch { setRegenerating(false); }
+            }}>
+              <GitBranch className="w-3.5 h-3.5 mr-1" /> New Version
+            </Button>
+          )}
           {doc.share_token ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => copyToClipboard(`${SITE_URL}/share/document/${doc.share_token}`, "Public link copied — anyone with it can view this document, no account needed.")}>
@@ -255,7 +260,7 @@ export default function DocumentDetailDialog({
             <DocumentDownloadButton doc={doc} />
 
             {/* Generate file for documents without native files */}
-            {!doc.native_file_url && !doc.pdf_file_url && doc.status !== "generating" && doc.status !== "failed" && (
+            {generated && !doc.native_file_url && !doc.pdf_file_url && doc.status !== "generating" && doc.status !== "failed" && (
               <Button
                 variant="primary"
                 disabled={regenerating}

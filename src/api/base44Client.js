@@ -15,6 +15,7 @@ const TABLES = {
   VoiceMeetingSession: 'voice_meeting_sessions',
   Decision: 'decisions',
   Task: 'tasks',
+  TaskRun: 'task_runs',
   Document: 'documents',
   DocumentDownloadLog: 'document_download_logs',
   Pin: 'pins',

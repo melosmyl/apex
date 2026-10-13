@@ -10,8 +10,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import TaskCard from "@/components/tasks/TaskCard";
 import DocumentDetailDialog from "@/components/documents/DocumentDetailDialog";
-import { generateDeliverable } from "@/lib/deliverables";
-import { DOCUMENT_TYPES } from "@/lib/documents";
+import { useTaskRuns } from "@/lib/taskRuns";
 
 const COLUMNS = [
   { key: "todo", label: "To Do" },
@@ -29,7 +28,6 @@ export default function Tasks() {
   const [advisors, setAdvisors] = useState([]);
   const [projects, setProjects] = useState([]);
   const [open, setOpen] = useState(false);
-  const [executingId, setExecutingId] = useState(null);
   const [acknowledgingId, setAcknowledgingId] = useState(null);
   const [viewDoc, setViewDoc] = useState(null);
   const [form, setForm] = useState({ title: "", assigned_to: "", project_id: "" });
@@ -75,49 +73,14 @@ export default function Tasks() {
     await base44.entities.Task.update(task.id, { status: next }); load();
   };
 
-  const detectDocType = (task) => {
-    const text = `${task.title} ${task.description || ""}`.toLowerCase();
-    if (["pitch deck", "investor deck", "slide deck", "presentation", "slides"].some((t) => text.includes(t))) return "Pitch Deck";
-    if (["financial model", "unit economics", "cash flow", "p&l", "profit and loss", "budget", "forecast", "margin", "breakeven", "break-even", "revenue model"].some((t) => text.includes(t))) return "Financial Model";
-    if (["market research", "market analysis", "market size", "tam sam som"].some((t) => text.includes(t))) return "Market Research";
-    if (["competitor", "competition", "competitive analysis"].some((t) => text.includes(t))) return "Competitor Analysis";
-    if (["business plan"].some((t) => text.includes(t))) return "Business Plan";
-    if (["strategy", "strategic plan", "go-to-market", "go to market", "expansion plan"].some((t) => text.includes(t))) return "Strategy";
-    if (["risk", "risk assessment", "risk analysis"].some((t) => text.includes(t))) return "Risk Assessment";
-    if (["proposal", "proposal draft"].some((t) => text.includes(t))) return "Proposal";
-    if (["marketing plan", "campaign plan", "marketing strategy"].some((t) => text.includes(t))) return "Marketing Plan";
-    if (["meeting summary", "board resolution", "decision memo", "minutes"].some((t) => text.includes(t))) return "Meeting Summary";
-    return "Report";
-  };
-
-  const execute = async (task) => {
-    const advisor = advisors.find((a) => a.name === task.assigned_to);
-    if (!advisor) return;
-    setExecutingId(task.id);
-    await base44.entities.Task.update(task.id, { status: "in_progress", delegated_back: false });
-    load();
-    try {
-      const result = await generateDeliverable({
-        companyId,
-        taskId: task.id,
-        advisorId: advisor.id,
-        documentType: detectDocType(task),
-        topic: task.title,
-      });
-      load();
-    } catch (e) {
-      await base44.entities.Task.update(task.id, { status: "todo", delegated_back: true, blocker: e.message || "Generation failed" });
-      load();
-    } finally {
-      setExecutingId(null);
-    }
-  };
-
   const completeForFounder = async (task) => {
     await markDone(task);
   };
 
   const visibleItems = meetingFilter ? (items || []).filter((t) => t.source_meeting_id === meetingFilter) : items;
+  // "Do this for me": each task's latest run; a finished run moves its task,
+  // so the board reloads when one settles.
+  const { runs, put } = useTaskRuns((visibleItems || []).map((t) => t.id), load);
 
   return (
     <div>
@@ -150,9 +113,9 @@ export default function Tasks() {
                       key={t.id}
                       task={t}
                       advisors={advisors}
-                      executing={executingId === t.id}
+                      run={runs[t.id]}
+                      onRunChanged={(run) => { if (run) put(run); load(); }}
                       acknowledging={acknowledgingId === t.id}
-                      onExecute={execute}
                       onCompleteFounder={completeForFounder}
                       onMove={move}
                       onOpenDocument={async (docId) => {

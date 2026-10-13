@@ -68,6 +68,8 @@ export const USER_LIMITS = {
   meeting_step: { max: 50, windowMinutes: 24 * 60 },
   followup: { max: 30, windowMinutes: 24 * 60 },
   task_ack: { max: 50, windowMinutes: 24 * 60 },
+  // "Do this for me" runs, including redos (owner's limit, Workstream M).
+  task_run: { max: 15, windowMinutes: 24 * 60 },
   embed: { max: 200, windowMinutes: 60 },
   // A free-meeting visitor gets the onboarding plan once, plus one retry.
   // Rows are purged after two days, which outlasts any free session.

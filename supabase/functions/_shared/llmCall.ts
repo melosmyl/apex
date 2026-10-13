@@ -478,8 +478,14 @@ export async function callWithFallback(spec: CallSpec) {
 export async function insertUsageLog(db: any, row: Record<string, unknown>) {
   try {
     let { error } = await db.from('ai_usage_logs').insert(row);
+    // A row the log points at may be gone (a task run, or the whole company,
+    // deleted mid-call): keep the spend, drop the links.
+    if (error && error.code === '23503') {
+      const { task_run_id: _r, company_id: _c, meeting_id: _m, advisor_id: _a, ...unlinked } = row;
+      ({ error } = await db.from('ai_usage_logs').insert(unlinked));
+    }
     if (error && (error.code === 'PGRST204' || error.code === '42703')) {
-      const { attempts: _a, model_substitution: _m, anonymous: _anon, thinking_size: _t, ...core } = row;
+      const { attempts: _a, model_substitution: _m, anonymous: _anon, thinking_size: _t, task_run_id: _r, ...core } = row;
       ({ error } = await db.from('ai_usage_logs').insert(core));
     }
     if (error) console.error('Usage log failed:', error.message);

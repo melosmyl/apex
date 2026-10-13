@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
     const { advisor_id, advisor_override, company_id, meeting_id, system_instructions, company_context, meeting_context,
       user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier, anonymous,
-      deadline_at, personal_details } = await req.json();
+      deadline_at, personal_details, model_override, task_run_id } = await req.json();
 
     if ((!advisor_id && !advisor_override) || !user_question)
       return Response.json({ error: 'advisor_id (or advisor_override) and user_question are required' }, { status: 400, headers: corsHeaders });
@@ -102,8 +102,14 @@ Deno.serve(async (req) => {
       timeoutMs);
 
     const [registry, advisorDefault] = await Promise.all([loadModelRegistry(db), loadAdvisorDefault(db, advisor.library_key)]);
+    // A server caller can run the advisor's persona on a set model (M2a: task
+    // runs use the model the owner chose per task type). It still has to be
+    // an approved model; the advisor's own backup stays the fallback.
+    const requested = model_override?.provider && model_override?.model
+      ? { provider: String(model_override.provider), model: String(model_override.model) }
+      : { provider: advisor.default_provider || 'openai', model: advisor.default_model || 'gpt-4o' };
     const { primary, fallback, substitution } = resolveApprovedModels(registry,
-      { provider: advisor.default_provider || 'openai', model: advisor.default_model || 'gpt-4o' },
+      requested,
       { provider: advisor.fallback_provider, model: advisor.fallback_model },
       advisorDefault);
     let provider = primary.provider;
@@ -151,6 +157,7 @@ Deno.serve(async (req) => {
       // Tagged by the caller, which knows the session: the free-meeting
       // ceiling sums these rows (free_meeting_spend_today).
       anonymous: anonymous === true,
+      ...(task_run_id ? { task_run_id } : {}),
     });
 
     // The real reason travels back too, so callers can record why an
@@ -158,7 +165,8 @@ Deno.serve(async (req) => {
     if (!result)
       return Response.json({ error: 'This advisor was temporarily unavailable.', reason: lastError }, { status: 503, headers: corsHeaders });
 
-    return Response.json(result, { headers: corsHeaders });
+    // What the call cost (every attempt), for callers that show it.
+    return Response.json({ ...result, cost_usd: totals.cost }, { headers: corsHeaders });
   } catch (error) {
     console.error('routeAdvisorRequest error:', error);
     return Response.json({ error: 'This advisor was temporarily unavailable.' }, { status: 500, headers: corsHeaders });
