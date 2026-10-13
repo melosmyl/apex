@@ -98,7 +98,13 @@ export function useTaskRuns(taskIds, onSettled) {
   // Shows a run the page has just started, before the next check.
   const put = useCallback((run) => {
     seq.current += 1;
-    setRuns((prev) => ({ ...prev, [run.task_id]: { earlier: prev[run.task_id] ? prev[run.task_id].earlier + 1 : 0, ...run } }));
+    // A new run adds one earlier attempt; the same run updated (an Accept)
+    // doesn't.
+    setRuns((prev) => {
+      const before = prev[run.task_id];
+      const earlier = !before ? 0 : before.id === run.id ? before.earlier : before.earlier + 1;
+      return { ...prev, [run.task_id]: { ...before, ...run, earlier } };
+    });
     previous.current = { ...previous.current, [run.task_id]: run };
   }, []);
 

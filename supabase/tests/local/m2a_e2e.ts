@@ -110,6 +110,18 @@ const acc2 = await A.fn('taskRun', { action: 'accept', run_id: r2?.id });
 check(acc2.status === 409, 'accepting twice saves one document', acc2.json);
 const afterDone = await A.fn('taskRun', { action: 'start', task_id: draftTask.id });
 check(afterDone.status === 409, 'a done task is not started again', afterDone.json);
+// Moved back to To Do, it can be done again; the new accepted version
+// replaces the old one in Knowledge.
+await A.client.from('tasks').update({ status: 'todo' }).eq('id', draftTask.id);
+const again2 = await A.fn('taskRun', { action: 'start', task_id: draftTask.id });
+check(again2.status === 200, 'a task moved back to To Do can be done again', again2.json);
+const r3 = await waitFor(again2.json?.run?.id);
+const acc3 = await A.fn('taskRun', { action: 'accept', run_id: r3?.id });
+const docs3 = await rows(`select id, status from documents where task_id='${draftTask.id}' and kind='knowledge' order by created_at`);
+const [task3] = await rows(`select status, document_id from tasks where id='${draftTask.id}'`);
+check(acc3.status === 200 && docs3.length === 2 && docs3[0].status === 'superseded' && docs3[1].id === acc3.json?.document_id && docs3[1].status !== 'superseded',
+  'accepting the new version replaces the old one in Knowledge', docs3);
+check(task3.status === 'done' && task3.document_id === acc3.json?.document_id, 'and the task points at the new one', task3);
 
 // ---- 3. A plan: dated steps, and the lawyer line when a lease is involved.
 console.log('\n== plan and discard');

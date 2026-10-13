@@ -261,6 +261,11 @@ Deno.serve(async (req) => {
       // The accepted document is the task's result now: a summary or "sent
       // back" note left by the retired generator goes.
       await db.from('tasks').update({ status: 'done', document_id: doc.id, deliverable: null, delegated_back: false, blocker: null }).eq('id', run.task_id);
+      // A task redone after it was accepted: the new version replaces the old
+      // one in Knowledge, which is kept but no longer read.
+      await db.from('documents').update({ status: 'superseded', is_latest_version: false })
+        .eq('task_id', run.task_id).eq('kind', 'knowledge').in('category', ['Draft', 'Plan']).neq('id', doc.id)
+        .or('status.is.null,status.not.in.(archived,superseded)');
       return json({ run: accepted, document_id: doc.id });
     }
 

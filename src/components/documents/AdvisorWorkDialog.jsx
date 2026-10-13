@@ -46,7 +46,11 @@ export default function AdvisorWorkDialog({ doc, advisors = [], onClose, onChang
   }, [doc?.id]);
 
   if (!current) return null;
+  // Archived, or replaced by a newer accepted version: kept for the record,
+  // not read by the board, so not edited either.
   const archived = current.status === "archived";
+  const replaced = current.status === "superseded";
+  const retired = archived || replaced;
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(current.content || ""); toast({ title: "Copied" }); }
@@ -84,7 +88,7 @@ export default function AdvisorWorkDialog({ doc, advisors = [], onClose, onChang
     <Dialog open onOpenChange={(o) => { if (!o) requestClose(); }}>
       <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader className="pr-8">
-          <span className="room-mono">{kindWord}{archived ? " · archived" : ""}</span>
+          <span className="room-mono">{kindWord}{archived ? " · archived" : replaced ? " · replaced by a newer version" : ""}</span>
           <DialogTitle className="font-display text-2xl font-normal leading-snug">{current.title}</DialogTitle>
         </DialogHeader>
 
@@ -139,8 +143,8 @@ export default function AdvisorWorkDialog({ doc, advisors = [], onClose, onChang
           ) : (
             <>
               <Button size="sm" variant="secondaryOutline" onClick={copy}>Copy</Button>
-              {!archived && <Button size="sm" variant="secondaryOutline" onClick={() => { setDraft(current.content || ""); setEditing(true); }}>Edit</Button>}
-              {!archived && <Button size="sm" variant="ghost" onClick={() => setConfirmArchive(true)}>Archive</Button>}
+              {!retired && <Button size="sm" variant="secondaryOutline" onClick={() => { setDraft(current.content || ""); setEditing(true); }}>Edit</Button>}
+              {!retired && <Button size="sm" variant="ghost" onClick={() => setConfirmArchive(true)}>Archive</Button>}
             </>
           )}
         </div>

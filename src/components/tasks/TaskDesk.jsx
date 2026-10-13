@@ -77,7 +77,7 @@ function PlanResult({ r }) {
 }
 
 // The advisor's finished work and the founder's three choices.
-function Finished({ task, run, onChanged }) {
+function Finished({ task, run, onChanged, onAccepted }) {
   const [redoing, setRedoing] = useState(false);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(null);
@@ -87,7 +87,7 @@ function Finished({ task, run, onChanged }) {
   const act = async (kind) => {
     setBusy(kind);
     try {
-      if (kind === "accept") { const d = await acceptRun(run.id); onChanged?.(d.run); toast({ title: "Saved to Knowledge", description: "Your board will use it in the next meeting." }); }
+      if (kind === "accept") { const d = await acceptRun(run.id); onAccepted?.(run.id); onChanged?.(d.run); toast({ title: "Saved to Knowledge", description: "Your board will use it in the next meeting." }); }
       if (kind === "discard") { const d = await discardRun(run.id); onChanged?.(d.run); }
       if (kind === "redo") { const d = await startRun(task.id, notes.trim()); setRedoing(false); setNotes(""); onChanged?.(d.run); }
     } catch (e) { failed(e); } finally { setBusy(null); }
@@ -130,7 +130,7 @@ function Finished({ task, run, onChanged }) {
 }
 
 // The line for the task's current state, and the button that goes with it.
-function Status({ task, run, onChanged, onOpen }) {
+function Status({ task, run, onChanged, onOpen, justAccepted }) {
   const [busy, setBusy] = useState(false);
   const who = firstName(run?.advisor_name || task.assigned_to);
   const start = async () => {
@@ -144,19 +144,29 @@ function Status({ task, run, onChanged, onOpen }) {
   if (run?.status === "done") {
     return onOpen ? <button type="button" onClick={onOpen} className="text-sm font-medium underline underline-offset-2">{who} finished this: see it</button> : null;
   }
-  if (run?.status === "accepted") return <p className="text-sm text-muted-foreground">Accepted and saved to Knowledge.</p>;
-  if (!isRunnable(task)) return run?.status === "failed" ? <p className="text-sm text-muted-foreground">{run.error}</p> : null;
+  // Accepted and the task done: that's the end of it. Moved back to To Do,
+  // it can be done again; the accepted version stays until a new one is
+  // accepted.
+  // (Just accepted here: the task is done, even before the page reloads it.)
+  const acceptedLine = <p className="text-sm text-muted-foreground">Accepted and saved to Knowledge.</p>;
+  if (run?.status === "accepted" && (task.status === "done" || justAccepted === run.id)) return acceptedLine;
+  if (!isRunnable(task)) {
+    if (run?.status === "accepted") return acceptedLine;
+    return run?.status === "failed" ? <p className="text-sm text-muted-foreground">{run.error}</p> : null;
+  }
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <Button size="sm" variant="secondaryOutline" disabled={busy} onClick={start}>{busy ? "Asking…" : run?.status === "failed" ? "Try again" : "Do this for me"}</Button>
       {run?.status === "failed" && <span className="text-sm text-muted-foreground">{run.error}</span>}
       {run?.status === "discarded" && <span className="text-sm text-muted-foreground">You set the last attempt aside.</span>}
+      {run?.status === "accepted" && <span className="text-sm text-muted-foreground">Your accepted version stays until you accept a new one.</span>}
     </div>
   );
 }
 
 export default function TaskDesk({ task, run, onChanged, compact = false }) {
   const [open, setOpen] = useState(false);
+  const [justAccepted, setJustAccepted] = useState(null);
   if (!task) return null;
   const done = run?.status === "done";
 
@@ -165,19 +175,19 @@ export default function TaskDesk({ task, run, onChanged, compact = false }) {
     return (
       <div aria-live="polite">
         {done
-          ? <div className="mt-3 rounded-md border-[1.5px] border-foreground bg-card p-4"><Finished task={task} run={run} onChanged={onChanged} /></div>
-          : <div className="mt-2"><Status task={task} run={run} onChanged={onChanged} /></div>}
+          ? <div className="mt-3 rounded-md border-[1.5px] border-foreground bg-card p-4"><Finished task={task} run={run} onChanged={onChanged} onAccepted={setJustAccepted} /></div>
+          : <div className="mt-2"><Status task={task} run={run} onChanged={onChanged} justAccepted={justAccepted} /></div>}
       </div>
     );
   }
 
   return (
     <>
-      <div className="mt-2" aria-live="polite"><Status task={task} run={run} onChanged={onChanged} onOpen={() => setOpen(true)} /></div>
+      <div className="mt-2" aria-live="polite"><Status task={task} run={run} onChanged={onChanged} onOpen={() => setOpen(true)} justAccepted={justAccepted} /></div>
       <Dialog open={open && done} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle className="font-display text-xl font-normal">{run?.result?.title || task.title}</DialogTitle></DialogHeader>
-          {done && <Finished task={task} run={run} onChanged={(r) => { onChanged?.(r); setOpen(false); }} />}
+          {done && <Finished task={task} run={run} onAccepted={setJustAccepted} onChanged={(r) => { onChanged?.(r); setOpen(false); }} />}
         </DialogContent>
       </Dialog>
     </>

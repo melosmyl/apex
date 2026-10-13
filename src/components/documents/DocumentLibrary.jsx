@@ -22,9 +22,10 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
   const [view, setView] = useState(null);
   const [form, setForm] = useState({ title: "", category: "Other", content: "", file_url: "", file_name: "" });
 
-  // Archived items leave the library (the board stops reading them too).
+  // Archived and replaced items leave the library (the board stops reading
+  // them too).
   const load = () => base44.entities.Document.filter({ company_id: companyId, kind }, "-created_date", 200)
-    .then((docs) => setItems(docs.filter((d) => d.status !== "archived")));
+    .then((docs) => setItems(docs.filter((d) => d.status !== "archived" && d.status !== "superseded")));
   useEffect(() => { load(); }, [companyId, kind]);
 
   const create = async () => {
