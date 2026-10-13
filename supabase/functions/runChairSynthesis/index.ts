@@ -50,6 +50,7 @@ THE RESULTS — the founder reads these first, in this order, so each must stand
    - Give it to "Founder" with type founder only when no advisor can do it for them: a phone call, a signature, a decision, a conversation.
    - Advisors never send, post, buy, sign or sign up for anything; the founder does. A draft is something the founder sends.
    - done_when says how the founder will know it's finished. why_first says why it can't wait.
+   - Never present an advisor's suggestion as something that already exists. If an advisor proposed finding six customers, the action is to find them, not to contact "the six identified customers". Only what the founder or the company record said is a fact.
 3. top_issues: the top issues with the founder's current plan, most serious first, at most 5: the problem, why it matters, and the fix, one line each.
    - Name plainly any risk a good advisor would flag: counterfeit or grey-market goods, scams, regulated or illegal activity, contracts that need a lawyer, tax that needs an accountant. Give the legal alternative as the fix.
 4. founder_questions: decisions only the founder can make, each a short question answerable yes or no. At most 4. Empty if none.
@@ -58,7 +59,7 @@ Then confidence_reason: one line on why the confidence is what it is.
 Everything else (reasoning, agreement, assumptions, the minority view) is the full record the founder can open; keep it accurate and don't repeat the results there word for word.`;
 
 const REPAIR_INSTRUCTIONS = `You are The Chair. Some of the actions and fixes you wrote are categories of work, not things the founder can actually do. Reword only the numbered items listed, so each names the specific thing to do: who to contact, what to write, which number to find, which customer to ask.
-Use only what was said in this meeting. Never invent a name, number, customer, supplier or fact that isn't in the meeting. If the meeting doesn't give you enough to name a concrete action, write the smallest concrete step that would get that information (for example, which question to ask whom).
+Use only what was said in this meeting. Never invent a name, number, customer, supplier or fact that isn't in the meeting, and never present an advisor's suggestion as something that already exists. If the meeting doesn't give you enough to name a concrete action, write the smallest concrete step that would get that information (for example, which question to ask whom).
 Return each reworded item with its number. The owner and type of each action stay as they are.`;
 
 function formatTranscriptForChair(transcript) {
