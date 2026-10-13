@@ -16,6 +16,7 @@ const STALE_CLAIM_MS = 10 * 60_000;
 // model, the 5s an attempt needs, and routeAdvisorRequest's own setup.
 const MIN_ROUND_MS = 30_000;
 import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
+import { companyProfile } from '../_shared/companyProfile.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
 // startBoardMeeting) — nothing stops two advisors reaching for the same
@@ -206,6 +207,9 @@ Deno.serve(async (req) => {
     dbForRelease = db;
 
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
+    // What the founder has told us, so later rounds don't treat it as unknown.
+    const { data: company } = await db.from('companies').select('*').eq('id', meeting.company_id).maybeSingle();
+    const profile = companyProfile(company) || null;
     // The Chair doesn't debate. A meeting started before she left the debate
     // may still hold her Round 1 answer: it's dropped here, so she neither
     // speaks in later rounds nor shows as absent from them.
@@ -272,7 +276,7 @@ Deno.serve(async (req) => {
         const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs);
         return callAdvisor(supabaseUrl, serviceKey, {
           advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-          system_instructions: null, company_context: null, meeting_context: meetingContext,
+          system_instructions: null, company_context: profile, meeting_context: meetingContext,
           user_question: meeting.question, previous_responses: [], output_schema: DISCUSSION_SCHEMA,
           temperature: advisor.temperature, request_type: `discussion_round_${round}`, deadline_at: roundDeadline,
           // Their book, hobby or place stay on offer until they've used one.

@@ -5,6 +5,7 @@ import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorRespo
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
+import { companyProfile } from '../_shared/companyProfile.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,12 +38,14 @@ async function loadProgressionSummary(db, companyId) {
 }
 
 function buildContext(company, documents, decisions, meetings, projects, commitments, progression, maxSize) {
-  let ctx = `Company: ${company.name || 'N/A'}\nIndustry: ${company.industry || 'N/A'}\n`;
-  ctx += `Description: ${company.description || company.tagline || 'N/A'}\n`;
-  if (company.tagline) ctx += `Tagline: ${company.tagline}\n`;
-  if (company.priorities?.length) ctx += `Strategic Priorities: ${company.priorities.join(', ')}\n`;
+  // Everything the founder has filled in, as facts they stated (not just
+  // the gaps below), the same block every later stage of the meeting gets.
+  let ctx = companyProfile(company) || `Company: ${company.name || 'N/A'}\n`;
+  // The onboarding plan's priorities are its suggestions, not the founder's
+  // words (its generated welcome line, the "tagline", is left out).
+  if (company.priorities?.length) ctx += `\nSuggested priorities from the onboarding plan (not the founder's own words): ${company.priorities.join(', ')}\n`;
   if (company.metrics?.length) ctx += `Key Metrics: ${company.metrics.map(m => `${m.label}: ${m.value} (${m.trend})`).join(', ')}\n`;
-  const gaps = PROFILE_GAPS.filter(g => !company[g.key]);
+  const gaps = PROFILE_GAPS.filter(g => !String(company[g.key] ?? '').trim());
   if (gaps.length) {
     ctx += `\nNot yet on file about this company (onboarding is short by design — the board fills these in over time):\n`;
     gaps.forEach(g => { ctx += `- ${g.label} [profile_field: "${g.key}"]\n`; });
@@ -205,7 +208,8 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
         ...chairCallFields(chair), company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
         // Her book, hobby or place may come up here; never in the resolution.
         personal_details: true,
-        company_context: null, meeting_context: null,
+        // The Chair opens knowing what the founder has told us, like the board.
+        company_context: companyProfile(company) || null, meeting_context: null,
         user_question: prompt, previous_responses: [], output_schema: CHAIR_OPENING_SCHEMA,
         temperature: 0.4, request_type: 'chair_opening', deadline_at: deadlineAt,
       }),

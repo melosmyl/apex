@@ -4,6 +4,7 @@ import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.t
 import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, chairCallFields } from '../_shared/chair.ts';
 import { mergeRepair, normalizeResults, vagueParts } from '../_shared/resultsStandard.ts';
+import { companyProfile } from '../_shared/companyProfile.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
@@ -193,6 +194,9 @@ Deno.serve(async (req) => {
     const discussionTranscript = meeting.discussion_transcript || [];
 
     const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
+    // What the founder has told us: the Chair must never list it as missing.
+    const { data: company } = await db.from('companies').select('*').eq('id', meeting.company_id).maybeSingle();
+    const profile = companyProfile(company) || null;
     // The board's Chair writes the resolution; a board without one gets the
     // built-in Chair, never a debater standing in.
     const chair = findChair(advisors);
@@ -216,7 +220,7 @@ Deno.serve(async (req) => {
 
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
       ...chairCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-      system_instructions: CHAIR_INSTRUCTIONS, company_context: null, meeting_context: meetingContext,
+      system_instructions: CHAIR_INSTRUCTIONS, company_context: profile, meeting_context: meetingContext,
       user_question: meeting.question, previous_responses: [],
       output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',
       // Ends in time for this function to save the resolution and its tasks.
@@ -256,7 +260,7 @@ Deno.serve(async (req) => {
       try {
         const repair = await callAdvisor(supabaseUrl, serviceKey, {
           ...chairCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-          system_instructions: REPAIR_INSTRUCTIONS, company_context: null,
+          system_instructions: REPAIR_INSTRUCTIONS, company_context: profile,
           meeting_context: `${meetingContext}\n\n=== YOUR RESULTS ===\nActions:\n${resolution.priority_actions.map((a, i) => `${i + 1}. ${a.title} (${a.assigned_to})`).join('\n')}\nIssues and fixes:\n${resolution.top_issues.map((x, i) => `${i + 1}. ${x.problem}: fix: ${x.fix}`).join('\n')}\n\nReword only these, which are too vague to act on:\n${vague.map((v) => `- ${v}`).join('\n')}`,
           user_question: meeting.question, previous_responses: [],
           output_schema: RESULTS_REPAIR_SCHEMA, temperature: 0.3, request_type: 'chair_repair',

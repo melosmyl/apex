@@ -4,6 +4,7 @@ import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.t
 import { FOLLOWUP_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair } from '../_shared/chair.ts';
 import { usedPersonalDetail, ownWords } from '../_shared/personalDetails.ts';
+import { companyProfile } from '../_shared/companyProfile.ts';
 
 // At most five debaters answer (startBoardMeeting seats the same); the
 // Chair doesn't debate, here or in any round.
@@ -134,6 +135,9 @@ Deno.serve(async (req) => {
     await db.from('board_meetings').update({ discussion_transcript: updatedTranscript }).eq('id', meeting.id);
 
     const followupContext = buildFollowupContext(founder_message.trim(), updatedTranscript, meeting.question);
+    // What the founder has told us about the company, as every meeting stage gets.
+    const { data: company } = await db.from('companies').select('*').eq('id', meeting.company_id).maybeSingle();
+    const profile = companyProfile(company) || null;
 
     // Model calls end in time for this function to save their answers.
     const deadlineAt = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
@@ -141,7 +145,7 @@ Deno.serve(async (req) => {
     const roundResults = await Promise.all(meetingAdvisors.map(advisor =>
       callAdvisor(supabaseUrl, serviceKey, {
         advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-        system_instructions: null, company_context: null, meeting_context: followupContext,
+        system_instructions: null, company_context: profile, meeting_context: followupContext,
         user_question: meeting.question, previous_responses: [], output_schema: FOLLOWUP_SCHEMA,
         temperature: advisor.temperature, request_type: 'founder_followup', deadline_at: deadlineAt,
         // Their book, hobby or place stay on offer until they've used one.
