@@ -93,8 +93,10 @@ function meetingErrorMessage(e, fallback) {
   const status = e?.response?.status;
   const serverMessage = e?.response?.data?.error;
   if (status === 401) return "Your session has ended. Please sign in again to continue.";
+  // The database only shows someone else's company to an admin, so this
+  // refusal (the server's ownership check) is one an admin sees.
   if (status === 403 && (!serverMessage || serverMessage === "Forbidden"))
-    return "This company belongs to a different account. Sign in with the account that created it to hold a meeting.";
+    return "You're viewing this as an admin; only the owner can hold meetings here.";
   if (status && status < 500 && serverMessage) return serverMessage;
   return fallback;
 }
