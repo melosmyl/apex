@@ -26,19 +26,30 @@ export default function Tasks() {
   const meetingFilter = searchParams.get("meeting");
   const [items, setItems] = useState(null);
   const [advisors, setAdvisors] = useState([]);
+  const [advisorsLoaded, setAdvisorsLoaded] = useState(false);
   const [projects, setProjects] = useState([]);
   const [open, setOpen] = useState(false);
   const [acknowledgingId, setAcknowledgingId] = useState(null);
   const [viewDoc, setViewDoc] = useState(null);
-  const [form, setForm] = useState({ title: "", assigned_to: "", project_id: "" });
+  const EMPTY_FORM = { title: "", assigned_to: "", project_id: "", task_type: "", brief: "" };
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const load = () => base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200).then(setItems);
-  useEffect(() => { load(); base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then(setAdvisors); base44.entities.Project.filter({ company_id: companyId }, "-created_date", 100).then(setProjects); }, [companyId]);
+  useEffect(() => { load(); base44.entities.Advisor.filter({ company_id: companyId }, "-created_date", 100).then((a) => { setAdvisors(a); setAdvisorsLoaded(true); }); base44.entities.Project.filter({ company_id: companyId }, "-created_date", 100).then(setProjects); }, [companyId]);
 
+  // A hand-made task can be one an advisor does for you (Draft or Plan, so
+  // "Do this for me" works on it), which needs one of your AI advisors.
+  const assignee = advisors.find((a) => a.name === form.assigned_to);
+  const aiAssignee = assignee && assignee.type !== "human" ? assignee : null;
+  const needsAdvisor = !!form.task_type && !aiAssignee;
   const create = async () => {
-    if (!form.title.trim()) return;
-    await base44.entities.Task.create({ company_id: companyId, title: form.title, assigned_to: form.assigned_to, project_id: form.project_id || undefined, created_by: "Founder", status: "todo" });
-    setForm({ title: "", assigned_to: "", project_id: "" }); setOpen(false); load();
+    if (!form.title.trim() || needsAdvisor) return;
+    await base44.entities.Task.create({
+      company_id: companyId, title: form.title, assigned_to: form.assigned_to, project_id: form.project_id || undefined,
+      advisor_id: aiAssignee?.id || null, task_type: form.task_type || null, description: form.brief.trim() || null,
+      created_by: "Founder", status: "todo",
+    });
+    setForm(EMPTY_FORM); setOpen(false); load();
   };
 
   // A task with source_meeting_id is a real commitment from a board
@@ -133,22 +144,42 @@ export default function Tasks() {
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(EMPTY_FORM); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle className="font-display text-2xl font-light">New task</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
-            <div><Label className="mb-1.5 block">Task</Label><Input value={form.title} onChange={(e)=>setForm(f=>({...f,title:e.target.value}))} autoFocus /></div>
-            <div><Label className="mb-1.5 block">Assign to</Label>
-              <select value={form.assigned_to} onChange={(e)=>setForm(f=>({...f,assigned_to:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                <option value="">Unassigned</option>{advisors.map(a=><option key={a.id}>{a.name}</option>)}
+            <div><Label htmlFor="task-title" className="mb-1.5 block">Task</Label><Input id="task-title" value={form.title} onChange={(e)=>setForm(f=>({...f,title:e.target.value}))} autoFocus /></div>
+            <div><Label htmlFor="task-kind" className="mb-1.5 block">What kind of task</Label>
+              <select id="task-kind" value={form.task_type} onChange={(e)=>setForm(f=>({...f,task_type:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="">A to-do you do yourself</option>
+                <option value="draft">Draft: an advisor writes it for you to send</option>
+                <option value="plan">Plan: an advisor writes a dated checklist</option>
               </select>
             </div>
-            <div><Label className="mb-1.5 block">Project</Label>
-              <select value={form.project_id} onChange={(e)=>setForm(f=>({...f,project_id:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+            <div><Label htmlFor="task-assignee" className="mb-1.5 block">{form.task_type ? "Which advisor does it" : "Assign to"}</Label>
+              <select id="task-assignee" value={form.assigned_to} onChange={(e)=>setForm(f=>({...f,assigned_to:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="">{form.task_type ? "Choose an advisor" : "Unassigned"}</option>
+                {advisors.filter((a) => !form.task_type || a.type !== "human").map(a=><option key={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            {form.task_type && (
+              <div><Label htmlFor="task-brief" className="mb-1.5 block">What should they know? <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                <textarea id="task-brief" value={form.brief} onChange={(e)=>setForm(f=>({...f,brief:e.target.value}))} rows={3} maxLength={1500}
+                  placeholder="Who it's for, what it should say, anything they need"
+                  className="block w-full rounded-md border border-input bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+              </div>
+            )}
+            <div><Label htmlFor="task-project" className="mb-1.5 block">Project</Label>
+              <select id="task-project" value={form.project_id} onChange={(e)=>setForm(f=>({...f,project_id:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">None</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
-            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={()=>setOpen(false)}>Cancel</Button><Button onClick={create} disabled={!form.title.trim()}>Create</Button></div>
+            {needsAdvisor && advisorsLoaded && (
+              <p className="text-sm text-muted-foreground">
+                {advisors.some((a) => a.type !== "human") ? "Choose which advisor does it." : "Draft and Plan need one of your advisors; add one on Your advisors first."}
+              </p>
+            )}
+            <div className="flex justify-end gap-2"><Button variant="ghost" onClick={()=>{ setOpen(false); setForm(EMPTY_FORM); }}>Cancel</Button><Button onClick={create} disabled={!form.title.trim() || needsAdvisor}>Create</Button></div>
           </div>
         </DialogContent>
       </Dialog>
