@@ -258,7 +258,9 @@ Deno.serve(async (req) => {
         await db.from('task_runs').update({ status: 'done', updated_at: nowIso() }).eq('id', run.id).eq('status', 'accepted');
         throw docErr;
       }
-      await db.from('tasks').update({ status: 'done', document_id: doc.id }).eq('id', run.task_id);
+      // The accepted document is the task's result now: a summary or "sent
+      // back" note left by the retired generator goes.
+      await db.from('tasks').update({ status: 'done', document_id: doc.id, deliverable: null, delegated_back: false, blocker: null }).eq('id', run.task_id);
       return json({ run: accepted, document_id: doc.id });
     }
 

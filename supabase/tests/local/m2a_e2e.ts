@@ -97,12 +97,15 @@ const [earlier] = await rows(`select status from task_runs where id='${r1?.id}'`
 check(earlier.status === 'discarded', 'the earlier attempt is kept, set aside', earlier);
 const r2 = await waitFor(redo.json?.run?.id);
 check(r2?.status === 'done' && r2.redo_notes === 'Make it shorter and friendlier', 'the redo finishes with its notes recorded', r2);
+await sql(`update tasks set deliverable = 'Old generator summary', blocker = 'old note' where id='${draftTask.id}'`);
 const acc = await A.fn('taskRun', { action: 'accept', run_id: r2?.id });
 check(acc.status === 200 && !!acc.json?.document_id, 'accept answers with the saved document', acc.json);
 const [doc] = await rows(`select kind, task_id, created_by_advisor_id, approval_status, content from documents where id='${acc.json?.document_id}'`);
 check(doc?.kind === 'knowledge' && doc.task_id === draftTask.id && doc.created_by_advisor_id === by('Grace').id && doc.approval_status === 'approved', 'it is saved to Knowledge, linked to the task and the advisor', doc);
 const [doneTask] = await rows(`select status, document_id from tasks where id='${draftTask.id}'`);
 check(doneTask.status === 'done' && doneTask.document_id === acc.json?.document_id, 'the task is done and points at the document');
+const [cleared] = await rows(`select deliverable, blocker, delegated_back from tasks where id='${draftTask.id}'`);
+check(cleared.deliverable === null && cleared.blocker === null && cleared.delegated_back === false, "an old generator's summary is cleared on Accept", cleared);
 const acc2 = await A.fn('taskRun', { action: 'accept', run_id: r2?.id });
 check(acc2.status === 409, 'accepting twice saves one document', acc2.json);
 const afterDone = await A.fn('taskRun', { action: 'start', task_id: draftTask.id });

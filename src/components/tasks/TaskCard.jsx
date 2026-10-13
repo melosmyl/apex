@@ -15,6 +15,7 @@ export default function TaskCard({ task, advisors, run, onRunChanged, acknowledg
   // A finished "Do this for me" result waits for Accept / Redo / Discard;
   // "Done" here would skip saving it.
   const awaitingDecision = run?.status === "done";
+  const isAdvisorTask = task.task_type === "draft" || task.task_type === "plan";
   const canComplete = !isDone && !awaitingDecision && (isDelegated || isFounderTask || task.status === "review");
   const hasDocument = !!task.document_id;
   const isCommitment = !!task.source_meeting_id;
@@ -30,7 +31,9 @@ export default function TaskCard({ task, advisors, run, onRunChanged, acknowledg
         </Badge>
       )}
 
-      {(isDelegated || task.deliverable) && (
+      {/* A Draft or Plan's result is the accepted document ("Open the result");
+          any summary left by the retired generator is stale. */}
+      {(isDelegated || (task.deliverable && !isAdvisorTask)) && (
         <div className="mb-2">
           <button onClick={() => setExpanded((v) => !v)} className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
             {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -49,7 +52,7 @@ export default function TaskCard({ task, advisors, run, onRunChanged, acknowledg
           onClick={() => onOpenDocument?.(task.document_id)}
           className="inline-flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 mb-2"
         >
-          <FileText className="w-3 h-3" /> Open deliverable
+          <FileText className="w-3 h-3" /> {isAdvisorTask ? "Open the result" : "Open deliverable"}
         </button>
       )}
 
