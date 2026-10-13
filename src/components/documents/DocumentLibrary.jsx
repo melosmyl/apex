@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Plus, Trash2, FileText, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -31,7 +32,21 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
     await base44.entities.Document.create({ ...form, company_id: companyId, kind });
     setForm({ title: "", category: "Other", content: "", file_url: "", file_name: "" }); setOpen(false); load();
   };
-  const remove = async (d) => { await base44.entities.Document.delete(d.id); setView(null); load(); };
+  // Deleting can't be undone, so the trash icon asks first, on the card.
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const remove = async (d) => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await base44.entities.Document.delete(d.id);
+      // An accepted "Do this for me" result: its task stops pointing at it.
+      if (isAdvisorWork(d)) await base44.entities.Task.update(d.task_id, { document_id: null }).catch(() => {});
+    } catch {
+      toast({ title: "Couldn't delete that", description: "Please try again." });
+    }
+    setDeleting(false); setConfirmDelete(null); setView(null); load();
+  };
 
   return (
     <div>
@@ -43,11 +58,31 @@ export default function DocumentLibrary({ kind, eyebrow, title, description, emp
         : (
         <div className="grid sm:grid-cols-2 gap-4">
           {items.map((d) => (
-            <div key={d.id} className="group bg-card border border-border/70 rounded-2xl p-5 rise-in cursor-pointer hover:shadow-elevated transition-all" onClick={() => setView(d)}>
+            <div key={d.id} className="group bg-card border border-border/70 rounded-2xl p-5 rise-in cursor-pointer hover:shadow-elevated transition-all" onClick={() => confirmDelete !== d.id && setView(d)}>
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="font-display text-lg leading-snug">{d.title}</h3>
-                <button onClick={(e) => { e.stopPropagation(); remove(d); }} className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive transition-all"><Trash2 className="w-4 h-4" /></button>
+                <button
+                  type="button"
+                  aria-label={`Delete ${d.title}`}
+                  onClick={(e) => { e.stopPropagation(); setConfirmDelete(d.id); }}
+                  className="text-muted-foreground transition-all hover:text-destructive focus-visible:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                ><Trash2 className="w-4 h-4" /></button>
               </div>
+              {confirmDelete === d.id && (
+                <div
+                  className="mb-3 rounded-md border border-border bg-secondary/60 p-3"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setConfirmDelete(null); } }}
+                >
+                  <p id={`delete-note-${d.id}`} className="text-sm">
+                    {isAdvisorWork(d) ? "Delete this result? Its task will lose the link, and it can't be undone." : "Delete this? It can't be undone."}
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <Button size="sm" variant="primary" autoFocus aria-describedby={`delete-note-${d.id}`} disabled={deleting} onClick={() => remove(d)}>{deleting ? "Deleting…" : "Delete"}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(null)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
               <Badge variant="secondary" className="rounded-full font-normal mb-2">{d.category}</Badge>
               {d.content && <p className="text-sm text-muted-foreground line-clamp-3">{d.content}</p>}
               {d.file_url && (
