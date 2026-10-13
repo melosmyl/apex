@@ -1,5 +1,5 @@
 import { assertEquals, assert } from 'jsr:@std/assert@1';
-import { PROFESSIONAL_NOTE, companyContext, finishResult, needsProfessionalCheck, resultAsText, taskPrompt, voiceSamples } from './taskRun.ts';
+import { PROFESSIONAL_NOTE, companyContext, finishResult, needsProfessionalCheck, openQuestions, resultAsText, taskPrompt, voiceSamples } from './taskRun.ts';
 
 Deno.test('legal and tax work gets the lawyer-or-accountant line; ordinary messages do not', () => {
   for (const t of ['Draft a contractor agreement for Sam', 'Write an NDA for the supplier', 'Register for VAT with HMRC', 'Reply to the landlord about the lease',
@@ -60,4 +60,33 @@ Deno.test('the prompt carries the task, the verdict, the voice and a redo, and n
   assert(p.meeting_context.includes('Make it friendlier') && p.meeting_context.includes('Dear Sir'));
   assert(p.system_instructions.includes('you never send anything'));
   assert(companyContext({ name: 'Second Coat', target_customer: 'Students' }, [{ title: 'Prices', content: 'Coats £45' }]).includes('Coats £45'));
+});
+
+Deno.test("what the meeting left open goes in as unknowns; answered decisions are settled; the founder's own word wins", () => {
+  const resolution = {
+    verdict: 'Test the price first.',
+    missing_information: ['The exact material of the dinner set', { detail: 'Lead times from the supplier' }],
+    founder_questions: ['Do you know the exact material?', 'Will you sell at the Saturday market?', 'The exact material of the dinner set'],
+    discussion_evaluation: { uncertain_assumptions: ['Parents will pay £45'] },
+  };
+  assertEquals(openQuestions(resolution).unknown, ['The exact material of the dinner set', 'Lead times from the supplier', 'Do you know the exact material?', 'Will you sell at the Saturday market?', 'Parents will pay £45']);
+  const answered = openQuestions(resolution, { 1: 'yes', 0: 'not_sure' });
+  assertEquals(answered.decided, ['Will you sell at the Saturday market? Yes.']);
+  assert(!answered.unknown.includes('Will you sell at the Saturday market?') && answered.unknown.includes('Do you know the exact material?'));
+  // A settled decision is never also listed as unknown.
+  const overlap = openQuestions({ missing_information: ['Will you sell at the market?'], founder_questions: ['Will you sell at the market?'] }, { 0: 'no' });
+  assertEquals(overlap, { unknown: [], decided: ['Will you sell at the market? No.'] });
+  // Numbered like the results page: empty entries don't shift the answers.
+  assertEquals(openQuestions({ founder_questions: ['', 'Q1?', 'Q2?'] }, { 0: 'yes' }).decided, ['Q1? Yes.']);
+  // Odd shapes from older meetings never break a run.
+  assertEquals(openQuestions(null), { unknown: [], decided: [] });
+  assertEquals(openQuestions({ founder_questions: { a: 1 }, missing_information: 'Price unknown' }), { unknown: [], decided: [] });
+
+  const p = taskPrompt({ type: 'draft', today: '2026-10-14', voice: [], task: { title: 'Message the parents' }, meeting: { question: 'q', board_resolution: resolution, founder_answers: { 1: 'yes' } } });
+  assert(p.meeting_context.includes('THE FOUNDER HAS DECIDED:\n- Will you sell at the Saturday market? Yes.'));
+  assert(p.meeting_context.includes('STILL UNKNOWN') && p.meeting_context.includes('- The exact material of the dinner set'));
+  assert(p.system_instructions.includes("the company record, the task's brief, and their notes on a redo"));
+  assert(p.system_instructions.includes('What advisors said in the meeting is not a source'));
+  assert(taskPrompt({ type: 'plan', today: '2026-10-14', voice: [], task: { title: 't' } }).system_instructions.includes('STILL UNKNOWN'));
+  assert(companyContext({ name: 'petit m' }).startsWith('THE COMPANY RECORD'));
 });

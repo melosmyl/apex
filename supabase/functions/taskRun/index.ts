@@ -90,19 +90,25 @@ async function processRun(db: Any, runId: string) {
 
     const [{ data: company }, { data: knowledge }, { data: meetings }, { data: notes }, meetingRes, previousRes] = await Promise.all([
       db.from('companies').select('*').eq('id', run.company_id).maybeSingle(),
-      // The founder's own Knowledge, not the board's earlier drafts and plans.
-      db.from('documents').select('title, content').eq('company_id', run.company_id).eq('kind', 'knowledge')
-        .or('category.is.null,category.not.in.("Draft","Plan")').order('created_at', { ascending: false }).limit(5),
+      db.from('documents').select('title, content, category, status').eq('company_id', run.company_id).eq('kind', 'knowledge')
+        .or('category.is.null,category.not.in.("Draft","Plan")').order('created_at', { ascending: false }).limit(30),
       db.from('board_meetings').select('question, founder_decision_notes, discussion_transcript')
         .eq('company_id', run.company_id).eq('created_by_id', run.created_by_id).order('created_at', { ascending: false }).limit(5),
       db.from('notes').select('raw_text').eq('company_id', run.company_id).eq('created_by_id', run.created_by_id).order('created_at', { ascending: false }).limit(5),
       task.source_meeting_id
-        ? db.from('board_meetings').select('question, board_resolution').eq('id', task.source_meeting_id).eq('company_id', run.company_id).maybeSingle()
+        ? db.from('board_meetings').select('question, board_resolution, founder_answers').eq('id', task.source_meeting_id).eq('company_id', run.company_id).maybeSingle()
         : Promise.resolve({ data: null }),
       run.previous_run_id
         ? db.from('task_runs').select('result').eq('id', run.previous_run_id).eq('task_id', run.task_id).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
+
+    // The founder's own Knowledge: not the board's earlier drafts and plans
+    // (filtered above), and nothing archived or replaced. The status check is
+    // done here: many rows have no status, which a second "or" can't say.
+    const ownKnowledge = (knowledge || [])
+      .filter((d: Any) => !['Draft', 'Plan'].includes(d.category) && !['archived', 'superseded'].includes(d.status))
+      .slice(0, 5);
 
     const voice = voiceSamples({
       followups: (meetings || []).flatMap((m: Any) => (m.discussion_transcript || []).filter((t: Any) => t.message_type === 'founder_message').map((t: Any) => t.message)),
@@ -121,7 +127,7 @@ async function processRun(db: Any, runId: string) {
       body: JSON.stringify({
         advisor_id: advisor.id, company_id: run.company_id, meeting_id: task.source_meeting_id || null, user_id: run.created_by_id,
         model_override: TASK_MODEL, task_run_id: run.id,
-        system_instructions: prompt.system_instructions, company_context: companyContext(company, knowledge || []),
+        system_instructions: prompt.system_instructions, company_context: companyContext(company, ownKnowledge),
         meeting_context: prompt.meeting_context, user_question: prompt.user_question, previous_responses: [],
         output_schema: SCHEMAS[run.task_type], temperature: 0.6, request_type: `task_${run.task_type}`,
         deadline_at: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,
@@ -132,7 +138,13 @@ async function processRun(db: Any, runId: string) {
       await finishRun(db, run, { status: 'failed', error: `${advisor.name.split(' ')[0]} couldn't finish this just now. Try again in a moment.` }, 'todo');
       return;
     }
-    const result = finishResult(run.task_type, data.response, task);
+    const result: Any = finishResult(run.task_type, data.response, task);
+    // Who actually wrote it: shown to the founder when it wasn't the model
+    // set for this task (a fallback, or a model swapped out by the registry).
+    result.written_by = {
+      provider: data.provider_used || null, model: data.model_used || null, intended: TASK_MODEL.model,
+      fallback: !!data.model_used && data.model_used !== TASK_MODEL.model,
+    };
     await finishRun(db, run, { status: 'done', result, error: null }, 'review');
   } catch (e) {
     console.error('taskRun: run failed', runId, (e as Error).message);

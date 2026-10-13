@@ -15,6 +15,10 @@ const log: any[] = [];
 // { "priority_actions": [[...], [...]] } returns the first list to the first
 // answer with that field and the second to the next.
 let fields: Record<string, any[]> = {};
+// Marker strings to look for in each prompt: GET /__log says which ones a
+// request contained (to check what a model was, or wasn't, told).
+let marks: string[] = [];
+const marked = (text: string) => marks.filter((m) => text.includes(m));
 
 function sample(s: any, key = '', book = ''): any {
   if (!s || typeof s !== 'object') return null;
@@ -57,7 +61,7 @@ async function anthropic(body: any): Promise<Response> {
   const mode = script.anthropic.shift() || 'ok';
   const schema = body.output_config?.format?.schema ?? pastedSchema(String(body.system));
   const sp = speaker(String(body.system));
-  log.push({ provider: 'anthropic', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, thinking: body.thinking, effort: body.output_config?.effort,
+  log.push({ marked: marked(String(body.system) + JSON.stringify(body.messages)), provider: 'anthropic', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, thinking: body.thinking, effort: body.output_config?.effort,
     native: !!body.output_config?.format, pasted: String(body.system).includes('JSON structure'), temperature: body.temperature, stream: body.stream });
   if (mode === 'overload529') return Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 529, headers: { 'retry-after': '1' } });
   if (mode === 'reject400') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'output_config.format.schema: unsupported' } }, { status: 400 });
@@ -97,7 +101,7 @@ async function openai(body: any): Promise<Response> {
   const rf = body.response_format;
   const schema = rf?.type === 'json_schema' ? rf.json_schema.schema : pastedSchema(String(body.messages?.[0]?.content));
   const sp = speaker(String(body.messages?.[0]?.content));
-  log.push({ provider: 'openai', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, format: rf?.type, strict: rf?.json_schema?.strict, temperature: body.temperature });
+  log.push({ marked: marked(JSON.stringify(body.messages)), provider: 'openai', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, format: rf?.type, strict: rf?.json_schema?.strict, temperature: body.temperature });
   if (mode === 'overload529') return Response.json({ error: { message: 'busy', type: 'server_error' } }, { status: 503 });
   if (delayBy[sp.who]) await sleep(delayBy[sp.who]);
   const content = mode === 'refusal' ? null : JSON.stringify(sample(schema, '', sp.book));
@@ -109,7 +113,7 @@ async function openai(body: any): Promise<Response> {
 
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
-  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; fields = s.fields || {}; log.length = 0; return Response.json({ ok: true }); }
+  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; fields = s.fields || {}; marks = s.marks || []; log.length = 0; return Response.json({ ok: true }); }
   if (url.pathname === '/__log') return Response.json(log);
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);
