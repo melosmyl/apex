@@ -12,7 +12,6 @@ const TABLES = {
   Project: 'projects',
   BoardMeeting: 'board_meetings',
   MeetingMessage: 'meeting_messages',
-  VoiceMeetingSession: 'voice_meeting_sessions',
   Decision: 'decisions',
   Task: 'tasks',
   TaskRun: 'task_runs',

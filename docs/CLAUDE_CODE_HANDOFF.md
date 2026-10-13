@@ -32,6 +32,8 @@ Table names are `snake_case` plural (e.g. `Company` → `companies`, `BoardMeeti
 
 **Not yet ported at all** (still only exists as Base44 Deno functions in `base44/functions/`, needs the same treatment): `runFounderFollowup`, `generate-deliverable` (+ its shared builders in `base44/shared/`), `getDocumentDownloadUrl`, `analyzePin`, `runLiveBoardroomTurn`, `endLiveBoardroom`, `create-checkout`, `cancel-subscription`, `wix-payments-webhook`.
 
+> Update, 14 October 2026: `analyzePin` is now ported (cheap tier). `runLiveBoardroomTurn` and `endLiveBoardroom` were dropped, together with the unused voice-meeting screens; they won't be ported.
+
 ## After the 4 functions are deployed and committed
 
 Test the full loop through the actual app: log in, create a company if needed, add 3+ advisors, go to the Boardroom, run a Board Debate. This exercises `startBoardMeeting` → `runBoardDiscussion` → `runChairSynthesis` together for the first time.
