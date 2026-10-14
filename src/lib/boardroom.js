@@ -101,10 +101,34 @@ function meetingErrorMessage(e, fallback) {
   return fallback;
 }
 
-export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId }) {
+// Where a meeting the server runs (P0) has got to, as the page shows it.
+// The page only watches: the server moves the meeting on by itself.
+export function meetingPhase(m) {
+  switch (m?.status) {
+    case "preparing": return "preparing";
+    case "independent_complete": return m.awaiting_human_input ? "human_input" : "discussion";
+    case "discussing": return "discussion";
+    case "discussion_complete":
+    case "synthesizing": return "resolution";
+    case "complete": return "result";
+    case "failed": return "failed";
+    case "superseded": return "superseded";
+    default: return null;
+  }
+}
+
+// A meeting the server is still running, so reopening it shows it live.
+export function isRunningOnServer(m) {
+  return m?.driver === "server" && ["preparing", "human_input", "discussion", "resolution"].includes(meetingPhase(m));
+}
+
+// Starts a meeting the server runs to the end (P0). It answers at once;
+// Round 1 and everything after happen on the server.
+export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId, awaitHumans = false }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
       company_id: companyId, question, advisor_ids: advisorIds,
+      server_driven: true, await_humans: awaitHumans,
       // Chosen here so the live view can follow exactly this meeting while
       // Round 1 forms, before the call returns.
       ...(meetingId ? { meeting_id: meetingId } : {}),
@@ -117,23 +141,25 @@ export async function startMeeting({ companyId, question, advisorIds, freeAttemp
   }
 }
 
-export async function runDiscussion(meetingId) {
+// After the founder has typed the human advisors' views, or skipped them.
+export async function continueMeeting(meetingId) {
   try {
-    const res = await base44.functions.invoke("runBoardDiscussion", { meeting_id: meetingId });
+    const res = await base44.functions.invoke("meetingRun", { action: "continue", meeting_id: meetingId });
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(meetingErrorMessage(e, "Your board couldn't finish the discussion just now. Please try again in a moment."));
+    throw new Error(meetingErrorMessage(e, "Your board couldn't carry on just now. Please try again in a moment."));
   }
 }
 
-export async function runResolution(meetingId) {
+// A meeting that stopped: ask the Chair for the resolution again.
+export async function retryMeeting(meetingId) {
   try {
-    const res = await base44.functions.invoke("runChairSynthesis", { meeting_id: meetingId });
+    const res = await base44.functions.invoke("meetingRun", { action: "retry", meeting_id: meetingId });
     if (res.data?.error) throw new Error(res.data.error);
     return res.data;
   } catch (e) {
-    throw new Error(meetingErrorMessage(e, "The Chair couldn't finish the resolution just now. Please try again in a moment."));
+    throw new Error(meetingErrorMessage(e, "Your board couldn't pick this meeting up again. Please ask the question again."));
   }
 }
 

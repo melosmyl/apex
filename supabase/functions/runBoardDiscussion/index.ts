@@ -17,6 +17,7 @@ const STALE_CLAIM_MS = 10 * 60_000;
 const MIN_ROUND_MS = 30_000;
 import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
+import { STEP_STALE_MS, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
 // startBoardMeeting) — nothing stops two advisors reaching for the same
@@ -168,6 +169,158 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
   return data;
 }
 
+// One discussion round: every advisor answers, in parallel, with the
+// discussion so far. Returns the round's messages (failed advisors dropped).
+async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, independentResponses, roundDeadline }: any) {
+  const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
+    const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs);
+    return callAdvisor(supabaseUrl, serviceKey, {
+      advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+      system_instructions: null, company_context: profile, meeting_context: meetingContext,
+      user_question: meeting.question, previous_responses: [], output_schema: DISCUSSION_SCHEMA,
+      temperature: advisor.temperature, request_type: `discussion_round_${round}`, deadline_at: roundDeadline,
+      // Their book, hobby or place stay on offer until they've used one.
+      personal_details: !usedPersonalDetail(advisor, ownWords(advisor, independentResponses, transcript)),
+    }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }));
+  }));
+
+  return roundResults.map((r: any) => {
+    if (r.error || !r.data?.response) return null;
+    const resp = r.data.response;
+    return {
+      round, advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
+      message: resp.message || '', message_type: resp.message_type || (isLastRound ? 'final_statement' : 'rebuttal'),
+      reply_to_advisor: resp.reply_to_advisor || null, changed_opinion: resp.changed_opinion || false,
+      new_position: resp.new_position || null, new_risks: resp.new_risks || [],
+      confidence_score: resp.confidence_score || 0,
+      answerable: resp.answerable !== false,
+      agrees_with: resp.agrees_with || null,
+      provider_used: r.data.provider_used, model_used: r.data.model_used,
+    };
+  }).filter(Boolean);
+}
+
+// Previously this only looked at changed_opinion/new_risks, which stops the
+// discussion exactly when two advisors quietly agree — neither needs to
+// change their mind or surface a new risk to keep agreeing. That's the
+// convergence bug: the loop would exit after a single discussion round in
+// precisely the case that most needed more rounds. When convergence was
+// flagged pre-discussion, run the full maxRounds so there's a genuine chance
+// to either differentiate or explicitly confirm agreement, rather than
+// exiting on silence.
+function discussionSettled(roundMessages, isLastRound, convergencePairs) {
+  const changes = roundMessages.filter(m => m.changed_opinion || (m.new_risks && m.new_risks.length > 0));
+  return changes.length === 0 && !isLastRound && convergencePairs.length === 0;
+}
+
+// What every round of this meeting works from: the server-chosen advisors,
+// the founder's profile, and Round 1 as the start of the transcript.
+async function loadDiscussion(db, meeting, ownerId): Promise<any> {
+  const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', ownerId).limit(100);
+  // What the founder has told us, so later rounds don't treat it as unknown.
+  const { data: company } = await db.from('companies').select('*').eq('id', meeting.company_id).maybeSingle();
+  const profile = companyProfile(company) || null;
+  // The Chair doesn't debate. A meeting started before she left the debate
+  // may still hold her Round 1 answer: it's dropped here, so she neither
+  // speaks in later rounds nor shows as absent from them.
+  const chair = findChair(advisors);
+  const independentResponses = (meeting.independent_responses || [])
+    .filter(r => !chair || r.advisor_id !== chair.id).slice(0, MAX_ROUND1_ENTRIES);
+  if (!independentResponses.length)
+    throw Object.assign(new Error('No independent responses found'), { status: 400 });
+
+  // Only the advisors the server chose when the meeting started — never
+  // whatever ids the browser-editable independent_responses list.
+  const chosen = meeting.participant_advisor_ids?.length ? new Set(meeting.participant_advisor_ids) : null;
+  const chosenNames = new Set(meeting.participants || []);
+  const meetingAdvisors = withoutChair((advisors || []).filter(a =>
+    a.type !== 'human' && (chosen ? chosen.has(a.id) : chosenNames.has(a.name))
+  ), chair);
+  if (!meetingAdvisors.length)
+    throw Object.assign(new Error('No AI advisors available for discussion'), { status: 400 });
+
+  const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
+  const limits = limitsList?.[0] || {};
+  const maxRounds = limits.max_discussion_rounds || 3;
+
+  // Names and roles of the board's AI advisors come from their rows, not
+  // from the browser-editable entry; human perspectives are bounded.
+  const byId = new Map<string, any>((advisors || []).map(a => [a.id, a]));
+  const clampScore = (n) => Math.max(0, Math.min(100, Number(n) || 0));
+  const roundOne = independentResponses.map(r => ({
+    round: 1, advisor_id: r.advisor_id,
+    advisor_name: String(byId.get(r.advisor_id)?.name ?? r.advisor_name ?? '').slice(0, 100),
+    role: String(byId.get(r.advisor_id)?.role ?? r.role ?? '').slice(0, 100),
+    message: String(r.position || r.recommendation || '').slice(0, MAX_ENTRY_CHARS), message_type: 'initial',
+    reply_to_advisor: null, changed_opinion: false, new_position: null,
+    new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
+    provider_used: r.provider_used, model_used: r.model_used,
+    unavailable: r.unavailable || false,
+  }));
+
+  // The server-chosen AI advisors plus the company's human advisors, all
+  // named from their rows: the entries themselves are browser-editable.
+  const meetingAdvisorIds = new Set(meetingAdvisors.map(a => a.id));
+  const convergenceInput = independentResponses
+    .filter(r => meetingAdvisorIds.has(r.advisor_id) || byId.get(r.advisor_id)?.type === 'human')
+    .map(r => ({ advisor_name: byId.get(r.advisor_id).name, recommendation: String(r.recommendation || '').slice(0, 2000) }));
+
+  return { profile, independentResponses, meetingAdvisors, maxRounds, roundOne, convergenceInput };
+}
+
+// A server-run meeting (P0): one round per step. Takes the next round,
+// answers at once, runs the round in the background, then hands over to
+// meetingRun for the next round or the resolution.
+async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
+  const completed = Math.max(1, meeting.discussion_rounds_completed || 0);
+  const round = completed + 1;
+  const claimedAt = new Date().toISOString();
+  const staleBefore = new Date(Date.now() - STEP_STALE_MS).toISOString();
+  let claim = db.from('board_meetings')
+    .update({ status: 'discussing', step_claimed_at: claimedAt, step_attempts: (meeting.step_attempts || 0) + 1 })
+    .eq('id', meeting.id).eq('step_attempts', meeting.step_attempts || 0).eq('awaiting_human_input', false)
+    .or(`status.eq.independent_complete,and(status.eq.discussing,step_claimed_at.is.null),and(status.eq.discussing,step_claimed_at.lt.${staleBefore})`);
+  claim = meeting.discussion_rounds_completed == null ? claim.is('discussion_rounds_completed', null) : claim.eq('discussion_rounds_completed', meeting.discussion_rounds_completed);
+  const { data: claimed } = await claim.select('id');
+  if (!claimed?.length) return { started: false };
+
+  later((async () => {
+    const startedAt = Date.now();
+    try {
+      const d = await loadDiscussion(db, meeting, user.id);
+      let convergencePairs: any = meeting.convergence_candidates;
+      if (!Array.isArray(convergencePairs)) {
+        convergencePairs = await detectConvergence(d.convergenceInput);
+        await db.from('board_meetings').update({ convergence_candidates: convergencePairs }).eq('id', meeting.id);
+      }
+      const transcript = meeting.discussion_transcript?.length ? meeting.discussion_transcript : d.roundOne;
+      const isLastRound = round >= d.maxRounds;
+      const roundMessages = round > d.maxRounds ? [] : await runOneRound({
+        supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds: d.maxRounds,
+        isLastRound, convergencePairs, profile: d.profile, independentResponses: d.independentResponses,
+        // Each round is its own step, with the whole step's time.
+        roundDeadline: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,
+      });
+      const next = [...transcript, ...roundMessages];
+      const done = isLastRound || !roundMessages.length || discussionSettled(roundMessages, isLastRound, convergencePairs);
+      const { data: saved } = await db.from('board_meetings').update({
+        discussion_transcript: next,
+        ...(roundMessages.length ? { discussion_rounds_completed: round } : {}),
+        status: done ? 'discussion_complete' : 'discussing',
+        step_claimed_at: null, step_attempts: 0, sweep_count: 0,
+        ...(done ? { convergence: convergencePairs.filter(p => stillConverged(p, next)).map(p => ({ advisors: p.names })) } : {}),
+      }).eq('id', meeting.id).eq('status', 'discussing').eq('step_claimed_at', claimedAt).select('id');
+      if (saved?.length) handOver(meeting.id);
+    } catch (e) {
+      // Let go of the round; the sweep tries it again (up to the limit).
+      console.error(`runBoardDiscussion: round ${round} failed:`, e.message);
+      await db.from('board_meetings').update({ step_claimed_at: null })
+        .eq('id', meeting.id).eq('status', 'discussing').eq('step_claimed_at', claimedAt);
+    }
+  })(), `discussion round ${round}`);
+  return { started: true, round };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -175,6 +328,20 @@ Deno.serve(async (req) => {
   let claimedMeetingId = null;
   let dbForRelease = null;
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const db = createClient(supabaseUrl, serviceKey);
+    const { meeting_id } = await req.json();
+    if (!meeting_id) return Response.json({ error: 'meeting_id is required' }, { status: 400, headers: corsHeaders });
+
+    // The server moving its own meeting on (meetingRun), as the owner.
+    if (isServiceCall(req)) {
+      const { data: meeting } = await db.from('board_meetings').select('*').eq('id', meeting_id).maybeSingle();
+      if (!meeting || meeting.driver !== 'server') return Response.json({ error: 'Not a server-run meeting' }, { status: 409, headers: corsHeaders });
+      const owner = await meetingOwner(db, meeting.created_by_id);
+      return Response.json(await serverRound(db, supabaseUrl, serviceKey, meeting, owner), { headers: corsHeaders });
+    }
+
     const authClient = createClient(
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_ANON_KEY'),
@@ -183,14 +350,10 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await authClient.auth.getUser();
     if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const db = createClient(supabaseUrl, serviceKey);
-
-    const { meeting_id } = await req.json();
-    if (!meeting_id) return Response.json({ error: 'meeting_id is required' }, { status: 400, headers: corsHeaders });
-
     const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
+    // The server runs this meeting itself; the page only watches.
+    if (meeting.driver === 'server')
+      return Response.json({ error: 'This meeting is moving on by itself.' }, { status: 409, headers: corsHeaders });
     await checkUserLimit(db, user.id, 'meeting_step');
 
     // Runs once, straight after Round 1. Claimed atomically, so parallel
@@ -206,59 +369,14 @@ Deno.serve(async (req) => {
     claimedMeetingId = meeting.id;
     dbForRelease = db;
 
-    const { data: advisors } = await db.from('advisors').select('*').eq('company_id', meeting.company_id).eq('created_by_id', user.id).limit(100);
-    // What the founder has told us, so later rounds don't treat it as unknown.
-    const { data: company } = await db.from('companies').select('*').eq('id', meeting.company_id).maybeSingle();
-    const profile = companyProfile(company) || null;
-    // The Chair doesn't debate. A meeting started before she left the debate
-    // may still hold her Round 1 answer: it's dropped here, so she neither
-    // speaks in later rounds nor shows as absent from them.
-    const chair = findChair(advisors);
-    const independentResponses = (meeting.independent_responses || [])
-      .filter(r => !chair || r.advisor_id !== chair.id).slice(0, MAX_ROUND1_ENTRIES);
-    if (!independentResponses.length)
-      throw Object.assign(new Error('No independent responses found'), { status: 400 });
+    const d = await loadDiscussion(db, meeting, user.id);
+    const { maxRounds } = d;
+    let transcript = d.roundOne;
+    const convergencePairs = await detectConvergence(d.convergenceInput);
 
-    // Only the advisors the server chose when the meeting started — never
-    // whatever ids the browser-editable independent_responses list.
-    const chosen = meeting.participant_advisor_ids?.length ? new Set(meeting.participant_advisor_ids) : null;
-    const chosenNames = new Set(meeting.participants || []);
-    const meetingAdvisors = withoutChair((advisors || []).filter(a =>
-      a.type !== 'human' && (chosen ? chosen.has(a.id) : chosenNames.has(a.name))
-    ), chair);
-    if (!meetingAdvisors.length)
-      throw Object.assign(new Error('No AI advisors available for discussion'), { status: 400 });
-
-    const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
-    const limits = limitsList?.[0] || {};
-    const maxRounds = limits.max_discussion_rounds || 3;
-
-    // Names and roles of the board's AI advisors come from their rows, not
-    // from the browser-editable entry; human perspectives are bounded.
-    const byId = new Map((advisors || []).map(a => [a.id, a]));
-    const clampScore = (n) => Math.max(0, Math.min(100, Number(n) || 0));
-    let transcript = independentResponses.map(r => ({
-      round: 1, advisor_id: r.advisor_id,
-      advisor_name: String(byId.get(r.advisor_id)?.name ?? r.advisor_name ?? '').slice(0, 100),
-      role: String(byId.get(r.advisor_id)?.role ?? r.role ?? '').slice(0, 100),
-      message: String(r.position || r.recommendation || '').slice(0, MAX_ENTRY_CHARS), message_type: 'initial',
-      reply_to_advisor: null, changed_opinion: false, new_position: null,
-      new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
-      provider_used: r.provider_used, model_used: r.model_used,
-      unavailable: r.unavailable || false,
-    }));
-
-    // The server-chosen AI advisors plus the company's human advisors, all
-    // named from their rows: the entries themselves are browser-editable.
-    const meetingAdvisorIds = new Set(meetingAdvisors.map(a => a.id));
-    const convergenceInput = independentResponses
-      .filter(r => meetingAdvisorIds.has(r.advisor_id) || byId.get(r.advisor_id)?.type === 'human')
-      .map(r => ({ advisor_name: byId.get(r.advisor_id).name, recommendation: String(r.recommendation || '').slice(0, 2000) }));
-    const convergencePairs = await detectConvergence(convergenceInput);
-
-    // Every round runs inside this one request until the meeting moves to
-    // the server (Phase 1b Stage 3): each round gets an equal share of the
-    // time left, and a round that couldn't finish isn't started.
+    // A meeting run by the page: every round inside this one request, each
+    // getting an equal share of the time left; a round that couldn't finish
+    // isn't started. (A server-run meeting gives each round its own step.)
     const stepDeadline = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
     for (let round = 2; round <= maxRounds; round++) {
       const timeLeft = stepDeadline - Date.now();
@@ -272,32 +390,10 @@ Deno.serve(async (req) => {
       // final-round instructions, so the discussion still closes properly.
       const isLastRound = round === maxRounds || timeLeft - roundShare < MIN_ROUND_MS;
 
-      const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
-        const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs);
-        return callAdvisor(supabaseUrl, serviceKey, {
-          advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-          system_instructions: null, company_context: profile, meeting_context: meetingContext,
-          user_question: meeting.question, previous_responses: [], output_schema: DISCUSSION_SCHEMA,
-          temperature: advisor.temperature, request_type: `discussion_round_${round}`, deadline_at: roundDeadline,
-          // Their book, hobby or place stay on offer until they've used one.
-          personal_details: !usedPersonalDetail(advisor, ownWords(advisor, independentResponses, transcript)),
-        }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }));
-      }));
-
-      const roundMessages = roundResults.map(r => {
-        if (r.error || !r.data?.response) return null;
-        const resp = r.data.response;
-        return {
-          round, advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
-          message: resp.message || '', message_type: resp.message_type || (isLastRound ? 'final_statement' : 'rebuttal'),
-          reply_to_advisor: resp.reply_to_advisor || null, changed_opinion: resp.changed_opinion || false,
-          new_position: resp.new_position || null, new_risks: resp.new_risks || [],
-          confidence_score: resp.confidence_score || 0,
-          answerable: resp.answerable !== false,
-          agrees_with: resp.agrees_with || null,
-          provider_used: r.data.provider_used, model_used: r.data.model_used,
-        };
-      }).filter(Boolean);
+      const roundMessages = await runOneRound({
+        supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
+        isLastRound, convergencePairs, profile: d.profile, independentResponses: d.independentResponses, roundDeadline,
+      });
 
       if (!roundMessages.length) break;
       transcript = [...transcript, ...roundMessages];
@@ -306,16 +402,7 @@ Deno.serve(async (req) => {
         discussion_transcript: transcript, discussion_rounds_completed: round,
       }).eq('id', meeting.id);
 
-      // Previously this only looked at changed_opinion/new_risks, which
-      // stops the discussion exactly when two advisors quietly agree —
-      // neither needs to change their mind or surface a new risk to keep
-      // agreeing. That's the convergence bug: the loop would exit after a
-      // single discussion round in precisely the case that most needed
-      // more rounds. When convergence was flagged pre-discussion, run the
-      // full maxRounds so there's a genuine chance to either differentiate
-      // or explicitly confirm agreement, rather than exiting on silence.
-      const changes = roundMessages.filter(m => m.changed_opinion || (m.new_risks && m.new_risks.length > 0));
-      if (changes.length === 0 && !isLastRound && convergencePairs.length === 0) break;
+      if (discussionSettled(roundMessages, isLastRound, convergencePairs)) break;
     }
 
     const finalConvergence = convergencePairs.filter(p => stillConverged(p, transcript));

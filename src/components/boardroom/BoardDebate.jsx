@@ -11,12 +11,14 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
 import { usePin } from "@/components/pins/PinContext";
-import { startMeeting, runDiscussion, runResolution, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
+import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
 import { useAdvisorProfile } from "@/components/advisors/AdvisorProfilePanel";
 import { useAssistant } from "@/lib/AssistantContext";
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 2000;
+// Phases in which the server is running the meeting and the page follows it.
+const LIVE_PHASES = ["preparing", "human_input", "discussion", "resolution"];
 
 function toRoundOneMessages(responses = []) {
   return responses.map((r) => ({
@@ -42,19 +44,36 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [question, setQuestion] = useState(initialQuestion || "");
-  const [phase, setPhase] = useState(loadedMeeting ? "result" : "idle");
-  const [result, setResult] = useState(loadedMeeting || null);
-  const [error, setError] = useState(null);
-  const [pendingMeetingId, setPendingMeetingId] = useState(null);
+  // A meeting reopened while the server is still running it (the founder
+  // locked their phone, or closed the tab) is followed live again.
+  const resuming = isRunningOnServer(loadedMeeting);
+  // A server-run meeting that stopped: reopened, it offers to try again
+  // rather than showing a resolution it doesn't have.
+  const stopped = loadedMeeting?.driver === "server" && loadedMeeting.status === "failed";
+  // True only until the founder starts a new question.
+  const resumingRef = useRef(resuming);
+  const [phase, setPhase] = useState(resuming ? meetingPhase(loadedMeeting) : stopped ? "idle" : loadedMeeting ? "result" : "idle");
+  const [result, setResult] = useState(resuming || stopped ? null : loadedMeeting || null);
+  const [error, setError] = useState(stopped ? loadedMeeting.failure_reason || "The board couldn't finish this meeting." : null);
+  // A server-run meeting that stopped, which the founder can try again.
+  const [failedMeetingId, setFailedMeetingId] = useState(stopped ? loadedMeeting.id : null);
+  // The meeting the page is following. Chosen here before startMeeting
+  // runs, so the live view can follow exactly this meeting while it forms.
+  const [pendingMeetingId, setPendingMeetingId] = useState(resuming ? loadedMeeting.id : null);
   const [liveTranscript, setLiveTranscript] = useState([]);
   // When this meeting was convened, for the "Meeting in session" line.
-  const [startedAt, setStartedAt] = useState(null);
-  // The id of the meeting being convened, chosen here before startMeeting
-  // runs, so the live view can follow exactly this meeting while it forms.
-  const [formingId, setFormingId] = useState(null);
+  const [startedAt, setStartedAt] = useState(resuming ? new Date(loadedMeeting.created_at) : null);
   // A finished meeting's result shows once the live playback has caught up
   // (or the founder skips ahead); a loaded past meeting shows straight away.
-  const [showResult, setShowResult] = useState(!!loadedMeeting);
+  const [showResult, setShowResult] = useState(!!loadedMeeting && !resuming);
+  const resultSentRef = useRef(false);
+  // Kept in a ref so a parent that passes a new function each render doesn't
+  // restart the meeting's polling.
+  const onResultRef = useRef(onResult);
+  onResultRef.current = onResult;
+  // Set once the founder has sent (or skipped) the human advisors' views: a
+  // poll that left before then mustn't bring that step back.
+  const humansSentRef = useRef(false);
   const finishPlayback = useCallback(() => { setShowResult(true); onResultShown?.(); }, [onResultShown]);
   // How many rounds a discussion can run, as the engine reads it.
   const [maxRounds, setMaxRounds] = useState(3);
@@ -114,6 +133,12 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   // from there, otherwise the whole board, up to the server's per-meeting
   // limit of MAX_DEBATERS debaters.
   useEffect(() => {
+    // A meeting picked up again keeps the advisors it started with.
+    if (resumingRef.current) {
+      const known = new Set(advisors.map((a) => a.id));
+      setSelectedIds((loadedMeeting.participant_advisor_ids || []).filter((id) => known.has(id)));
+      return;
+    }
     if (initialSelectedIds) {
       const known = new Set(advisors.map((a) => a.id));
       setSelectedIds(initialSelectedIds.filter((id) => known.has(id)));
@@ -125,41 +150,41 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     setSelectedIds(aiAdvisors.slice(0, MAX_DEBATERS).map((a) => a.id));
   }, [advisors, initialSelectedIds]);
 
-  // While Round 1 forms, the engine saves the Chair's opening and each
-  // advisor's answer as it arrives; show them as they come instead of
-  // waiting for the slowest advisor.
+  // Seats are fixed once for a meeting picked up again, as for a new one.
   useEffect(() => {
-    if (phase !== "preparing" || !formingId) return;
-    let cancelled = false;
-    const poll = async () => {
-      const { data } = await supabase
-        .from("board_meetings")
-        .select("chair_opening, independent_responses")
-        .eq("id", formingId)
-        .maybeSingle();
-      if (cancelled || !data) return;
-      if (data.chair_opening) setChairOpening((prev) => prev || data.chair_opening);
-      if (data.independent_responses?.length) growTranscript(toRoundOneMessages(data.independent_responses));
-    };
-    const t = setInterval(() => poll().catch(() => {}), 2000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, [phase, formingId, growTranscript]);
+    if (resumingRef.current && selectedIds?.length && !Object.keys(seatAssignment).length)
+      setSeatAssignment(assignChairs(aiAdvisors.filter((a) => selectedIds.includes(a.id)), chair));
+  }, [selectedIds, advisors]); // aiAdvisors and chair derive from advisors
 
+  // The server runs the meeting (P0); the page follows the meeting row: the
+  // Chair's opening and each answer as it arrives, and the step it's on.
   useEffect(() => {
-    if (phase !== "discussion" || !pendingMeetingId) return;
+    if (!LIVE_PHASES.includes(phase) || !pendingMeetingId) return;
     let cancelled = false;
     const poll = async () => {
-      try {
-        const meeting = await base44.entities.BoardMeeting.get(pendingMeetingId);
-        if (!cancelled) growTranscript(meeting?.discussion_transcript);
-      } catch {
-        // A dropped poll is cosmetic — the discussion continues server-side regardless.
+      const { data: m } = await supabase.from("board_meetings").select("*").eq("id", pendingMeetingId).maybeSingle();
+      if (cancelled || !m) return;
+      if (m.chair_opening) setChairOpening((prev) => prev || m.chair_opening);
+      if (m.discussion_transcript?.length) growTranscript(m.discussion_transcript);
+      else if (m.independent_responses?.length) growTranscript(toRoundOneMessages(m.independent_responses));
+      const next = meetingPhase(m);
+      if (next === "result") {
+        const final = { ...m, meeting_id: m.id };
+        setResult(final);
+        setPhase("result");
+        if (!resultSentRef.current) { resultSentRef.current = true; onResultRef.current?.(final); }
+      } else if (next === "failed" || next === "superseded") {
+        setError(next === "superseded" ? "This meeting was replaced by a newer one." : m.failure_reason || "The board couldn't finish this meeting.");
+        setFailedMeetingId(next === "failed" ? m.id : null);
+        setPhase("idle");
+      } else if (next && next !== phase && !(next === "human_input" && humansSentRef.current)) {
+        setPhase(next);
       }
     };
-    poll();
-    const t = setInterval(poll, POLL_INTERVAL_MS);
+    poll().catch(() => {});
+    const t = setInterval(() => poll().catch(() => {}), POLL_INTERVAL_MS);
     return () => { cancelled = true; clearInterval(t); };
-  }, [phase, pendingMeetingId]);
+  }, [phase, pendingMeetingId, growTranscript]);
 
   const toggleAdvisor = (a) => {
     let next;
@@ -173,29 +198,52 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const selectedAiAdvisors = aiAdvisors.filter((a) => selectedIds?.includes(a.id));
   const selectedHumanAdvisors = humanAdvisors.filter((a) => selectedIds?.includes(a.id));
 
+  // The human advisors' views are in (or skipped): the server carries on.
   const continueToDiscussion = async (meetingId, humanPerspectives = []) => {
-    setPhase("discussion");
     try {
       // Merge human perspectives into the meeting's independent responses
       if (humanPerspectives.length > 0) {
         const meeting = await base44.entities.BoardMeeting.get(meetingId);
-        const updatedResponses = [...(meeting.independent_responses || []), ...humanPerspectives];
+        // Sent again after a failed try: each person's view is kept once.
+        const sent = new Set(humanPerspectives.map((p) => p.advisor_id));
+        const updatedResponses = [...(meeting.independent_responses || []).filter((r) => !sent.has(r.advisor_id)), ...humanPerspectives];
         await base44.entities.BoardMeeting.update(meetingId, { independent_responses: updatedResponses });
         setLiveTranscript(toRoundOneMessages(updatedResponses));
       }
-      const discussed = await runDiscussion(meetingId);
-      // The poll stops with the discussion, and the last round can land
-      // between two polls: the engine returns the finished transcript, so
-      // the live view plays every round.
-      growTranscript(discussed?.discussion_transcript);
-      setPhase("resolution");
-      const final = await runResolution(meetingId);
-      setResult(final);
-      setPhase("result");
-      onResult?.(final);
+      humansSentRef.current = true;
+      await continueMeeting(meetingId);
+      setError(null);
+      setPhase("discussion");
     } catch (e) {
-      setError(e.message || "The board could not convene.");
-      setPhase("idle");
+      // The meeting is still waiting for these views: stay on this step so
+      // the founder can send them again.
+      humansSentRef.current = false;
+      setError(e.message || "The board could not carry on.");
+    }
+  };
+
+  const newQuestion = () => {
+    resumingRef.current = false;
+    setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); setSeatAssignment({}); setChairOpening(null);
+    // The finished meeting leaves the address, so a refresh starts fresh.
+    if (!freeAttemptId) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("meeting");
+      window.history.replaceState(window.history.state, "", url);
+    }
+  };
+
+  // A meeting that stopped: the Chair tries the resolution again.
+  const tryAgain = async () => {
+    const id = failedMeetingId;
+    setError(null); setFailedMeetingId(null);
+    try {
+      await retryMeeting(id);
+      setPendingMeetingId(id);
+      setShowResult(false);
+      setPhase("resolution");
+    } catch (e) {
+      setError(e.message);
     }
   };
 
@@ -203,26 +251,32 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     if (!question.trim()) return;
     if (selectedAiAdvisors.length < MIN_DEBATERS) { setError(`Select at least ${MIN_DEBATERS} advisors to debate.`); return; }
     if (selectedAiAdvisors.length > MAX_DEBATERS) { setError(`Select at most ${MAX_DEBATERS} advisors to debate.`); return; }
-    setPhase("preparing"); setError(null); setResult(null); setLiveTranscript([]); setChairOpening(null);
+    setPhase("preparing"); setError(null); setFailedMeetingId(null); setResult(null); setLiveTranscript([]); setChairOpening(null);
     setStartedAt(new Date()); setShowResult(false);
+    resultSentRef.current = false;
+    humansSentRef.current = false;
+    resumingRef.current = false;
     const meetingId = crypto.randomUUID();
-    setFormingId(meetingId);
+    setPendingMeetingId(meetingId);
+    // In the address, so a refresh or a reopened tab picks the meeting up
+    // again. (The free meeting page has its own address.)
+    if (!freeAttemptId) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("meeting", meetingId);
+      window.history.replaceState(window.history.state, "", url);
+    }
     setSeatAssignment(assignChairs(selectedAiAdvisors, chair));
     try {
-      const phase1 = await startMeeting({ companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId, meetingId });
-      setPendingMeetingId(phase1.meeting_id);
-      growTranscript(toRoundOneMessages(phase1.independent_responses));
-      setChairOpening(phase1.chair_opening || null);
+      // The server runs the meeting from here; the page follows it. With
+      // human advisors seated, it waits after Round 1 for their views.
+      const started = await startMeeting({
+        companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId, meetingId,
+        awaitHumans: selectedHumanAdvisors.length > 0,
+      });
       // The Assistant routed this question in from a captured note — the
       // note only learns its meeting_id now that a real meeting exists.
       if (routeFromNoteId) {
-        base44.entities.Note.update(routeFromNoteId, { routed_meeting_id: phase1.meeting_id, status: "routed" }).catch(() => {});
-      }
-      // If human advisors are selected, show the human perspective step
-      if (selectedHumanAdvisors.length > 0) {
-        setPhase("human_input");
-      } else {
-        await continueToDiscussion(phase1.meeting_id);
+        base44.entities.Note.update(routeFromNoteId, { routed_meeting_id: started.meeting_id, status: "routed" }).catch(() => {});
       }
     } catch (e) {
       setError(e.message || "The board could not convene.");
@@ -303,12 +357,15 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   // Human perspective step
   if (phase === "human_input") {
     return (
+      <>
+      {error && <p className="text-center text-sm text-destructive mb-3">{error}</p>}
       <HumanPerspectiveStep
         humanAdvisors={selectedHumanAdvisors}
         question={question}
         onSubmit={handleHumanPerspectives}
         onSkip={skipHumanInput}
       />
+      </>
     );
   }
 
@@ -345,6 +402,11 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
             {selectedAiAdvisors.length > MAX_DEBATERS && ` · At most ${MAX_DEBATERS} can debate`}
           </p>
           {error && <p className="text-center text-sm text-destructive mt-2">{error}</p>}
+          {failedMeetingId && (
+            <div className="text-center mt-2">
+              <Button variant="secondaryOutline" onClick={tryAgain}>Try the resolution again</Button>
+            </div>
+          )}
           <div className="max-w-xl mx-auto mt-8">
             <Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={3}
               placeholder="Ask your board a strategic question…"
@@ -367,7 +429,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     <div>
       <div className="flex items-center justify-between mb-6">
         <p className="font-display text-xl max-w-2xl">"{question}"</p>
-        <Button variant="secondaryOutline" className="shrink-0" onClick={() => { setPhase("idle"); setQuestion(""); setResult(null); setLiveTranscript([]); setSeatAssignment({}); setChairOpening(null); }}>New question</Button>
+        <Button variant="secondaryOutline" className="shrink-0" onClick={newQuestion}>New question</Button>
       </div>
       <MeetingResult result={result} advisors={advisors.filter((a) => selectedIds?.includes(a.id) || a.id === boardChair?.id)} companyId={companyId} onRecordDecision={isAnonymous ? undefined : recordDecision} onFollowup={isAnonymous ? undefined : handleFollowup} isAnonymous={isAnonymous} />
     </div>

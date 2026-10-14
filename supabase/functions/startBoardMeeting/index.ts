@@ -6,6 +6,7 @@ import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.t
 import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
+import { STEP_STALE_MS, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -275,11 +276,185 @@ async function claimFreeMeeting(db, userId, attemptId) {
   return outcome === 'ok' ? null : (CLAIM_REFUSALS[outcome] || CLAIM_REFUSALS.expired);
 }
 
+// Everything the board draws on for Round 1, for the meeting's owner.
+async function gather(db, userId, companyId, question): Promise<any> {
+  const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
+    // Archived and replaced documents stay out of the meeting.
+    db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
+      .or('status.is.null,status.not.in.(archived,superseded)').order('created_at', { ascending: false }).limit(20),
+    db.from('board_meetings').select('*').eq('company_id', companyId).eq('created_by_id', userId).eq('status', 'complete').order('created_at', { ascending: false }).limit(5),
+    db.from('projects').select('*').eq('company_id', companyId).eq('created_by_id', userId).order('created_at', { ascending: false }).limit(10),
+    db.from('advisors').select('*').eq('company_id', companyId).eq('created_by_id', userId).limit(100),
+    recallRelatedDecisions(db, companyId, userId, question),
+    loadOpenCommitments(db, companyId, userId),
+    loadProgressionSummary(db, companyId),
+  ]);
+  return { documents, meetings, projects, advisors, recalled, commitments, progression };
+}
+
+// What the board is drawing on, recorded so the founder can see it later.
+function buildMemoryContext(recalled, decisions, commitments) {
+  return {
+    retrieval: recalled.retrieval,
+    recalled_decisions: (decisions || []).slice(0, 5).map(d => ({
+      id: d.id,
+      question: d.question,
+      decided_at: d.created_at,
+      similarity: d.similarity ?? null,
+    })),
+    open_commitments: (commitments || []).map(c => ({
+      title: c.title,
+      days_open: c.days_open,
+      overdue: c.days_open >= OVERDUE_AFTER_DAYS,
+      meeting_question: c.meeting_question,
+    })),
+  };
+}
+
+// Round 1: every advisor answers on their own, in parallel, and the Chair
+// opens. Ends with the meeting at independent_complete.
+async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, previousMeeting, startedAt }: any) {
+  const company_id = meeting.company_id;
+  const question = meeting.question;
+  // Model calls end in time for this function to save their answers.
+  const deadlineAt = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
+
+  // Each Round 1 answer, and the Chair's opening, is saved the moment it's
+  // ready, so the founder's screen can show them as they arrive rather
+  // than waiting for the slowest advisor. Saves run one after another (no
+  // write overtakes another) and only while the meeting is still forming.
+  // While the meeting forms they're kept in arrival order.
+  const formatIndependent = (r: { advisor: any; data?: any; error?: string }) => {
+    const d = r.data;
+    if (r.error || !d?.response) {
+      return {
+        advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
+        provider_used: d?.provider_used || null, model_used: d?.model_used || null, used_fallback: d?.used_fallback || false,
+        position: 'This advisor was temporarily unavailable.', recommendation: 'No recommendation available.',
+        key_arguments: [], assumptions: [], risks: [], missing_information: [], suggested_actions: [], confidence_score: 0,
+        unavailable: true,
+      };
+    }
+    const resp = d.response;
+    return {
+      advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
+      provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
+      position: resp.position || '', recommendation: resp.recommendation || '',
+      key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
+      risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m: any) => keepOpenProfileField(m, company)),
+      suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
+    };
+  };
+  // Writes only while this run still holds Round 1: a server-run meeting's
+  // stalled run that wakes up after the sweep restarted it writes nothing.
+  const ours = (q) => {
+    q = q.eq('id', meeting.id).eq('status', 'preparing');
+    return meeting.driver === 'server' ? q.eq('step_attempts', meeting.step_attempts) : q;
+  };
+  const arrived: any[] = [];
+  let saving: Promise<unknown> = Promise.resolve();
+  const saveProgress = (fields: Record<string, unknown>) => {
+    saving = saving
+      .then(async () => {
+        const { error } = await ours(db.from('board_meetings').update(fields));
+        if (error) console.error('Round 1 progress save failed:', error.message);
+      })
+      .catch((e) => console.error('Round 1 progress save failed:', e?.message));
+  };
+
+  const [, chairOpening] = await Promise.all([
+    Promise.all(selectedAdvisors.map(advisor =>
+      callAdvisor(supabaseUrl, serviceKey, {
+        advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+        system_instructions: advisor.system_instructions, company_context: contextPackage,
+        user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
+        temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
+        personal_details: true, // nothing said yet in this meeting
+      }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
+        .then((r: { advisor: any; data?: any; error?: string }) => {
+          arrived.push(formatIndependent(r));
+          saveProgress({ independent_responses: [...arrived] });
+        })
+    )),
+    buildChairOpening({
+      supabaseUrl, serviceKey, db, chair, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
+      meetingId: meeting.id, newQuestion: question, previousMeeting, debaterNames: selectedAdvisors.map(a => a.name), deadlineAt,
+    }).then((opening) => {
+      if (opening) saveProgress({ chair_opening: opening });
+      return opening;
+    }).catch((e) => {
+      // The opening is never worth losing the meeting over.
+      console.error('Chair opening failed:', e.message);
+      return null;
+    }),
+  ]);
+  await saving;
+  // Saved for good in the board's own order, so later rounds don't always
+  // list the slowest advisors last. The live view follows turns by who
+  // gave them, not by position, so it isn't affected.
+  const rank = new Map<string, number>(selectedAdvisors.map((a: any, i: number) => [a.id, i]));
+  const independentResponses = [...arrived].sort((a, b) => (rank.get(a.advisor_id) ?? 0) - (rank.get(b.advisor_id) ?? 0));
+
+  // A free-meeting retry may have superseded it meanwhile.
+  await ours(db.from('board_meetings').update({
+    status: 'independent_complete', independent_responses: independentResponses,
+    chair_opening: chairOpening,
+    // A server-run meeting's step is over: the next one starts fresh.
+    ...(meeting.driver === 'server' ? { step_claimed_at: null, step_attempts: 0, sweep_count: 0 } : {}),
+  }));
+  return { independentResponses, chairOpening };
+}
+
+// The sweep found a server-run meeting's Round 1 stalled (the worker died):
+// run it again from the stored meeting, if it's still the one to run.
+async function retryRoundOne(db, supabaseUrl, serviceKey, meetingId) {
+  const { data: m } = await db.from('board_meetings').select('*').eq('id', meetingId).maybeSingle();
+  if (!m || m.driver !== 'server' || m.status !== 'preparing' || !m.step_claimed_at) return { started: false };
+  // Only a meeting startBoardMeeting set up has its advisors chosen.
+  if (!m.participant_advisor_ids?.length) throw Object.assign(new Error('This meeting has no advisors.'), { status: 400 });
+  const staleBefore = new Date(Date.now() - STEP_STALE_MS).toISOString();
+  const { data: claimed } = await db.from('board_meetings')
+    .update({ step_claimed_at: new Date().toISOString(), step_attempts: (m.step_attempts || 0) + 1, independent_responses: [], chair_opening: null })
+    .eq('id', m.id).eq('status', 'preparing').eq('step_attempts', m.step_attempts).lt('step_claimed_at', staleBefore)
+    .select().maybeSingle();
+  if (!claimed) return { started: false };
+
+  const user = await meetingOwner(db, m.created_by_id);
+  const { data: company } = await db.from('companies').select('*').eq('id', m.company_id).maybeSingle();
+  const { documents, meetings, projects, advisors, recalled, commitments, progression } = await gather(db, user.id, m.company_id, m.question);
+  const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
+  const chair = findChair(advisors);
+  const chosen = new Set(m.participant_advisor_ids || []);
+  const selectedAdvisors: any[] = withoutChair((advisors || []).filter(a => chosen.has(a.id) && a.type !== 'human'), chair);
+  const contextPackage = buildContext(company, documents, recalled.decisions, meetings, projects, commitments, progression, limitsList?.[0]?.max_context_size || 8000);
+  later(runRoundOne({
+    db, supabaseUrl, serviceKey, meeting: claimed, company, user, selectedAdvisors, chair, contextPackage,
+    previousMeeting: meetings?.[0] || null, startedAt: Date.now(),
+  }).then(() => handOver(m.id)), 'Round 1 retry');
+  return { started: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const startedAt = Date.now();
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const db = createClient(supabaseUrl, serviceKey);
+    const body = await req.json();
+
+    // The server restarting a server-run meeting's Round 1 that stalled.
+    if (isServiceCall(req)) {
+      if (body?.action !== 'round1' || !body.meeting_id) return Response.json({ error: 'Unknown action' }, { status: 400, headers: corsHeaders });
+      try {
+        return Response.json(await retryRoundOne(db, supabaseUrl, serviceKey, body.meeting_id), { headers: corsHeaders });
+      } catch (e) {
+        if (e.status === 400) return Response.json({ error: e.message }, { status: 400, headers: corsHeaders });
+        throw e;
+      }
+    }
+
     const authClient = createClient(
       Deno.env.get('SUPABASE_URL'),
       Deno.env.get('SUPABASE_ANON_KEY'),
@@ -288,11 +463,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await authClient.auth.getUser();
     if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const db = createClient(supabaseUrl, serviceKey);
-
-    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId } = await req.json();
+    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId, server_driven, await_humans } = body;
     // The browser may choose the new meeting's id, so its live view can follow
     // exactly this meeting while Round 1 forms. Only a well-formed UUID is
     // accepted; a clash with an existing row simply fails the insert.
@@ -317,23 +488,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'The free meeting needs to be started from the free meeting page.' }, { status: 403, headers: corsHeaders });
     if (!user.is_anonymous) await checkUserLimit(db, user.id, 'board_meeting');
 
-    const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
-      // Archived and replaced documents stay out of the meeting.
-      db.from('documents').select('*').eq('company_id', company_id).eq('created_by_id', user.id)
-        .or('status.is.null,status.not.in.(archived,superseded)').order('created_at', { ascending: false }).limit(20),
-      db.from('board_meetings').select('*').eq('company_id', company_id).eq('created_by_id', user.id).eq('status', 'complete').order('created_at', { ascending: false }).limit(5),
-      db.from('projects').select('*').eq('company_id', company_id).eq('created_by_id', user.id).order('created_at', { ascending: false }).limit(10),
-      db.from('advisors').select('*').eq('company_id', company_id).eq('created_by_id', user.id).limit(100),
-      recallRelatedDecisions(db, company_id, user.id, question),
-      loadOpenCommitments(db, company_id, user.id),
-      loadProgressionSummary(db, company_id),
-    ]);
+    const { documents, meetings, projects, advisors, recalled, commitments, progression } = await gather(db, user.id, company_id, question);
     const decisions = recalled.decisions;
 
     // The Chair never debates, even if the browser sends her id; a board
     // without one gets the built-in Chair for the opening and resolution.
     const chair = findChair(advisors);
-    const selectedAdvisors = withoutChair((advisors || []).filter(a => advisor_ids.includes(a.id) && a.type !== 'human'), chair);
+    const selectedAdvisors: any[] = withoutChair((advisors || []).filter(a => advisor_ids.includes(a.id) && a.type !== 'human'), chair);
     if (selectedAdvisors.length < minAdv)
       return Response.json({ error: `Select at least ${minAdv} advisors to debate` }, { status: 400, headers: corsHeaders });
     if (selectedAdvisors.length > maxAdv)
@@ -347,115 +508,37 @@ Deno.serve(async (req) => {
     }
 
     const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
+    const memoryContext = buildMemoryContext(recalled, decisions, commitments);
 
-    // What the board is drawing on, recorded so the founder can see it later.
-    const memoryContext = {
-      retrieval: recalled.retrieval,
-      recalled_decisions: (decisions || []).slice(0, 5).map(d => ({
-        id: d.id,
-        question: d.question,
-        decided_at: d.created_at,
-        similarity: d.similarity ?? null,
-      })),
-      open_commitments: (commitments || []).map(c => ({
-        title: c.title,
-        days_open: c.days_open,
-        overdue: c.days_open >= OVERDUE_AFTER_DAYS,
-        meeting_question: c.meeting_question,
-      })),
-    };
-
+    // A meeting the server runs (P0) moves on by itself; one started by an
+    // older page is run by that page, step by step, as before.
+    const serverRun = server_driven === true;
     const { data: meeting, error: createErr } = await db.from('board_meetings').insert({
       ...(requestedId ? { id: requestedId } : {}),
       company_id, created_by_id: user.id, question, participants: selectedAdvisors.map(a => a.name),
       participant_advisor_ids: selectedAdvisors.map(a => a.id),
       status: 'preparing', independent_responses: [], challenge_responses: [],
       memory_context: memoryContext,
+      ...(serverRun ? { driver: 'server', step_claimed_at: new Date().toISOString(), step_attempts: 1, awaiting_human_input: await_humans === true } : {}),
     }).select().single();
     if (createErr) throw createErr;
-
-    // Model calls end in time for this function to save their answers.
-    const deadlineAt = startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS;
 
     // The last meeting that actually reached a resolution: an abandoned,
     // failed or superseded one never happened as far as the Chair knows.
     const previousMeeting = meetings?.[0] || null;
+    const roundOne = { db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, previousMeeting };
 
-    // Each Round 1 answer, and the Chair's opening, is saved the moment it's
-    // ready, so the founder's screen can show them as they arrive rather
-    // than waiting for the slowest advisor. Saves run one after another (no
-    // write overtakes another) and only while the meeting is still forming.
-    // While the meeting forms they're kept in arrival order.
-    const formatIndependent = (r: { advisor: any; data?: any; error?: string }) => {
-      const d = r.data;
-      if (r.error || !d?.response) {
-        return {
-          advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
-          provider_used: d?.provider_used || null, model_used: d?.model_used || null, used_fallback: d?.used_fallback || false,
-          position: 'This advisor was temporarily unavailable.', recommendation: 'No recommendation available.',
-          key_arguments: [], assumptions: [], risks: [], missing_information: [], suggested_actions: [], confidence_score: 0,
-          unavailable: true,
-        };
-      }
-      const resp = d.response;
-      return {
-        advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
-        provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
-        position: resp.position || '', recommendation: resp.recommendation || '',
-        key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
-        risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m: any) => keepOpenProfileField(m, company)),
-        suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
-      };
-    };
-    const arrived: any[] = [];
-    let saving: Promise<unknown> = Promise.resolve();
-    const saveProgress = (fields: Record<string, unknown>) => {
-      saving = saving
-        .then(async () => {
-          const { error } = await db.from('board_meetings').update(fields).eq('id', meeting.id).eq('status', 'preparing');
-          if (error) console.error('Round 1 progress save failed:', error.message);
-        })
-        .catch((e) => console.error('Round 1 progress save failed:', e?.message));
-    };
+    if (serverRun) {
+      // Round 1 runs after this answers, so a closed tab doesn't stop it;
+      // the page follows the meeting row.
+      later(runRoundOne({ ...roundOne, startedAt }).then(() => handOver(meeting.id)), 'Round 1');
+      return Response.json({
+        meeting_id: meeting.id, status: 'preparing',
+        advisor_names: selectedAdvisors.map(a => a.name), memory_context: memoryContext,
+      }, { headers: corsHeaders });
+    }
 
-    const [, chairOpening] = await Promise.all([
-      Promise.all(selectedAdvisors.map(advisor =>
-        callAdvisor(supabaseUrl, serviceKey, {
-          advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-          system_instructions: advisor.system_instructions, company_context: contextPackage,
-          user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
-          temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
-          personal_details: true, // nothing said yet in this meeting
-        }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
-          .then((r: { advisor: any; data?: any; error?: string }) => {
-            arrived.push(formatIndependent(r));
-            saveProgress({ independent_responses: [...arrived] });
-          })
-      )),
-      buildChairOpening({
-        supabaseUrl, serviceKey, db, chair, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
-        meetingId: meeting.id, newQuestion: question, previousMeeting, debaterNames: selectedAdvisors.map(a => a.name), deadlineAt,
-      }).then((opening) => {
-        if (opening) saveProgress({ chair_opening: opening });
-        return opening;
-      }).catch((e) => {
-        // The opening is never worth losing the meeting over.
-        console.error('Chair opening failed:', e.message);
-        return null;
-      }),
-    ]);
-    await saving;
-    // Saved for good in the board's own order, so later rounds don't always
-    // list the slowest advisors last. The live view follows turns by who
-    // gave them, not by position, so it isn't affected.
-    const rank = new Map(selectedAdvisors.map((a, i) => [a.id, i]));
-    const independentResponses = [...arrived].sort((a, b) => (rank.get(a.advisor_id) ?? 0) - (rank.get(b.advisor_id) ?? 0));
-
-    await db.from('board_meetings').update({
-      status: 'independent_complete', independent_responses: independentResponses,
-      chair_opening: chairOpening,
-    }).eq('id', meeting.id).eq('status', 'preparing'); // a free-meeting retry may have superseded it meanwhile
-
+    const { independentResponses, chairOpening } = await runRoundOne({ ...roundOne, startedAt });
     return Response.json({
       meeting_id: meeting.id, status: 'independent_complete',
       independent_responses: independentResponses,

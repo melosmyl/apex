@@ -5,9 +5,13 @@ import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchem
 import { findChair, chairCallFields } from '../_shared/chair.ts';
 import { mergeRepair, normalizeResults, vagueParts } from '../_shared/resultsStandard.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
+import { STEP_STALE_MS, isServiceCall, meetingOwner } from '../_shared/meetingDriver.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
+// Shown to the founder when the Chair couldn't write a server-run meeting's
+// resolution; the page offers to try again.
+const CHAIR_FAILED = "The Chair couldn't write the resolution this time.";
 
 // The vague-action repair only runs with this much of the deadline left.
 const REPAIR_MIN_MS = 25_000;
@@ -137,15 +141,9 @@ Deno.serve(async (req) => {
   const startedAt = Date.now();
   let claimedMeetingId = null;
   let dbForRelease = null;
+  let serverRun = false;
+  let claimMine = (q) => q;
   try {
-    const authClient = createClient(
-      Deno.env.get('SUPABASE_URL'),
-      Deno.env.get('SUPABASE_ANON_KEY'),
-      { global: { headers: { Authorization: req.headers.get('Authorization') } } }
-    );
-    const { data: { user }, error: authErr } = await authClient.auth.getUser();
-    if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const db = createClient(supabaseUrl, serviceKey);
@@ -153,8 +151,29 @@ Deno.serve(async (req) => {
     const { meeting_id } = await req.json();
     if (!meeting_id) return Response.json({ error: 'meeting_id is required' }, { status: 400, headers: corsHeaders });
 
-    const meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
-    await checkUserLimit(db, user.id, 'meeting_step');
+    // A server-run meeting (P0) is resolved by the server, as its owner; the
+    // page only watches it. Any other meeting, by its owner's page.
+    let user, meeting;
+    serverRun = isServiceCall(req);
+    if (serverRun) {
+      const { data } = await db.from('board_meetings').select('*').eq('id', meeting_id).maybeSingle();
+      if (!data || data.driver !== 'server') return Response.json({ error: 'Not a server-run meeting' }, { status: 409, headers: corsHeaders });
+      meeting = data;
+      user = await meetingOwner(db, meeting.created_by_id);
+    } else {
+      const authClient = createClient(
+        Deno.env.get('SUPABASE_URL'),
+        Deno.env.get('SUPABASE_ANON_KEY'),
+        { global: { headers: { Authorization: req.headers.get('Authorization') } } }
+      );
+      const { data: { user: caller }, error: authErr } = await authClient.auth.getUser();
+      if (authErr || !caller) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+      user = caller;
+      meeting = await requireOwnedRow(db, 'board_meetings', meeting_id, user.id);
+      if (meeting.driver === 'server')
+        return Response.json({ error: 'This meeting is moving on by itself.' }, { status: 409, headers: corsHeaders });
+      await checkUserLimit(db, user.id, 'meeting_step');
+    }
 
     // A free-meeting visitor gets one finished meeting.
     if (user.is_anonymous) {
@@ -166,11 +185,18 @@ Deno.serve(async (req) => {
     // One resolution per meeting, claimed atomically so parallel requests
     // can't each run it (and each insert its tasks). A superseded meeting
     // (replaced by a free-meeting retry) is never finished.
-    const staleBefore = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
-    const { data: claimed } = await db.from('board_meetings').update({ status: 'synthesizing' })
+    // A server-run meeting counts its tries (the sweep gives up after a few)
+    // and takes over a stalled resolution sooner.
+    const staleBefore = new Date(Date.now() - (serverRun ? STEP_STALE_MS : STALE_CLAIM_MS)).toISOString();
+    let claim = db.from('board_meetings')
+      .update(serverRun ? { status: 'synthesizing', step_attempts: (meeting.step_attempts || 0) + 1 } : { status: 'synthesizing' })
       .eq('id', meeting.id)
-      .or(`status.in.(discussion_complete,challenge_complete,failed),and(status.eq.synthesizing,updated_at.lt.${staleBefore})`)
-      .select('id');
+      .or(`status.in.(discussion_complete,challenge_complete,failed),and(status.eq.synthesizing,updated_at.lt.${staleBefore})`);
+    if (serverRun) claim = claim.eq('step_attempts', meeting.step_attempts || 0);
+    const { data: claimed } = await claim.select('id');
+    // This run's own claim: its saves land only while it still holds it.
+    const mine = (q) => serverRun ? q.eq('step_attempts', (meeting.step_attempts || 0) + 1) : q;
+    claimMine = mine;
     if (!claimed?.length)
       return Response.json({ error: meeting.status === 'complete' ? 'This meeting already has a resolution.' : 'This meeting is not ready for a resolution.' }, { status: 409, headers: corsHeaders });
     claimedMeetingId = meeting.id;
@@ -229,7 +255,8 @@ Deno.serve(async (req) => {
 
     const resolution = chairResult?.response;
     if (!resolution) {
-      await db.from('board_meetings').update({ status: 'failed' }).eq('id', meeting.id).eq('status', 'synthesizing');
+      await mine(db.from('board_meetings').update({ status: 'failed', ...(serverRun ? { failure_reason: CHAIR_FAILED } : {}) })
+        .eq('id', meeting.id).eq('status', 'synthesizing'));
       claimedMeetingId = null;
       return Response.json({ error: 'Chair synthesis failed. The board could not reach a resolution.' }, { status: 503, headers: corsHeaders });
     }
@@ -279,8 +306,9 @@ Deno.serve(async (req) => {
           ...challengeResponses.map(r => ({ advisor: r.advisor_name, role: 'Challenge', message: r.revised_position, stance: 'challenges' })),
         ];
 
-    const { data: updated, error: saveErr } = await db.from('board_meetings').update({
+    const { data: updated, error: saveErr } = await mine(db.from('board_meetings').update({
       status: 'complete', board_resolution: resolution,
+      ...(serverRun ? { step_attempts: 0, sweep_count: 0, failure_reason: null } : {}),
       executive_summary: resolution.executive_summary,
       recommendation: resolution.recommended_direction,
       confidence_score: resolution.overall_confidence_score,
@@ -289,7 +317,7 @@ Deno.serve(async (req) => {
       next_steps: priorityActions.map(a => a.title),
       assigned_tasks: priorityActions,
       discussion: discussionField,
-    }).eq('id', meeting.id).eq('status', 'synthesizing').select().maybeSingle();
+    }).eq('id', meeting.id).eq('status', 'synthesizing')).select().maybeSingle();
     // A failed write is an error (the catch marks the meeting failed), not a
     // replaced meeting.
     if (saveErr) throw saveErr;
@@ -350,8 +378,8 @@ Deno.serve(async (req) => {
     }, { headers: corsHeaders });
   } catch (error) {
     if (claimedMeetingId && dbForRelease) {
-      await dbForRelease.from('board_meetings').update({ status: 'failed' })
-        .eq('id', claimedMeetingId).eq('status', 'synthesizing');
+      await claimMine(dbForRelease.from('board_meetings').update({ status: 'failed', ...(serverRun ? { failure_reason: CHAIR_FAILED } : {}) })
+        .eq('id', claimedMeetingId).eq('status', 'synthesizing'));
     }
     const denied = accessErrorResponse(error, corsHeaders);
     if (denied) return denied;
