@@ -108,6 +108,7 @@ export default function AdvisorResponseCard({ independent, challenge, accent, me
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Position</div>
           <p className="text-sm">{independent.position}</p>
+          {independent.because && <p className="text-sm text-muted-foreground mt-1">Why: {independent.because}</p>}
         </div>
         <div>
           <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Recommendation</div>

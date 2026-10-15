@@ -19,6 +19,8 @@ export default function Boardroom() {
   const [mode, setMode] = useState(null);
   const [question, setQuestion] = useState("");
   const [autoStart, setAutoStart] = useState(false);
+  // Ask the board, or Sit in, as chosen on the home view.
+  const [pace, setPace] = useState("quick");
   const [loadedMeeting, setLoadedMeeting] = useState(null);
   const [routeFromNoteId, setRouteFromNoteId] = useState(null);
   // Who's seated for the next meeting, set on the table and carried into it.
@@ -77,8 +79,9 @@ export default function Boardroom() {
     );
   }
 
-  const startDebate = (q, ids) => {
+  const startDebate = (q, ids, how = "quick") => {
     setQuestion(q);
+    setPace(how);
     if (ids) setAttendingIds(ids);
     setAutoStart(true);
     setMode("board_debate");
@@ -122,6 +125,7 @@ export default function Boardroom() {
             companyId={companyId}
             advisors={advisors}
             initialQuestion={question}
+            initialPace={pace}
             initialSelectedIds={attendingIds}
             onSelectionChange={setAttendingIds}
             loadedMeeting={loadedMeeting}

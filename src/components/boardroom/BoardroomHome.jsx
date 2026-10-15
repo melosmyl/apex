@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { MAX_DEBATERS, MIN_DEBATERS, MAX_AI_ADVISORS, MEETING_HINT, suggestedQuestionsFor } from "@/lib/boardroom";
 import BoardTable from "@/components/boardroom/BoardTable";
 import LastMeetingStrip from "@/components/boardroom/LastMeetingStrip";
+import PaceChoice, { usePaceOffered } from "@/components/boardroom/PaceChoice";
 
 // The Boardroom's front page (Workstream L, from the boardroom mock): who's
 // at the table, with attending/benched on each seat; the question box with
@@ -19,11 +20,14 @@ import LastMeetingStrip from "@/components/boardroom/LastMeetingStrip";
 // ported off Base44 (see AGENTS/handoff notes). Shown for discoverability,
 // not offered as a working alternative.
 const OTHER_MODES = MEETING_MODES.filter((m) => m.key !== "board_debate");
+const SIT_IN_HINT = "Plain words are fine. The board stops after each round, and nothing moves on until you do.";
 const ICONS = { Zap, MessagesSquare, FileText, ClipboardCheck, Radio };
 
 export default function BoardroomHome({ company, companyId, advisors, attendingIds, onAttendingChange, onStartDebate }) {
   const [question, setQuestion] = useState("");
   const [showOtherModes, setShowOtherModes] = useState(false);
+  const paceOffered = usePaceOffered();
+  const [pace, setPace] = useState("quick");
 
   // Resurfacing's real trigger point: this is where a founder actually
   // composes their question in the normal flow (BoardDebate's own idle
@@ -52,7 +56,7 @@ export default function BoardroomHome({ company, companyId, advisors, attendingI
 
   const submit = () => {
     if (!question.trim() || !enough) return;
-    onStartDebate(question, attendingIds);
+    onStartDebate(question, attendingIds, paceOffered ? pace : "quick");
   };
 
   return (
@@ -83,9 +87,10 @@ export default function BoardroomHome({ company, companyId, advisors, attendingI
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
             }}
           />
+          {paceOffered && <PaceChoice pace={pace} onChange={setPace} className="mt-2 border-t border-border pt-3" />}
           <div className="mt-2 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm text-muted-foreground">
-              {enough ? MEETING_HINT : aiOthers.length < MIN_DEBATERS ? (
+              {enough ? (paceOffered && pace === "sit_in" ? SIT_IN_HINT : MEETING_HINT) : aiOthers.length < MIN_DEBATERS ? (
                 <>A debate needs {MIN_DEBATERS} advisors besides the Chair. <Link to={`/company/${companyId}/team`} className="underline underline-offset-2 text-foreground">Invite {MIN_DEBATERS - aiOthers.length} more</Link>.</>
               ) : `Seat at least ${MIN_DEBATERS} advisors besides the Chair to convene.`}
             </span>

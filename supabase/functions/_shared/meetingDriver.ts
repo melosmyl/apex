@@ -48,6 +48,12 @@ export function handOver(meetingId: string) {
 
 export type Step = 'round1' | 'round' | 'synthesis';
 
+// Sit in: the meeting is at a stop and nothing starts until the founder
+// acts. Asking for the decision always wins: a stop written just after the
+// founder asked for it (a round finishing at that moment) never holds the
+// meeting.
+export const waitsForFounder = (m: any) => !!m?.waiting_for_founder && !m?.decide_now;
+
 // What a server-run meeting needs next, or null when nothing should start
 // now (a step is running, the founder is being waited for, or it's over).
 // `retry` is the founder asking to try a failed meeting again.
@@ -55,16 +61,12 @@ export function nextStep(m: any, now = Date.now(), retry = false): Step | null {
   if (!m || m.driver !== 'server') return null;
   const age = (t: string | null) => (t ? now - new Date(t).getTime() : Infinity);
   const claimStale = age(m.step_claimed_at) >= STEP_STALE_MS;
-  // Between steps, the founder typing holds the next one (up to the cap the
-  // server set), and asking for the decision skips the rounds left.
-  const typing = !!m.founder_typing_until && new Date(m.founder_typing_until).getTime() > now;
+  // Between steps, asking for the decision skips the rounds left.
   const between = m.status === 'independent_complete' ? !m.awaiting_human_input
     : m.status === 'discussing' ? !m.step_claimed_at : false;
-  // Typing as the last round ends holds the Chair too, so the note reaches her.
-  if ((between || m.status === 'discussion_complete') && typing) return null;
-  // An engaged founder's screen is still playing the last round: the next
-  // round waits for them, up to PACE_CAP_MS (P1.1). Not the Chair.
-  if (between && !m.decide_now && behindScreen(m, now)) return null;
+  // Sit in: at a stop, nothing starts until the founder acts (Carry on, a
+  // note, Decide now or One more round clear it first).
+  if ((between || m.status === 'discussion_complete') && waitsForFounder(m)) return null;
   // A step that failed is tried again after a pause, however often the
   // page checks in, so a short outage doesn't use up every try at once.
   const failedAt = m.step_finished_at ? new Date(m.step_finished_at).getTime() : 0;
@@ -97,9 +99,9 @@ export function needsSweep(m: any, now = Date.now()) {
   const age = (t: string | null) => (t ? now - new Date(t).getTime() : Infinity);
   switch (m.status) {
     case 'preparing': return !!m.step_claimed_at && age(m.step_claimed_at) >= STEP_STALE_MS;
-    case 'independent_complete': return !m.awaiting_human_input && age(m.updated_at) >= IDLE_GRACE_MS;
-    case 'discussing': return m.step_claimed_at ? age(m.step_claimed_at) >= STEP_STALE_MS : age(m.updated_at) >= IDLE_GRACE_MS;
-    case 'discussion_complete': return age(m.updated_at) >= IDLE_GRACE_MS;
+    case 'independent_complete': return !m.awaiting_human_input && !waitsForFounder(m) && age(m.updated_at) >= IDLE_GRACE_MS;
+    case 'discussing': return m.step_claimed_at ? age(m.step_claimed_at) >= STEP_STALE_MS : !waitsForFounder(m) && age(m.updated_at) >= IDLE_GRACE_MS;
+    case 'discussion_complete': return !waitsForFounder(m) && age(m.updated_at) >= IDLE_GRACE_MS;
     case 'synthesizing': return age(m.updated_at) >= STEP_STALE_MS;
     default: return false;
   }
@@ -114,38 +116,11 @@ export const STEP_FUNCTION: Record<Step, string> = {
 export const GAVE_UP = 'The board stopped partway through this meeting. Please ask the question again.';
 
 // ---- P1: the founder in the room --------------------------------------
-// P1.1: once the founder engages, the room keeps pace with their screen.
-export const WATCHING_MS = 15_000;
-export const PACE_CAP_MS = 45_000;
-
-// The founder is engaged and watching, and hasn't yet seen the round that
-// just finished; the wait is capped from when that round ended.
-export function behindScreen(m: any, now = Date.now()) {
-  const watching = !!m?.founder_watching_until && new Date(m.founder_watching_until).getTime() > now;
-  if (!watching) return false;
-  const done = Math.max(1, m.discussion_rounds_completed || 0);
-  if ((m.founder_seen_round || 0) >= done) return false;
-  // A meeting from before this change has no finish time: never held for it.
-  if (!m.step_finished_at) return false;
-  return now - new Date(m.step_finished_at).getTime() < PACE_CAP_MS;
-}
+// The pace a meeting runs at (owner, 15 October 2026). Join isn't built yet.
+export const PACES = ['quick', 'sit_in'];
 export const MAX_NOTES = 6;
 export const NOTE_LIMIT = 2000;
 export const MAX_EXTRA_ROUNDS = 2;
-// A typing signal holds the next step this long; the page renews it while
-// the founder types, up to HOLD_CAP_MS after the last step finished.
-export const TYPING_HOLD_MS = 15_000;
-export const HOLD_CAP_MS = 60_000;
-
-// Until when the next step waits for a founder who is typing now.
-export function holdUntil(m: any, now = Date.now()) {
-  const wanted = now + TYPING_HOLD_MS;
-  const running = m.status === 'preparing' || !!m.step_claimed_at;
-  // While a step runs, the hold only matters once it ends: no cap yet.
-  if (running || !m.step_finished_at) return new Date(wanted).toISOString();
-  return new Date(Math.min(wanted, new Date(m.step_finished_at).getTime() + HOLD_CAP_MS)).toISOString();
-}
-
 // The founder's notes no round has taken in yet (a note is taken when it
 // appears in the transcript, by id).
 export function unusedNotes(m: any) {

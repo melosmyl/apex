@@ -32,6 +32,7 @@ export const INDEPENDENT_SCHEMA = {
   type: 'object',
   properties: {
     position: { type: 'string', description: 'Your overall position on the question' },
+    because: { type: 'string', description: 'One sentence: the main reason for your position, naming something specific to this company or question (a number, a person, a place, or a fact the founder gave)' },
     recommendation: { type: 'string', description: 'Your specific recommendation' },
     key_arguments: { type: 'array', items: { type: 'string' } },
     assumptions: { type: 'array', items: { type: 'string' }, description: 'Empty if none' },
@@ -54,7 +55,7 @@ export const INDEPENDENT_SCHEMA = {
     suggested_actions: { type: 'array', items: { type: 'string' }, description: 'Empty if none' },
     confidence_score: { type: 'number', description: '0-100' },
   },
-  required: ['position', 'recommendation', 'key_arguments', 'assumptions', 'risks', 'missing_information', 'suggested_actions', 'confidence_score'],
+  required: ['position', 'because', 'recommendation', 'key_arguments', 'assumptions', 'risks', 'missing_information', 'suggested_actions', 'confidence_score'],
   'x-core': ['position', 'recommendation', 'key_arguments', 'confidence_score'],
 };
 

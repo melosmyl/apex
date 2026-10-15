@@ -51,9 +51,9 @@ const debaters = [names.grace, names.victor, names.priya].map((n) => byName(n).i
 const KNOW = `kiln-booked-for-november-${tag}`;
 await F.from('documents').insert({ company_id: co.id, created_by_id: uid, kind: 'knowledge', category: 'Operations', title: 'Kiln', content: `Our ${KNOW}.` });
 const slow = (ms: number) => Object.fromEntries([names.grace, names.victor, names.priya].map((n) => [n, ms]));
-const start = async (question: string) => {
+const start = async (question: string, pace = 'quick') => {
   const id = crypto.randomUUID();
-  const r = await call('startBoardMeeting', { company_id: co.id, question, advisor_ids: debaters, meeting_id: id, server_driven: true });
+  const r = await call('startBoardMeeting', { company_id: co.id, question, advisor_ids: debaters, meeting_id: id, server_driven: true, pace });
   if (r.status !== 200) console.log('start failed', r);
   return id;
 };
@@ -97,23 +97,6 @@ await script({ marks: ["THE BOARD'S RESOLUTION", KNOW] });
 const fu = await call('runFounderFollowup', { meeting_id: A, founder_message: 'Why craft fairs first?' });
 const fuLog = await fakeLog();
 check(fu.status === 200 && fuLog.length > 0 && fuLog.every((l: any) => l.marked.includes("THE BOARD'S RESOLUTION") && l.marked.includes(KNOW)), 'every follow-up answer is given the resolution and the full memory', fuLog.map((l: any) => l.marked));
-
-// ---- 2. Typing holds the next round; Carry on lets it go.
-console.log('\n== the board waits while the founder types');
-await script({ delayBy: slow(3000) });
-const B = await start('Should we raise prices?');
-await waitFor(B, (m) => m.status === 'discussing' && !!m.step_claimed_at, 60_000);
-await act(B, 'typing');
-const held = await waitFor(B, (m) => m.discussion_rounds_completed === 2, 60_000);
-await sleep(3000);
-const stillHeld = await row(B);
-check(held?.discussion_rounds_completed === 2 && stillHeld?.status === 'discussing' && !stillHeld?.step_claimed_at && new Date(stillHeld?.founder_typing_until).getTime() > Date.now(),
-  'after Round 2 the board waits for the founder who is typing', [stillHeld?.status, stillHeld?.step_claimed_at, stillHeld?.founder_typing_until]);
-const sw = await (await fetch(`${URL}/functions/v1/meetingRun`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE}` }, body: JSON.stringify({ action: 'sweep' }) })).json();
-check(!(B in (sw?.moved || {})) || sw.moved[B] === null, 'the sweep leaves it waiting too', sw);
-const co1 = await act(B, 'carry_on');
-const mB = await waitFor(B, finished);
-check(co1.json?.step === 'round' && mB?.status === 'complete' && JSON.stringify(rounds(mB)) === '[1,2,3]', 'Carry on: Round 3 runs and the meeting finishes', [co1.json, rounds(mB)]);
 
 // ---- 3. Decide now, and a note the Chair gets.
 console.log('\n== Decide now');
@@ -165,57 +148,18 @@ console.log('\n== One more round after an early end');
 // Distinct recommendations (no convergence) and no new risks: the room
 // settles after Round 2.
 await script({ delayBy: slow(2500), fields: { new_risks: Array(40).fill([]), recommendation: ['apples and pears', 'zebra crossing now', 'quantum kiln timing'] } });
-const E = await start('Should we sell at markets?');
-await waitFor(E, (m) => m.status === 'discussing' && !!m.step_claimed_at, 60_000);
-await act(E, 'typing');
-const settled = await waitFor(E, (m) => m.status === 'discussion_complete', 60_000);
+// Sit in, so the meeting stops after the discussion settles.
+const E = await start('Should we sell at markets?', 'sit_in');
+let e = await waitFor(E, (m) => m.waiting_for_founder, 60_000);
+while (e && e.status !== 'discussion_complete') { await act(E, 'carry_on'); e = await waitFor(E, (m) => m.waiting_for_founder && m.updated_at !== e.updated_at, 60_000); }
+const settled = e;
 const reopen = await act(E, 'more');
+// Round 3 runs, then Sit in stops again before the Chair.
+const afterMore = await waitFor(E, (m) => m.status === 'discussion_complete' && m.waiting_for_founder && m.discussion_rounds_completed === 3, 60_000);
+await act(E, 'carry_on');
 const mE = await waitFor(E, finished);
 check(settled?.discussion_rounds_completed === 2 && reopen.json?.rounds_target === 3 && JSON.stringify(rounds(mE)) === '[1,2,3]',
   'it settled at Round 2; one more round runs Round 3 only', [settled?.discussion_rounds_completed, reopen.json, rounds(mE)]);
-
-// ---- 6. A hold that runs out with the page gone: the sweep carries on.
-console.log('\n== the page goes away while the board waits');
-await script({ delayBy: slow(2500) });
-const G = await start('Should we hire a part-timer?');
-await waitFor(G, (m) => m.status === 'discussing' && !!m.step_claimed_at, 60_000);
-await act(G, 'typing');
-await waitFor(G, (m) => m.discussion_rounds_completed === 2, 60_000);
-// The hold ends, then the meeting sits idle long enough for the sweep.
-await waitFor(G, (m) => Date.now() - new Date(m.updated_at).getTime() > 31_000 && new Date(m.founder_typing_until || 0).getTime() < Date.now(), 90_000);
-const swG = await (await fetch(`${URL}/functions/v1/meetingRun`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE}` }, body: JSON.stringify({ action: 'sweep' }) })).json();
-const mG = await waitFor(G, finished);
-check(swG?.moved?.[G] === 'round' && mG?.status === 'complete' && JSON.stringify(rounds(mG)) === '[1,2,3]', 'the sweep moves it on and it finishes', [swG?.moved?.[G], rounds(mG)]);
-
-// ---- 7. P1.1: the room keeps pace with an engaged founder's screen.
-console.log('\n== the room keeps pace with the founder');
-await script({ delayBy: slow(2000) });
-const H = await start('Should we raise the price to £50?');
-await waitFor(H, (m) => m.status === 'discussing' && !!m.step_claimed_at, 60_000);
-// Engaged, and the screen has finished Round 1 only.
-await act(H, 'watching', { seen_round: 1 });
-const r2done = await waitFor(H, (m) => m.discussion_rounds_completed === 2, 60_000);
-await act(H, 'watching', { seen_round: 1 });
-await sleep(3000);
-const paced = await row(H);
-check(r2done?.discussion_rounds_completed === 2 && paced?.status === 'discussing' && !paced?.step_claimed_at && paced?.discussion_rounds_completed === 2,
-  "Round 3 waits while the founder's screen is still on Round 2", [paced?.status, paced?.step_claimed_at, paced?.founder_seen_round]);
-const caught = await act(H, 'watching', { seen_round: 2 });
-const mH = await waitFor(H, finished);
-check(caught.json?.step === 'round' && mH?.status === 'complete' && JSON.stringify(rounds(mH)) === '[1,2,3]', 'once the screen has played Round 2, Round 3 starts', [caught.json, rounds(mH)]);
-const back = await act(H, 'watching', { seen_round: 0 });
-check(back.status === 200, 'a finished meeting ignores the signal', back.status);
-
-console.log('\n== the wait for the screen is capped');
-const I = await start('Should we hire a designer?');
-await waitFor(I, (m) => m.status === 'discussing' && !!m.step_claimed_at, 60_000);
-await act(I, 'watching', { seen_round: 1 });
-await waitFor(I, (m) => m.discussion_rounds_completed === 2, 60_000);
-// The founder's screen stays behind: after 45 seconds the room carries on.
-await sleep(46_000);
-const capped = await act(I, 'watching', { seen_round: 1 });
-const mI = await waitFor(I, finished);
-check(capped.json?.step === 'round' && JSON.stringify(rounds(mI)) === '[1,2,3]', 'after 45 seconds the room carries on anyway', [capped.json, rounds(mI)]);
 
 // ---- 8. P1.1: a change of position after the founder pushes back is recorded.
 console.log('\n== changing position after the founder pushes back');

@@ -379,7 +379,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
     return {
       advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
       provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
-      position: resp.position || '', recommendation: resp.recommendation || '',
+      position: resp.position || '', because: resp.because || '', recommendation: resp.recommendation || '',
       key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
       risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m: any) => keepOpenProfileField(m, company)),
       suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
@@ -454,12 +454,21 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
     }).then(data => formatIndependent({ advisor, data })).catch(() => null),
   });
 
+  // Asked for the decision while Round 1 ran: no stop after it.
+  if (meeting.pace === 'sit_in') {
+    const { data: now } = await db.from('board_meetings').select('decide_now').eq('id', meeting.id).maybeSingle();
+    if (now?.decide_now) meeting = { ...meeting, decide_now: true };
+  }
   // A free-meeting retry may have superseded it meanwhile.
   await ours(db.from('board_meetings').update({
     status: 'independent_complete', independent_responses: independentResponses,
     chair_opening: chairOpening,
     // A server-run meeting's step is over: the next one starts fresh.
-    ...(meeting.driver === 'server' ? { step_claimed_at: null, step_attempts: 0, sweep_count: 0, step_finished_at: new Date().toISOString() } : {}),
+    ...(meeting.driver === 'server' ? {
+      step_claimed_at: null, step_attempts: 0, sweep_count: 0, step_finished_at: new Date().toISOString(),
+      // Sit in: the meeting stops here until the founder carries on.
+      waiting_for_founder: meeting.pace === 'sit_in' && !meeting.decide_now,
+    } : {}),
   }));
   return { independentResponses, chairOpening };
 }
@@ -524,7 +533,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await authClient.auth.getUser();
     if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
 
-    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId, server_driven, await_humans } = body;
+    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId, server_driven, await_humans, pace } = body;
     // The browser may choose the new meeting's id, so its live view can follow
     // exactly this meeting while Round 1 forms. Only a well-formed UUID is
     // accepted; a clash with an existing row simply fails the insert.
@@ -587,6 +596,9 @@ Deno.serve(async (req) => {
         driver: 'server', step_claimed_at: new Date().toISOString(), step_attempts: 1, awaiting_human_input: await_humans === true,
         // Every later round and the Chair work from this same memory (P1).
         context_package: contextPackage,
+        // How the founder holds it: Quick (the default) or Sit in. A visitor
+        // on the free meeting always gets Quick.
+        pace: !user.is_anonymous && pace === 'sit_in' ? 'sit_in' : 'quick',
       } : {}),
     }).select().single();
     if (createErr) throw createErr;

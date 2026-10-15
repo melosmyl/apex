@@ -81,7 +81,7 @@ export function DiscussionMessage({ msg, accent }) {
             <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">{msg.note_id ? `Said in the meeting${msg.to_name ? ` · to ${msg.to_name}` : ""}` : "Founder Reply"}</span>
           </div>
           <div className="bg-primary/5 rounded-xl p-3 border border-primary/10">
-            <p className="text-sm leading-relaxed text-foreground/90">{msg.message}</p>
+            <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{msg.message}</p>
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@ export function DiscussionMessage({ msg, accent }) {
             </span>
           )}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{msg.message}</p>
+        <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{msg.message}</p>
         {msg.new_position && (
           <p className="text-sm italic text-muted-foreground mt-1.5 pl-3 border-l-2 border-primary/30">
             New position: {msg.new_position}

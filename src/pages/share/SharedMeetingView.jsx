@@ -70,7 +70,7 @@ function TranscriptEntry({ msg }) {
             <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground"><RefreshCw className="w-2.5 h-2.5" /> Changed position</span>
           )}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90">{msg.message}</p>
+        <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{msg.message}</p>
         {msg.new_position && <p className="text-sm italic text-muted-foreground mt-1.5 pl-3 border-l-2 border-primary/30">New position: {msg.new_position}</p>}
       </div>
       <div className="text-right shrink-0 pt-0.5 text-xs text-muted-foreground">{Math.round(msg.confidence_score || 0)}%</div>

@@ -1,4 +1,4 @@
-import { assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { IDLE_GRACE_MS, STEP_STALE_MS, needsSweep, nextStep } from './meetingDriver.ts';
 
 const NOW = Date.parse('2026-10-15T12:00:00Z');
@@ -50,7 +50,7 @@ Deno.test('the sweep picks up stalled steps and meetings left between steps', ()
 });
 
 Deno.test("the sweep's thresholds match the cron job's filter in the migration", async () => {
-  const sql = await Deno.readTextFile(new URL('../../migrations/20261015100000_p0_server_meeting.sql', import.meta.url));
+  const sql = await Deno.readTextFile(new URL('../../migrations/20261016100000_sit_in.sql', import.meta.url));
   const job = sql.slice(sql.indexOf("'meeting-run-sweep'"));
   assertEquals((job.match(/interval '4 minutes'/g) || []).length, 3);
   assertEquals((job.match(/interval '30 seconds'/g) || []).length, 3);
@@ -58,29 +58,9 @@ Deno.test("the sweep's thresholds match the cron job's filter in the migration",
 });
 
 // ---- P1: the founder in the room
-import { HOLD_CAP_MS, TYPING_HOLD_MS, challengerFor, holdUntil, nextTarget, roundsFor, unusedNotes } from './meetingDriver.ts';
+import { challengerFor, nextTarget, roundsFor, unusedNotes } from './meetingDriver.ts';
 
-Deno.test('the founder typing holds the next step, and asking for the decision skips the rounds left', () => {
-  const typing = new Date(NOW + 5000).toISOString();
-  assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: null, founder_typing_until: typing }), NOW), null);
-  assertEquals(nextStep(m({ status: 'discussion_complete', founder_typing_until: typing }), NOW), null);
-  assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: null, founder_typing_until: ago(1000) }), NOW), 'round');
-  assertEquals(nextStep(m({ status: 'independent_complete', decide_now: true }), NOW), 'synthesis');
-  assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: null, decide_now: true }), NOW), 'synthesis');
-  // A round already running finishes first.
-  assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: ago(1000), decide_now: true }), NOW), null);
-});
 
-Deno.test('a typing hold lasts a few seconds, and never past a minute after the last step', () => {
-  const between = m({ status: 'discussing', step_claimed_at: null, step_finished_at: ago(50_000) });
-  assertEquals(holdUntil(between, NOW), new Date(NOW + 10_000).toISOString());
-  assertEquals(holdUntil(m({ status: 'discussing', step_claimed_at: null, step_finished_at: ago(1000) }), NOW), new Date(NOW + TYPING_HOLD_MS).toISOString());
-  assertEquals(holdUntil(m({ status: 'discussing', step_claimed_at: null, step_finished_at: ago(HOLD_CAP_MS + 1) }), NOW) <= new Date(NOW).toISOString(), true);
-  assertEquals(holdUntil(m({ status: 'preparing', step_claimed_at: ago(1000), step_finished_at: null }), NOW), new Date(NOW + TYPING_HOLD_MS).toISOString());
-  assertEquals(holdUntil(m({ status: 'discussing', step_claimed_at: null, step_finished_at: null }), NOW), new Date(NOW + TYPING_HOLD_MS).toISOString());
-  // While a round runs, the hold waits for it to end (no cap yet).
-  assertEquals(holdUntil(m({ status: 'discussing', step_claimed_at: ago(1000), step_finished_at: ago(HOLD_CAP_MS * 5) }), NOW), new Date(NOW + TYPING_HOLD_MS).toISOString());
-});
 
 Deno.test("a note is used once a round has taken it in; extra rounds are capped at two", () => {
   const notes = [{ id: 'a', text: 'x' }, { id: 'b', text: 'y' }];
@@ -104,24 +84,7 @@ Deno.test('the challenge duty rotates, starting with the Contrarian when seated'
 });
 
 // ---- P1.1: the room keeps pace with an engaged founder's screen
-import { PACE_CAP_MS, behindScreen } from './meetingDriver.ts';
 
-Deno.test("once engaged, the next round waits for the founder's screen, up to a cap; not the Chair", () => {
-  const watching = new Date(NOW + 10_000).toISOString();
-  const between = { status: 'discussing', step_claimed_at: null, discussion_rounds_completed: 2, step_finished_at: ago(5000), founder_watching_until: watching };
-  assertEquals(nextStep(m({ ...between, founder_seen_round: 1 }), NOW), null);
-  assertEquals(nextStep(m({ ...between, founder_seen_round: 2 }), NOW), 'round');
-  // Waited long enough, or the page went away: carry on.
-  assertEquals(nextStep(m({ ...between, founder_seen_round: 1, step_finished_at: ago(PACE_CAP_MS) }), NOW), 'round');
-  assertEquals(nextStep(m({ ...between, founder_seen_round: 1, founder_watching_until: ago(1) }), NOW), 'round');
-  // Never engaged: full speed, as before.
-  assertEquals(nextStep(m({ ...between, founder_watching_until: null }), NOW), 'round');
-  // The Chair isn't held for the screen, and Decide now isn't either.
-  assertEquals(nextStep(m({ ...between, status: 'discussion_complete', founder_seen_round: 1 }), NOW), 'synthesis');
-  assertEquals(nextStep(m({ ...between, founder_seen_round: 1, decide_now: true }), NOW), 'synthesis');
-  // Round 1: the screen must have finished it.
-  assertEquals(behindScreen({ status: 'independent_complete', discussion_rounds_completed: 0, founder_seen_round: 0, founder_watching_until: watching, step_finished_at: ago(1000) }, NOW), true);
-});
 
 
 Deno.test('a failed step is tried again after a pause, however often the page checks in', () => {
@@ -132,11 +95,6 @@ Deno.test('a failed step is tried again after a pause, however often the page ch
   assertEquals(nextStep(m({ ...failed, step_attempts: 0, step_finished_at: ago(1000) }), NOW), 'round');
 });
 
-Deno.test('a meeting from before pacing is never held for the screen', () => {
-  assertEquals(behindScreen({ status: 'discussing', discussion_rounds_completed: 2, founder_seen_round: 0, founder_watching_until: new Date(NOW + 10_000).toISOString(), step_finished_at: null }, NOW), false);
-  // A screen ahead of the server (after a reload) isn't behind.
-  assertEquals(behindScreen({ status: 'discussing', discussion_rounds_completed: 2, founder_seen_round: 3, founder_watching_until: new Date(NOW + 10_000).toISOString(), step_finished_at: ago(1000) }, NOW), false);
-});
 
 Deno.test('Decide now after a failed round goes straight to the Chair', () => {
   assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: null, step_attempts: 1, step_finished_at: ago(2000), decide_now: true }), NOW), 'synthesis');
@@ -152,4 +110,30 @@ Deno.test("the Chair's resolution always goes to Claude, with no other provider 
   assertEquals([onClaude.model_override, onClaude.same_provider_only], [undefined, true]);
   const builtIn: any = resolutionCallFields(null);
   assertEquals([builtIn.advisor_override?.default_provider, builtIn.same_provider_only], ['anthropic', true]);
+});
+
+
+// ---- Sit in (owner, 15 October 2026)
+Deno.test('Sit in: at a stop nothing starts, and the sweep leaves it alone, until the founder acts', () => {
+  for (const status of ['independent_complete', 'discussing', 'discussion_complete']) {
+    const waiting = m({ status, step_claimed_at: null, waiting_for_founder: true, updated_at: ago(24 * 60 * 60_000) });
+    assertEquals([nextStep(waiting, NOW), needsSweep(waiting, NOW)], [null, false]);
+    assertEquals(nextStep({ ...waiting, waiting_for_founder: false }, NOW), status === 'discussion_complete' ? 'synthesis' : 'round');
+  }
+  // A round that is running isn't affected by the flag.
+  assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: ago(STEP_STALE_MS), waiting_for_founder: true }), NOW), 'round');
+});
+
+Deno.test('Sit in: asking for the decision always wins over a stop written at the same moment', () => {
+  for (const status of ['independent_complete', 'discussing', 'discussion_complete']) {
+    const both = m({ status, step_claimed_at: null, waiting_for_founder: true, decide_now: true, updated_at: ago(60_000) });
+    assertEquals([nextStep(both, NOW), needsSweep(both, NOW)], ['synthesis', true]);
+  }
+});
+
+Deno.test("the cron job never calls the sweep for a meeting at a stop, and counts a day from the last move", async () => {
+  const sql = await Deno.readTextFile(new URL('../../migrations/20261016100000_sit_in.sql', import.meta.url));
+  const job = sql.slice(sql.indexOf("'meeting-run-sweep'"));
+  assertEquals((job.match(/\(not waiting_for_founder or decide_now\)/g) || []).length, 3);
+  assert(job.includes("updated_at > now() - interval '1 day'") && !job.includes("created_at > now()"));
 });

@@ -6,25 +6,25 @@
 //   advance  (service role)   a step that just ended hands over here
 //   continue (the founder)    after typing human advisors' views, or skipping
 //   retry    (the founder)    a meeting that failed: try the resolution again
-//   typing   (the founder)    is typing: hold the next step a little (P1)
 //   note     (the founder)    a fact, a question to one advisor, or a challenge
-//   carry_on (the founder)    stop waiting for them
+//   carry_on (the founder)    Sit in: the board may go on to the next step
 //   decide   (the founder)    no more rounds: the Chair resolves now
 //   more     (the founder)    one more round, up to two (not on a free meeting)
-//   watching (the founder)    engaged, and their screen has played up to a
-//                             round: the room keeps pace with them (P1.1)
 //   sweep    (service role)   pg_cron, every minute: meetings nobody moved on
 //                             and steps that stalled
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, accessErrorResponse, checkUserLimit } from '../_shared/access.ts';
-import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, WATCHING_MS, callAsServer, holdUntil, isServiceCall, later, needsSweep, nextStep, nextTarget } from '../_shared/meetingDriver.ts';
+import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, callAsServer, isServiceCall, later, needsSweep, nextStep, nextTarget, unusedNotes } from '../_shared/meetingDriver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: corsHeaders });
+// Not at a Sit in stop (see waitsForFounder): the sweep never fetches those,
+// so a backlog of waiting meetings can't crowd out one that stalled.
+const NOT_WAITING = 'or(waiting_for_founder.eq.false,decide_now.eq.true)';
 const ACTIVE = ['preparing', 'independent_complete', 'discussing', 'discussion_complete', 'synthesizing'];
 
 const giveUp = (db: any, m: any, reason: string) =>
@@ -39,6 +39,40 @@ async function refused(db: any, m: any, res: Response) {
   if (res.status !== 400 && res.status !== 403) { await res.body?.cancel(); return; }
   const body = await res.json().catch(() => ({}));
   await giveUp(db, m, typeof body?.error === 'string' && body.error.length < 200 ? body.error : GAVE_UP);
+}
+
+// A Sit in stop ends: the founder carried on (or did something that does).
+// Given the stop the founder's page showed (status and rounds done), only
+// that stop ends: a click that arrives late never ends a later one.
+function release(db: any, id: string, seen?: any) {
+  let q = db.from('board_meetings').update({ waiting_for_founder: false }).eq('id', id);
+  if (seen && typeof seen.status === 'string' && Number.isInteger(seen.rounds))
+    q = q.eq('status', seen.status).eq('discussion_rounds_completed', seen.rounds);
+  return q;
+}
+
+// Sit in, once the planned rounds are done: a note gets one more round so
+// the board answers it (owner's decision), while extra rounds are left and
+// the founder hasn't asked for the decision.
+const oneMoreForNote = (m: any, user: any) => m.status === 'discussion_complete' && m.pace === 'sit_in'
+  && !user.is_anonymous && !m.decide_now && (m.extra_rounds || 0) < MAX_EXTRA_ROUNDS;
+
+// Exactly one more round: one past the plan, or one past where a discussion
+// that just ended stopped (it reopens; the Chair hasn't started). A paid
+// step, counted like any other. Ends a Sit in stop.
+async function addRound(db: any, user: any, meeting: any, { limitChecked = false } = {}) {
+  if (!limitChecked) await checkUserLimit(db, user.id, 'meeting_step');
+  const { data: limitsRows } = await db.from('system_limits').select('max_discussion_rounds').order('created_at', { ascending: false }).limit(1);
+  const target = nextTarget(limitsRows?.[0]?.max_discussion_rounds || 3, meeting);
+  const reopen = meeting.status === 'discussion_complete';
+  const { data: more } = await db.from('board_meetings')
+    .update({
+      extra_rounds: (meeting.extra_rounds || 0) + 1, rounds_target: target, waiting_for_founder: false,
+      ...(reopen ? { status: 'discussing', step_finished_at: new Date().toISOString() } : {}),
+    })
+    .eq('id', meeting.id).eq('status', meeting.status).eq('extra_rounds', meeting.extra_rounds || 0).select('extra_rounds, rounds_target');
+  if (!more?.length) return { ok: false };
+  return { ok: true, extra_rounds: more[0].extra_rounds, rounds_target: more[0].rounds_target, step: await advance(db, meeting.id) };
 }
 
 // Starts what the meeting needs next. A step that has already been tried
@@ -71,17 +105,19 @@ async function advance(db: any, meetingId: string, { retry = false, swept = fals
 // need picking up, oldest first, so a backlog can't hide one.
 async function sweep(db: any) {
   const now = Date.now();
+  // Anything that moved in the last day: a Sit in meeting can wait for days
+  // and carry on later.
   const since = new Date(now - 24 * 60 * 60_000).toISOString();
   const stale = new Date(now - STEP_STALE_MS).toISOString();
   const idle = new Date(now - IDLE_GRACE_MS).toISOString();
   const { data } = await db.from('board_meetings').select('*')
-    .eq('driver', 'server').in('status', ACTIVE).gte('created_at', since)
+    .eq('driver', 'server').in('status', ACTIVE).gte('updated_at', since)
     .or([
       `and(status.eq.preparing,step_claimed_at.lt.${stale})`,
-      `and(status.eq.independent_complete,awaiting_human_input.eq.false,updated_at.lt.${idle})`,
-      `and(status.eq.discussing,step_claimed_at.is.null,updated_at.lt.${idle})`,
+      `and(status.eq.independent_complete,awaiting_human_input.eq.false,${NOT_WAITING},updated_at.lt.${idle})`,
+      `and(status.eq.discussing,step_claimed_at.is.null,${NOT_WAITING},updated_at.lt.${idle})`,
       `and(status.eq.discussing,step_claimed_at.lt.${stale})`,
-      `and(status.eq.discussion_complete,updated_at.lt.${idle})`,
+      `and(status.eq.discussion_complete,${NOT_WAITING},updated_at.lt.${idle})`,
       `and(status.eq.synthesizing,updated_at.lt.${stale})`,
     ].join(','))
     .order('updated_at', { ascending: true }).limit(50);
@@ -114,29 +150,13 @@ Deno.serve(async (req) => {
 
     if (action === 'continue') {
       // Only the founder ends the wait for human advisors' views.
-      await db.from('board_meetings').update({ awaiting_human_input: false })
+      // In Sit in this is also the stop after Round 1: one click goes on.
+      await db.from('board_meetings').update({ awaiting_human_input: false, waiting_for_founder: false })
         .eq('id', meeting.id).eq('awaiting_human_input', true);
       return json({ step: await advance(db, meeting.id) });
     }
     const open = ['preparing', 'independent_complete', 'discussing', 'discussion_complete'].includes(meeting.status);
 
-    if (action === 'typing') {
-      // Past the minute's cap the board carries on: no more holding.
-      const until = holdUntil(meeting);
-      if (open && new Date(until).getTime() > Date.now())
-        await db.from('board_meetings').update({ founder_typing_until: until }).eq('id', meeting.id).eq('status', meeting.status);
-      return json({ ok: true });
-    }
-    if (action === 'watching') {
-      if (!open) return json({ ok: true });
-      // The screen only moves forward; a page reloaded at the start replays
-      // from Round 1, but what the founder already saw stays seen.
-      const seen = Math.max(meeting.founder_seen_round || 0, Math.min(20, Math.max(0, Number(body.seen_round) || 0)));
-      await db.from('board_meetings').update({ founder_seen_round: seen, founder_watching_until: new Date(Date.now() + WATCHING_MS).toISOString() })
-        .eq('id', meeting.id).eq('status', meeting.status);
-      // Caught up, or waited long enough: the room carries on.
-      return json({ step: await advance(db, meeting.id) });
-    }
     if (action === 'note') {
       const text = typeof body.text === 'string' ? body.text.trim() : '';
       if (!text) return json({ error: 'Write something first.' }, 400);
@@ -149,6 +169,10 @@ Deno.serve(async (req) => {
         const { data: a } = await db.from('advisors').select('name').eq('id', to).maybeSingle();
         toName = a?.name || null;
       }
+      // A note that brings one more round is a paid step: counted before the
+      // note is kept, so a refused round never leaves a note behind.
+      const oneMore = oneMoreForNote(meeting, user);
+      if (oneMore) await checkUserLimit(db, user.id, 'meeting_step');
       const note = { id: crypto.randomUUID(), text, to_advisor_id: to, to_name: toName, at: new Date().toISOString() };
       const { data: added, error } = await db.rpc('append_founder_note', { p_meeting_id: meeting.id, p_note: note, p_max: MAX_NOTES });
       if (error) throw error;
@@ -156,39 +180,37 @@ Deno.serve(async (req) => {
         const full = (meeting.founder_notes || []).length >= MAX_NOTES;
         return json({ error: full ? `You can add up to ${MAX_NOTES} notes in one meeting.` : 'The Chair is already writing up. Ask the board after the resolution.' }, 409);
       }
-      // Goes into the next round; after the last round, to the Chair.
+      // Otherwise, and in a Quick meeting, a note after the last round goes
+      // to the Chair.
+      if (oneMore) {
+        const added = await addRound(db, user, meeting, { limitChecked: true });
+        if (added.ok) return json({ note, extra_rounds: added.extra_rounds, step: added.step, answered_in: 'one more round' });
+      }
+      await release(db, meeting.id);
       return json({ note, step: await advance(db, meeting.id), to_chair: meeting.status === 'discussion_complete' });
     }
     if (action === 'carry_on') {
-      await db.from('board_meetings').update({ founder_typing_until: null }).eq('id', meeting.id);
+      // A note that arrived while the last round was being written hasn't
+      // been answered: carrying on gives it its round, as one sent at the stop.
+      if (meeting.waiting_for_founder && unusedNotes(meeting).length && oneMoreForNote(meeting, user)) {
+        const added = await addRound(db, user, meeting);
+        if (added.ok) return json({ extra_rounds: added.extra_rounds, step: added.step, answered_in: 'one more round' });
+      }
+      await release(db, meeting.id, body.at);
       return json({ step: await advance(db, meeting.id) });
     }
     if (action === 'decide') {
       if (!open) return json({ error: 'The Chair is already on it.' }, 409);
-      await db.from('board_meetings').update({ decide_now: true, founder_typing_until: null }).eq('id', meeting.id).in('status', ['preparing', 'independent_complete', 'discussing']);
+      await db.from('board_meetings').update({ decide_now: true, waiting_for_founder: false }).eq('id', meeting.id).in('status', ['preparing', 'independent_complete', 'discussing', 'discussion_complete']);
       return json({ step: await advance(db, meeting.id) });
     }
     if (action === 'more') {
       if (user.is_anonymous) return json({ error: 'Create an account to ask for more rounds.' }, 403);
       if (!open || meeting.decide_now) return json({ error: 'The Chair is already on it.' }, 409);
       if ((meeting.extra_rounds || 0) >= MAX_EXTRA_ROUNDS) return json({ error: `A meeting can have up to ${MAX_EXTRA_ROUNDS} extra rounds.` }, 409);
-      // Each extra round is a paid step.
-      await checkUserLimit(db, user.id, 'meeting_step');
-      // Exactly one more round: one past the plan, or one past where a
-      // discussion that just ended stopped (it reopens; the Chair hasn't
-      // started).
-      const { data: limitsRows } = await db.from('system_limits').select('max_discussion_rounds').order('created_at', { ascending: false }).limit(1);
-      const target = nextTarget(limitsRows?.[0]?.max_discussion_rounds || 3, meeting);
-      const reopen = meeting.status === 'discussion_complete';
-      const { data: more } = await db.from('board_meetings')
-        .update({
-          // Asking for a round is the founder done typing, like Decide now.
-          extra_rounds: (meeting.extra_rounds || 0) + 1, rounds_target: target, founder_typing_until: null,
-          ...(reopen ? { status: 'discussing', step_finished_at: new Date().toISOString() } : {}),
-        })
-        .eq('id', meeting.id).eq('status', meeting.status).eq('extra_rounds', meeting.extra_rounds || 0).select('extra_rounds, rounds_target');
-      if (!more?.length) return json({ error: 'The Chair is already on it.' }, 409);
-      return json({ extra_rounds: more[0].extra_rounds, rounds_target: more[0].rounds_target, step: await advance(db, meeting.id) });
+      const added = await addRound(db, user, meeting);
+      if (!added.ok) return json({ error: 'The Chair is already on it.' }, 409);
+      return json({ extra_rounds: added.extra_rounds, rounds_target: added.rounds_target, step: added.step });
     }
     if (action === 'retry') {
       // Each try is a paid resolution: it counts like any meeting step.

@@ -3,20 +3,19 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCost } from "@/lib/money";
-import { meetingAction, betweenSteps, noteStatus, EXTRA_ROUND_USD, MAX_EXTRA_ROUNDS } from "@/lib/boardroom";
+import { meetingAction, noteStatus, EXTRA_ROUND_USD, MAX_EXTRA_ROUNDS } from "@/lib/boardroom";
 import { firstName } from "@/lib/meetingPlayback";
 
-// The founder in the room (Workstream P1): while the meeting runs, the
-// founder can add a fact, ask one advisor something, or push back. It goes
-// into the next round, and the advisors answer it as they answer each other.
+// "Sit in" (owner, 15 October 2026): the meeting stops after every round and
+// waits for the founder. They read at their own pace, then add a fact, ask
+// one advisor something or push back (answered first in the next round), or
+// press Carry on. Nothing moves until they do. After the last round a note
+// gets one more round, so the board answers it, while extra rounds are left.
 //
-// P1.1: the box is pinned to the bottom of the screen and never moves; the
-// meeting scrolls behind it, and on a phone it sits above the keyboard. Once
-// the founder engages (clicks into it or types), the room keeps pace with
-// their screen: the next round waits until they've seen the last one.
-// A founder who says nothing sees the meeting run exactly as before.
+// The box is pinned to the bottom of the screen and never moves; the meeting
+// scrolls behind it, and on a phone it sits above the keyboard. Only Sit in
+// meetings have it: "Ask the board" (Quick) is today's meeting, untouched.
 
-const SIGNAL_EVERY_MS = 5000;
 // Bars on the page now (normally one), so the page's bottom padding is
 // cleared only when the last one goes.
 let openBars = 0;
@@ -38,14 +37,11 @@ function useKeyboardInset() {
   return inset;
 }
 
-export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = false, seenRound = 0, besideSidebar = true }) {
+export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = false, besideSidebar = true, maxRounds = 3 }) {
   const [text, setText] = useState("");
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
-  const [engaged, setEngaged] = useState(false);
-  const lastTyping = useRef(0);
-  const carriedOn = useRef(null);
   const barRef = useRef(null);
   const keyboard = useKeyboardInset();
 
@@ -53,13 +49,17 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
   const chairBusy = status === "synthesizing" || !!row?.decide_now;
   const finished = ["complete", "failed", "superseded"].includes(status);
   const extra = row?.extra_rounds || 0;
-  const typingUntil = row?.founder_typing_until ? new Date(row.founder_typing_until).getTime() : 0;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const waiting = betweenSteps(row) && typingUntil > now;
+  // Sit in: the board has stopped and waits for the founder.
+  const yourTurn = !!row?.waiting_for_founder && !chairBusy;
+  const lastRoundDone = status === "discussion_complete";
+  const roundsLeft = !isAnonymous && extra < MAX_EXTRA_ROUNDS && !row?.decide_now;
+  // The planned rounds' last one is being written: a note sent now misses it.
+  const target = Number.isInteger(row?.rounds_target) ? row.rounds_target : maxRounds;
+  const lastRoundRunning = status === "discussing" && !row?.waiting_for_founder && (row?.discussion_rounds_completed || 0) + 1 >= target;
+  // Notes no round has answered yet: at the last stop, carrying on gives
+  // them one more round (while extra rounds are left).
+  const heard = new Set((row?.discussion_transcript || []).map((x) => x.note_id).filter(Boolean));
+  const unheard = (row?.founder_notes || []).filter((n) => !heard.has(n.id));
 
   // The whole page keeps room at the bottom for the bar (and the keyboard
   // under it), so everything, footer included, can scroll above it.
@@ -78,43 +78,13 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
     };
   }, [finished, keyboard]);
 
-  // A hold that ran out (nothing sent, or the minute's cap reached while
-  // still typing): let the board carry on now rather than wait for the
-  // server's own check. Whatever is sent later goes into the next round.
-  useEffect(() => {
-    if (!betweenSteps(row) || !typingUntil || typingUntil > now) return;
-    if (carriedOn.current === row.founder_typing_until) return;
-    carriedOn.current = row.founder_typing_until;
-    meetingAction(meetingId, "carry_on").catch(() => {});
-  }, [row, typingUntil, now, meetingId]);
-
-  // Once engaged, tell the room how far the screen has got, so it keeps
-  // pace: at once when a round finishes playing, and every few seconds.
-  useEffect(() => {
-    if (!engaged || finished || chairBusy) return undefined;
-    const signal = () => meetingAction(meetingId, "watching", { seen_round: seenRound }).catch(() => {});
-    signal();
-    const t = setInterval(signal, SIGNAL_EVERY_MS);
-    return () => clearInterval(t);
-  }, [engaged, finished, chairBusy, seenRound, meetingId]);
-
   if (finished) return null;
-
-  const onType = (value) => {
-    setEngaged(true);
-    setText(value.slice(0, NOTE_LIMIT));
-    setError(null);
-    if (!value.trim() || chairBusy) return;
-    if (Date.now() - lastTyping.current < SIGNAL_EVERY_MS) return;
-    lastTyping.current = Date.now();
-    meetingAction(meetingId, "typing").catch(() => {});
-  };
 
   const run = async (action, extraBody) => {
     setBusy(action); setError(null);
     try {
       await meetingAction(meetingId, action, extraBody);
-      if (action === "note") { setText(""); lastTyping.current = 0; }
+      if (action === "note") setText("");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -122,6 +92,11 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
     }
   };
 
+  // Where a note goes from here, in plain words.
+  const whereItGoes = !(lastRoundDone || lastRoundRunning) ? "The board answers it first in the next round."
+    : !roundsLeft ? "It goes to the Chair for the decision."
+    : lastRoundDone ? `The board answers it in one more round (about ${formatCost(EXTRA_ROUND_USD)}).`
+    : `This is the board's last planned round. When it stops, carry on and they answer it in one more round (about ${formatCost(EXTRA_ROUND_USD)}).`;
   const notes = row?.founder_notes || [];
 
   // Rendered on the page body: the meeting's own containers animate in with
@@ -137,9 +112,11 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
     >
       <div className="mx-auto max-w-6xl px-5 py-3 sm:px-8">
         <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <b className="font-display text-base font-medium">Add something, or let them carry on</b>
+          <b className="font-display text-base font-medium">
+            {chairBusy ? "The Chair is writing up" : yourTurn ? (lastRoundDone ? "Your turn: the board has finished its rounds" : "Your turn") : "The board is writing"}
+          </b>
           {error ? <span className="text-sm text-destructive">{error}</span>
-            : waiting ? <span className="room-mono">The board is waiting for you</span>
+            : !chairBusy ? <span className="room-mono">{yourTurn ? "Nothing moves until you do" : "You can write while they do"}</span>
             : null}
         </div>
 
@@ -164,10 +141,9 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
             <Textarea
               id="open-door-note"
               value={text}
-              onFocus={() => setEngaged(true)}
-              onChange={(e) => onType(e.target.value)}
+              onChange={(e) => { setText(e.target.value.slice(0, NOTE_LIMIT)); setError(null); }}
               rows={2}
-              placeholder="A fact they've missed, a question for one of them, or where you disagree."
+              placeholder={`A fact they've missed, a question for one of them, or where you disagree. ${whereItGoes}`}
               className="resize-none bg-background text-base"
             />
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -176,17 +152,22 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
                 <option value="">To the board</option>
                 {debaters.map((d) => <option key={d.id} value={d.id}>To {firstName(d.name)}</option>)}
               </select>
-              <Button variant="primary" disabled={!text.trim() || !!busy} onClick={() => run("note", { text: text.trim(), to_advisor_id: to || undefined })}>
+              <Button variant={text.trim() ? "primary" : "secondaryOutline"} disabled={!text.trim() || !!busy} onClick={() => run("note", { text: text.trim(), to_advisor_id: to || undefined })}>
                 {busy === "note" ? "Sending…" : "Send to the board"}
               </Button>
-              {waiting && !text.trim() && (
-                <Button variant="secondaryOutline" disabled={!!busy} onClick={() => run("carry_on")}>Carry on</Button>
+              {yourTurn && (
+                <Button variant={text.trim() ? "secondaryOutline" : "primary"} disabled={!!busy}
+                  onClick={() => run("carry_on", { at: { status, rounds: row?.discussion_rounds_completed || 0 } })}>
+                  {busy === "carry_on" ? "Carrying on…" : !lastRoundDone ? "Carry on"
+                    : unheard.length && roundsLeft ? `Carry on: one more round for your note · about ${formatCost(EXTRA_ROUND_USD)}` : "Carry on to the decision"}
+                </Button>
               )}
               <span className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                 <button type="button" className="border-b border-foreground disabled:opacity-50" disabled={!!busy} onClick={() => run("decide")}>
                   {busy === "decide" ? "Asking the Chair…" : "Decide now"}
                 </button>
-                {!isAnonymous && extra < MAX_EXTRA_ROUNDS && (
+                {/* Before the last round, Carry on already runs the next one. */}
+                {roundsLeft && lastRoundDone && (
                   <button type="button" className="border-b border-foreground disabled:opacity-50" disabled={!!busy} onClick={() => run("more")}>
                     {busy === "more" ? "Adding a round…" : `One more round · about ${formatCost(EXTRA_ROUND_USD)}`}
                   </button>

@@ -101,6 +101,7 @@ function formatTranscriptForChair(transcript) {
       if (msg.agrees_with) text += ` [AGREES WITH ${msg.agrees_with} — nothing to add beyond their reasoning]`;
       text += `: ${msg.message}\n`;
       if (msg.changed_opinion && msg.new_position) text += `  -> New position: ${msg.new_position}\n`;
+      if (msg.key_arguments?.length) text += `  -> Arguments: ${msg.key_arguments.join('; ')}\n`;
       if (msg.new_risks?.length) text += `  -> New risks: ${msg.new_risks.join('; ')}\n`;
       text += `  [Confidence: ${msg.confidence_score}%]\n`;
     });

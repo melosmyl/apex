@@ -108,7 +108,9 @@ export function meetingPhase(m) {
     case "preparing": return "preparing";
     case "independent_complete": return m.awaiting_human_input ? "human_input" : "discussion";
     case "discussing": return "discussion";
-    case "discussion_complete":
+    // Sit in: the board has finished its rounds and waits for the founder
+    // before the Chair starts.
+    case "discussion_complete": return m.waiting_for_founder ? "discussion" : "resolution";
     case "synthesizing": return "resolution";
     case "complete": return "result";
     case "failed": return "failed";
@@ -124,11 +126,11 @@ export function isRunningOnServer(m) {
 
 // Starts a meeting the server runs to the end (P0). It answers at once;
 // Round 1 and everything after happen on the server.
-export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId, awaitHumans = false }) {
+export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId, awaitHumans = false, pace = "quick" }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
       company_id: companyId, question, advisor_ids: advisorIds,
-      server_driven: true, await_humans: awaitHumans,
+      server_driven: true, await_humans: awaitHumans, pace,
       // Chosen here so the live view can follow exactly this meeting while
       // Round 1 forms, before the call returns.
       ...(meetingId ? { meeting_id: meetingId } : {}),
@@ -168,20 +170,17 @@ export async function meetingAction(meetingId, action, extra = {}) {
 export const EXTRA_ROUND_USD = 0.08;
 export const MAX_EXTRA_ROUNDS = 2;
 
-// A meeting between steps, where the founder typing holds the next one.
-export function betweenSteps(m) {
-  if (!m) return false;
-  if (m.status === "independent_complete") return !m.awaiting_human_input;
-  if (m.status === "discussing") return !m.step_claimed_at;
-  return m.status === "discussion_complete";
-}
-
 // What happens to each of the founder's notes: heard in a round, going into
 // the next round, or (after the last round) going to the Chair.
 export function noteStatus(note, m) {
   const heard = (m?.discussion_transcript || []).find((x) => x.note_id === note.id);
   if (heard) return { label: `Heard in Round ${heard.round}`, done: true };
-  if (["discussion_complete", "synthesizing"].includes(m?.status) || m?.decide_now) return { label: "Goes to the Chair", done: false };
+  if (m?.decide_now || m?.status === "synthesizing") return { label: "Goes to the Chair", done: false };
+  // Sit in, at the last stop: carrying on gives it one more round while
+  // extra rounds are left.
+  if (m?.status === "discussion_complete")
+    return m.pace === "sit_in" && m.waiting_for_founder && (m.extra_rounds || 0) < MAX_EXTRA_ROUNDS
+      ? { label: "Goes into one more round", done: false } : { label: "Goes to the Chair", done: false };
   return { label: "Goes into the next round", done: false };
 }
 

@@ -10,7 +10,7 @@ Deno.env.set('ANTHROPIC_API_KEY', 'test-key');
 Deno.env.set('OPENAI_API_KEY', 'test-key');
 
 const ANSWER = {
-  position: 'Ship it', recommendation: 'Call three customers this week', key_arguments: ['a'], assumptions: [],
+  position: 'Ship it', because: 'Three regulars asked for it', recommendation: 'Call three customers this week', key_arguments: ['a'], assumptions: [],
   risks: [], missing_information: [{ detail: 'Who pays?', profile_field: 'business_model' }], suggested_actions: [], confidence_score: 70,
 };
 

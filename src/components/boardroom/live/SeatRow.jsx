@@ -62,7 +62,7 @@ export default function SeatRow({ seats, bubble, onOpen }) {
         >
           <div className={`meeting-now-bubble ${pointAt >= 0 ? "has-tail" : ""} ${pointAt >= 3 ? "tail-wide-only" : ""} rounded-[14px] border-2 border-foreground bg-card px-4 py-3 shadow-[3px_3px_0_hsl(var(--foreground))]`}>
             <span className="room-mono block">{bubble.label}</span>
-            <p className="mt-1 font-display text-[1.15rem] font-light leading-snug text-pretty">{bubble.text}</p>
+            <p className="mt-1 font-display text-[1.15rem] font-light leading-snug text-pretty whitespace-pre-line">{bubble.text}</p>
           </div>
         </div>
       )}

@@ -87,6 +87,9 @@ export function firstName(name = "") {
 // A bubble-sized excerpt: whole sentences up to about `max` characters, or a
 // clean cut at a word.
 export function excerpt(text = "", max = 240) {
+  // A Round 1 position keeps its reason, each part shortened on its own.
+  const why = String(text).indexOf("\nWhy: ");
+  if (why > 0) return `${excerpt(String(text).slice(0, why), max)}\n${excerpt(String(text).slice(why + 1), max)}`;
   const t = String(text).trim();
   if (t.length <= max) return t;
   const cut = t.slice(0, max);

@@ -9,6 +9,19 @@ import { usedPersonalDetail, ownWords } from '../_shared/personalDetails.ts';
 // browser-edited entry (human perspectives) can add.
 const MAX_ROUND1_ENTRIES = 20;
 const MAX_ENTRY_CHARS = 4000;
+
+// A Round 1 position always carries its reason (owner, 15 October 2026), and
+// later rounds see the advisor's top arguments too, not only the headline.
+// Answers from before the reason was asked for fall back to the first argument.
+function positionWithReason(r) {
+  const args = (Array.isArray(r.key_arguments) ? r.key_arguments : []).map((a) => String(a).trim()).filter(Boolean);
+  const reason = String(r.because || '').trim() || (r.unavailable ? '' : args[0] || '');
+  const head = String(r.position || r.recommendation || '').trim();
+  return {
+    message: (reason ? `${head}\nWhy: ${reason}` : head).slice(0, MAX_ENTRY_CHARS),
+    key_arguments: args.filter((a) => a !== reason).slice(0, 2).map((a) => a.slice(0, 500)),
+  };
+}
 // A step that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
 // A round isn't started with less time than this left: its answers would
@@ -122,6 +135,7 @@ function formatTranscript(transcript, currentAdvisorId) {
       const changed = msg.changed_opinion ? ' [OPINION CHANGED]' : '';
       text += `${msg.advisor_name} (${msg.role})${youMarker}${reply}${changed}: ${msg.message}\n`;
       if (msg.changed_opinion && msg.new_position) text += `  -> New position: ${msg.new_position}\n`;
+      if (msg.key_arguments?.length) text += `  -> Arguments: ${msg.key_arguments.join('; ')}\n`;
       if (msg.new_risks?.length) text += `  -> New risks: ${msg.new_risks.join('; ')}\n`;
     });
     text += '\n';
@@ -141,7 +155,7 @@ function founderSection(notes, advisor) {
   text += `- A fact the founder states about their own business is a fact. Use it, and drop anything you said that it rules out.\n`;
   text += `- A view, preference or pushback from the founder is their opinion, not evidence. If you still disagree, say so plainly and why. The founder is here for honest advice, not agreement; changing your position only because the founder prefers another answer is a failure.\n`;
   text += `- If you change your position, name the new fact or reasoning that changed it. "The founder has decided" or "the founder insists" is not a reason: if that is all that has changed, keep your position and say plainly that you still disagree, then help as far as you honestly can. A change after the founder speaks is shown to the Chair and listed where the room disagreed.\n`;
-  text += `- If something was asked of you directly, answer it first. Set reply_to_advisor to "Founder" when you are mainly answering the founder.\n`;
+  text += `- Answer the founder first: open your message by responding to what they said (or asked you directly), then carry on with the discussion. Set reply_to_advisor to "Founder" when you are mainly answering the founder.\n`;
   text += `- Keep arguing with the other advisors too: the founder joined the discussion, they didn't replace it.\n\n`;
   return text;
 }
@@ -284,7 +298,7 @@ async function loadDiscussion(db, meeting, ownerId): Promise<any> {
     round: 1, advisor_id: r.advisor_id,
     advisor_name: String(byId.get(r.advisor_id)?.name ?? r.advisor_name ?? '').slice(0, 100),
     role: String(byId.get(r.advisor_id)?.role ?? r.role ?? '').slice(0, 100),
-    message: String(r.position || r.recommendation || '').slice(0, MAX_ENTRY_CHARS), message_type: 'initial',
+    ...positionWithReason(r), message_type: 'initial',
     reply_to_advisor: null, changed_opinion: false, new_position: null,
     new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
     provider_used: r.provider_used, model_used: r.model_used,
@@ -365,6 +379,9 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
           || (discussionSettled(roundMessages, isLastRound, convergencePairs) && !founderEntries.length && !pending.length && !belowAsked);
         let save = db.from('board_meetings').update({
           discussion_transcript: next, step_finished_at: new Date().toISOString(),
+          // Sit in: the meeting stops after every round, the last one too,
+          // until the founder acts. Not when they've asked for the decision.
+          waiting_for_founder: meeting.pace === 'sit_in' && !fresh?.decide_now,
           ...(roundMessages.length ? { discussion_rounds_completed: round } : {}),
           status: done ? 'discussion_complete' : 'discussing',
           step_claimed_at: null, step_attempts: 0, sweep_count: 0,

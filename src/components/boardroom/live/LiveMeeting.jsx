@@ -17,7 +17,7 @@ const whenFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long"
 
 export default function LiveMeeting({
   phase, question, startedAt, chair, debaters, seatAssignment, transcript, chairOpening, advisors,
-  maxRounds = MAX_ROUNDS, onOpenProfile, onPin, onFinished, onSeenRound,
+  maxRounds = MAX_ROUNDS, onOpenProfile, onPin, onFinished, waitingForYou = false,
 }) {
   // The opening plays first. Round 1 answers that arrive before it wait up
   // to a few seconds for it, then play anyway (an opening that fails never
@@ -48,7 +48,9 @@ export default function LiveMeeting({
   }, [phase, caughtUp, onFinished]);
 
   const latestRound = items.reduce((r, i) => (i.kind === "turn" ? Math.max(r, i.round) : r), 0);
+  // Sit in, at a stop: nobody is writing; the founder has the floor.
   const pendingRound =
+    waitingForYou ? null :
     phase === "preparing" ? 1 :
     phase === "discussion" && latestRound < maxRounds ? latestRound + 1 :
     null;
@@ -112,6 +114,8 @@ export default function LiveMeeting({
     };
   } else if (phase === "preparing") {
     bubble = { label: `Round 1 · ${clock}`, text: "The board is writing its first positions, each on their own. Round 1 usually takes under a minute; answers play here as they arrive." };
+  } else if (waitingForYou) {
+    bubble = { label: "Your turn", text: "The board has stopped for you. Say something below, or carry on when you're ready." };
   } else if (pendingRound) {
     bubble = { label: `Round ${pendingRound}`, text: "Everyone writes this round at the same time. Their turns play back here as they arrive." };
   } else if (phase === "resolution") {
@@ -128,19 +132,6 @@ export default function LiveMeeting({
   // the minutes say so once that round has played back.
   const lastShownRound = items.slice(0, revealed).reduce((r, i) => (i.kind === "turn" ? Math.max(r, i.round) : r), 0);
   const fullyShown = (round) => !items.some((i, n) => n >= revealed && i.kind === "turn" && i.round === round);
-  // The last round the screen has finished playing (P1.1): the room keeps
-  // pace with an engaged founder. Round 1 counts only once it's complete.
-  const seenRound = useMemo(() => {
-    const rounds = [...new Set(items.filter((i) => i.kind === "turn").map((i) => i.round))].sort((a, b) => a - b);
-    let seen = 0;
-    for (const r of rounds) {
-      if (!fullyShown(r) || (r === 1 && phase === "preparing")) break;
-      seen = r;
-    }
-    return seen;
-  }, [items, revealed, phase]); // fullyShown reads items and revealed
-  useEffect(() => { onSeenRound?.(seenRound); }, [seenRound, onSeenRound]);
-
   const missed = Object.entries(absenteesByRound(transcript, chair.name))
     .filter(([round]) => Number(round) <= lastShownRound && fullyShown(Number(round)))
     .map(([round, names]) => ({ round: Number(round), names: names.filter((n) => debaterNames.includes(n)) }))

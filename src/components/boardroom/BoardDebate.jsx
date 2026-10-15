@@ -11,6 +11,7 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
 import OpenDoor from "@/components/boardroom/live/OpenDoor";
+import PaceChoice, { usePaceOffered } from "@/components/boardroom/PaceChoice";
 import { usePin } from "@/components/pins/PinContext";
 import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
@@ -21,15 +22,12 @@ const POLL_INTERVAL_MS = 2000;
 // Phases in which the server is running the meeting and the page follows it.
 const LIVE_PHASES = ["preparing", "human_input", "discussion", "resolution"];
 
-// The open door (P1) shows once the system switch is on, or for a test when
-// the address asks for it (?openDoor=1), remembered for the browser tab.
-function openDoorAsked() {
-  try {
-    if (new URLSearchParams(window.location.search).get("openDoor") === "1") sessionStorage.setItem("openDoor", "1");
-    return sessionStorage.getItem("openDoor") === "1";
-  } catch {
-    return false;
-  }
+// A Round 1 position with its reason, as the server writes it.
+function positionWithReason(r) {
+  const head = (r.position || r.recommendation || "").trim();
+  const reason = (r.because || "").trim()
+    || (r.unavailable ? "" : (r.key_arguments || []).map((a) => String(a).trim()).find(Boolean) || "");
+  return reason ? `${head}\nWhy: ${reason}` : head;
 }
 
 function toRoundOneMessages(responses = []) {
@@ -38,7 +36,7 @@ function toRoundOneMessages(responses = []) {
     advisor_id: r.advisor_id,
     advisor_name: r.advisor_name,
     role: r.role,
-    message: r.position || r.recommendation || "",
+    message: positionWithReason(r),
     message_type: "initial",
     reply_to_advisor: null,
     changed_opinion: false,
@@ -52,7 +50,7 @@ function toRoundOneMessages(responses = []) {
 
 
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, initialSelectedIds, onSelectionChange, loadedMeeting, autoStart, onResult, onResultShown, routeFromNoteId, freeAttemptId }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, initialPace, initialSelectedIds, onSelectionChange, loadedMeeting, autoStart, onResult, onResultShown, routeFromNoteId, freeAttemptId }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -90,18 +88,17 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const finishPlayback = useCallback(() => { setShowResult(true); onResultShown?.(); }, [onResultShown]);
   // How many rounds a discussion can run, as the engine reads it.
   const [maxRounds, setMaxRounds] = useState(3);
-  const [openDoor, setOpenDoor] = useState(openDoorAsked);
+  const paceOffered = usePaceOffered();
+  const [pace, setPace] = useState(initialPace || "quick");
   // The meeting row as last seen, for the open door: notes, extra rounds,
   // whether the board is waiting for the founder.
   const [liveRow, setLiveRow] = useState(resuming ? loadedMeeting : null);
   // How far the founder's screen has played, and the pinned box's height,
   // so the meeting can scroll above it (P1.1).
-  const [seenRound, setSeenRound] = useState(0);
   useEffect(() => {
     base44.entities.SystemLimits.list().then((rows) => {
       const n = rows?.[0]?.max_discussion_rounds;
       if (Number.isInteger(n) && n > 0) setMaxRounds(n);
-      if (rows?.[0]?.founder_in_room === true) setOpenDoor(true);
     }).catch(() => {});
   }, []);
   // The transcript only ever grows: a slow poll answering after a newer one
@@ -295,6 +292,8 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
       const started = await startMeeting({
         companyId, question, advisorIds: selectedAiAdvisors.map((a) => a.id), freeAttemptId, meetingId,
         awaitHumans: selectedHumanAdvisors.length > 0,
+        // Visitors on the free meeting always get Quick.
+        pace: !freeAttemptId ? pace : "quick",
       });
       // The Assistant routed this question in from a captured note — the
       // note only learns its meeting_id now that a real meeting exists.
@@ -410,11 +409,11 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         maxRounds={Number.isInteger(liveRow?.rounds_target) ? liveRow.rounds_target : maxRounds}
         onPin={pinTurn}
         onFinished={finishPlayback}
-        onSeenRound={setSeenRound}
+        waitingForYou={!!liveRow?.waiting_for_founder}
       />
-      {openDoor && pendingMeetingId && liveRow?.driver === "server" && ["preparing", "discussion", "resolution"].includes(phase) && (
+      {pendingMeetingId && liveRow?.driver === "server" && liveRow?.pace === "sit_in" && ["preparing", "discussion", "resolution"].includes(phase) && (
         <OpenDoor meetingId={pendingMeetingId} row={liveRow} debaters={selectedAiAdvisors} isAnonymous={isAnonymous || !!freeAttemptId}
-          seenRound={seenRound} besideSidebar={!freeAttemptId} />
+          besideSidebar={!freeAttemptId} maxRounds={maxRounds} />
       )}
       </>
     );
@@ -446,6 +445,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
                 <button key={p} onClick={() => setQuestion(p)} className="text-xs text-left text-muted-foreground bg-secondary hover:bg-accent rounded-2xl px-3 py-1.5 transition-colors">{p}</button>
               ))}
             </div>
+            {paceOffered && !freeAttemptId && <PaceChoice pace={pace} onChange={setPace} className="mt-4" />}
             <Button onClick={start} disabled={!question.trim() || !debaterCountOk} variant="primary" className="w-full mt-4 h-11">
               <Landmark className="w-4 h-4" /> Convene the board
             </Button>
