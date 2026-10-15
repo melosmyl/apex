@@ -1,6 +1,6 @@
 /* The landing page's layout, from jatr-landing-mock.html as it opens:
    palette C, Comic, frames off. Colours, type and the shared pieces (card,
-   bubble, button, dots, grain) come from room.css. */
+   bubble, button, dots) come from room.css. */
 
 .landing {
   position: relative;

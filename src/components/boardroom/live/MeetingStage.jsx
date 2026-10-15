@@ -73,7 +73,7 @@ export default function MeetingStage({ seats = [], litChairId = null, onOpen }) 
           const cx = tag.x;
           const cy = tag.y - r - 8;
           const portrait = portraitFor({ libraryKey: s.libraryKey, name: s.name });
-          const ring = s.state === "speaking" ? LAMP : s.isChair ? "hsl(var(--gold))" : "#FBF8F0";
+          const ring = s.state === "speaking" ? LAMP : s.isChair ? "hsl(var(--gold))" : "hsl(var(--card))";
           const dim = s.state === "thinking" || s.state === "absent" ? 0.75 : s.state === "spoke" || s.state === "up_next" ? 0.85 : 1;
           return (
             <g
@@ -89,12 +89,12 @@ export default function MeetingStage({ seats = [], litChairId = null, onOpen }) 
                 {portrait ? (
                   <image href={portrait.avatar2x} x={cx - r} y={cy - r} width={2 * r} height={2 * r} clipPath={`url(#${uid}-clip-${s.chairId})`} preserveAspectRatio="xMidYMid slice" />
                 ) : (
-                  <text x={cx} y={cy + r * 0.18} textAnchor="middle" fontFamily="var(--font-mono)" fontSize={r * 0.55} fill="#F6F2E8">{initialsOf(s.name)}</text>
+                  <text x={cx} y={cy + r * 0.18} textAnchor="middle" fontFamily="var(--font-mono)" fontSize={r * 0.55} fill="hsl(var(--primary-foreground))">{initialsOf(s.name)}</text>
                 )}
               </g>
               <circle cx={cx} cy={cy} r={r} fill="none" stroke={ring} strokeWidth={s.state === "speaking" ? 6 : 4} />
               <g className="meeting-stage-caption">
-                <text x={cx} y={tag.y + 24} textAnchor="middle" fontFamily="var(--font-display)" fontSize="22" fill="#F6F2E8" stroke="rgba(0,0,0,0.75)" strokeWidth="4" paintOrder="stroke">
+                <text x={cx} y={tag.y + 24} textAnchor="middle" fontFamily="var(--font-display)" fontSize="22" fill="hsl(var(--primary-foreground))" stroke="rgba(0,0,0,0.75)" strokeWidth="4" paintOrder="stroke">
                   {s.shortName}
                 </text>
                 {STATE_TEXT[s.state] && (

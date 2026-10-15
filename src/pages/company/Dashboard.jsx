@@ -88,7 +88,7 @@ export default function Dashboard() {
           recessed a step below the loud card rather than competing with it. */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Continue */}
-        <div className="bg-secondary/50 rounded-xl p-5 rise-in">
+        <div className="bg-secondary rounded-xl p-5 rise-in">
           <div className="flex items-center gap-2 mb-3">
             <CircleDot className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
             <h3 className="font-display text-base">Continue where you left off</h3>
@@ -129,7 +129,7 @@ export default function Dashboard() {
         </div>
 
         {/* Recent progress */}
-        <div className="bg-secondary/50 rounded-xl p-5 rise-in">
+        <div className="bg-secondary rounded-xl p-5 rise-in">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="w-4 h-4 text-muted-foreground" strokeWidth={1.75} />
             <h3 className="font-display text-base">Recent progress</h3>

@@ -1,7 +1,7 @@
 /* Just Ask The Room's own look (Workstream L): palette C ("Manor") with the
    Comic treatment, from the owner's landing and app mocks. This is the one
    shared set: tokens on :root, and the pieces (card, speech bubble, pill,
-   mono label, buttons, dotted panel, grain) usable on any page. The app's
+   mono label, buttons, dotted panel) usable on any page. The app's
    Tailwind theme in src/index.css carries the same colours.
    Tokens are prefixed --room- because the theme already uses --muted and
    --accent for something else. Light only, as the mocks are.
@@ -9,15 +9,15 @@
    style (the landing page). */
 
 :root {
-  --room-paper: #F6F2E8;
-  --room-paper-2: #EDE7D8;
-  --room-panel: #E5DEC9;
-  --room-mat: #FBF8F0;
-  --room-mat-warm: #F1EAD6;
-  --room-side: #EFE9DB;
+  --room-paper: #FFFFFF;
+  --room-paper-2: #F4F3EE;
+  --room-panel: #F4F3EE;
+  --room-mat: #FFFFFF;
+  --room-mat-warm: #FFFFFF;
+  --room-side: #F4F3EE;
   --room-ink: #2B0F18;
   --room-muted: #6B6652;
-  --room-line: #DAD3C1;
+  --room-line: #E3E1DA;
   --room-label: #6E6B45;
   --room-accent: #5E1125;
   --room-gold: #D2BF81;
@@ -25,9 +25,6 @@
   --room-blue: #8AA0F7;
   --room-outline: rgba(43, 15, 24, 0.1);
   --room-dot: rgba(43, 15, 24, 0.16);
-  --room-glow-1: rgba(210, 191, 129, 0.22);
-  --room-glow-2: rgba(153, 171, 166, 0.22);
-  --room-glow-3: rgba(94, 17, 37, 0.06);
 
   --room-serif: "Fraunces", Georgia, "Times New Roman", serif;
   --room-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
@@ -151,30 +148,6 @@
   background-size: 9px 9px;
 }
 
-/* Paper grain and the warm glows, fixed behind the whole page. */
-.room-grain {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-.room-grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(60rem 36rem at 12% -6%, var(--room-glow-1), transparent 60%),
-    radial-gradient(50rem 30rem at 92% 18%, var(--room-glow-2), transparent 60%),
-    radial-gradient(70rem 40rem at 50% 110%, var(--room-glow-3), transparent 60%);
-}
-.room-grain::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.11;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
 
 /* Cards across the app (Workstream L). Anything drawn as a card — bg-card
    with a large radius — gets the Comic edge and shadow, so the ~120 card

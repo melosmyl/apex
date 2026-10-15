@@ -85,7 +85,6 @@ export default function Landing() {
 
   return (
     <div className="room landing">
-      <div className="room-grain" aria-hidden="true" />
       <main>
         <div className="wrap">
           <header className="top">
