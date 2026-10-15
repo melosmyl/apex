@@ -1,7 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
-import { DISCUSSION_SCHEMA } from '../_shared/answerSchemas.ts';
+import { discussionSchema, recordWords, shapedEntry, turnFlags, turnRules } from '../_shared/turnShape.ts';
 import { findChair, withoutChair } from '../_shared/chair.ts';
 import { usedPersonalDetail, ownWords } from '../_shared/personalDetails.ts';
 
@@ -77,7 +77,10 @@ function stillConverged(pair, transcript) {
   const differentiated = laterMessages.some(m => {
     const other = m.advisor_name === nameA ? nameB : nameA;
     const addressedOther = m.reply_to_advisor === other;
-    const isDistinguishing = ['challenge', 'rebuttal'].includes(m.message_type) || (m.changed_opinion && m.new_position);
+    // A shaped turn (Workstream I) says how it stands; an older one, its type.
+    const isDistinguishing = m.stance
+      ? ['disagree', 'question'].includes(m.stance) || (m.stance !== 'agree' && !!m.adds) || (m.changed_opinion && m.new_position)
+      : ['challenge', 'rebuttal'].includes(m.message_type) || (m.changed_opinion && m.new_position);
     return addressedOther && isDistinguishing;
   });
   return !differentiated;
@@ -134,6 +137,8 @@ function formatTranscript(transcript, currentAdvisorId) {
       const reply = msg.reply_to_advisor ? ` (replying to ${msg.reply_to_advisor})` : '';
       const changed = msg.changed_opinion ? ' [OPINION CHANGED]' : '';
       text += `${msg.advisor_name} (${msg.role})${youMarker}${reply}${changed}: ${msg.message}\n`;
+      if (msg.position && msg.round > 1) text += `  -> Position: ${msg.position}${msg.because ? ` Why: ${msg.because}` : ''}\n`;
+      if (msg.adds) text += `  -> Adds: ${msg.adds}\n`;
       if (msg.changed_opinion && msg.new_position) text += `  -> New position: ${msg.new_position}\n`;
       if (msg.key_arguments?.length) text += `  -> Arguments: ${msg.key_arguments.join('; ')}\n`;
       if (msg.new_risks?.length) text += `  -> New risks: ${msg.new_risks.join('; ')}\n`;
@@ -155,7 +160,7 @@ function founderSection(notes, advisor) {
   text += `- A fact the founder states about their own business is a fact. Use it, and drop anything you said that it rules out.\n`;
   text += `- A view, preference or pushback from the founder is their opinion, not evidence. If you still disagree, say so plainly and why. The founder is here for honest advice, not agreement; changing your position only because the founder prefers another answer is a failure.\n`;
   text += `- If you change your position, name the new fact or reasoning that changed it. "The founder has decided" or "the founder insists" is not a reason: if that is all that has changed, keep your position and say plainly that you still disagree, then help as far as you honestly can. A change after the founder speaks is shown to the Chair and listed where the room disagreed.\n`;
-  text += `- Answer the founder first: open your message by responding to what they said (or asked you directly), then carry on with the discussion. Set reply_to_advisor to "Founder" when you are mainly answering the founder.\n`;
+  text += `- Answer the founder first: open your message by responding to what they said (or asked you directly), then carry on with the discussion. Set answering_who to "Founder" when you are mainly answering the founder.\n`;
   text += `- Keep arguing with the other advisors too: the founder joined the discussion, they didn't replace it.\n\n`;
   return text;
 }
@@ -182,13 +187,14 @@ function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRou
   if (ownPair) {
     const other = ownPair.names.find(n => n !== advisor.name);
     context += `NOTE: your independent recommendation landed very close to ${other}'s. Do exactly one of two things about this — do not do both, and do not invent a difference that isn't real:\n`;
-    context += `- If you genuinely agree and have nothing to add beyond their reasoning, say so plainly and set agrees_with to "${other}". Real agreement is a legitimate, valuable outcome — it is not a failure to have a distinct opinion.\n`;
+    context += `- If you genuinely agree and have nothing to add beyond their reasoning, say so plainly: answering_who "${other}", stance agree, and leave adds empty. Real agreement is a legitimate, valuable outcome — it is not a failure to have a distinct opinion.\n`;
     context += `- If you actually see it differently — different risk tolerance, sequencing, cost, or what you'd do first — say so concretely, addressed to ${other} by name. A manufactured distinction to look independent is worse than honest agreement.\n\n`;
   }
   context += founderSection(founderNotes, advisor);
   if (isChallenger) context += CHALLENGER_DUTY;
+  context += turnRules({ isLastRound, founderSpoke: founderNotes.length > 0 });
   if (isLastRound) {
-    context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. If you are now in agreement with another advisor, say so explicitly and set agrees_with to their name.\n`;
+    context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. If you are now in agreement with another advisor and have nothing to add, say so: answering_who is their name, stance agree, adds empty.\n`;
   } else {
     context += `YOUR TASK: Contribute to the discussion. You may:\n`;
     context += `- Question another advisor's reasoning or ask for evidence\n- Challenge an assumption or identify a weakness\n- Defend your position against criticism\n- Change your opinion if persuaded (explain why)\n- Support another advisor's argument\n- Identify a risk nobody has mentioned\n- Introduce new information or evidence\n- Say the question itself is wrong, and name the question that should be asked instead\n\n`;
@@ -210,31 +216,36 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 
 // One discussion round: every advisor answers, in parallel, with the
 // discussion so far. Returns the round's messages (failed advisors dropped).
-async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, independentResponses, roundDeadline, founderNotes = [], challenger = null }: any) {
+async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, facts = '', independentResponses, roundDeadline, founderNotes = [], challenger = null }: any) {
+  // The turn shape (Workstream I): "who I'm answering" can only name
+  // someone in this meeting.
+  const schema = discussionSchema(meetingAdvisors.map((a) => a.name));
   const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
     const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs,
       { founderNotes, isChallenger: !!challenger && challenger.id === advisor.id });
     return callAdvisor(supabaseUrl, serviceKey, {
       advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: null, company_context: profile, meeting_context: meetingContext,
-      user_question: meeting.question, previous_responses: [], output_schema: DISCUSSION_SCHEMA,
+      user_question: meeting.question, previous_responses: [], output_schema: schema,
       temperature: advisor.temperature, request_type: `discussion_round_${round}`, deadline_at: roundDeadline,
       // Their book, hobby or place stay on offer until they've used one.
       personal_details: !usedPersonalDetail(advisor, ownWords(advisor, independentResponses, transcript)),
     }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }));
   }));
 
-  return roundResults.map((r: any) => {
+  // What the founder has told the board about the company, the question and
+  // their notes in the meeting: a specific reason names some of it. (Not the
+  // earlier meetings' advice, which would make any stock phrase count.)
+  const record = recordWords(facts || '', meeting.question || '', ...founderNotes.map((n) => n.text || ''));
+  const entries: any[] = roundResults.map((r: any) => {
     if (r.error || !r.data?.response) return null;
     const resp = r.data.response;
     return {
       round, advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
-      message: resp.message || '', message_type: resp.message_type || (isLastRound ? 'final_statement' : 'rebuttal'),
-      reply_to_advisor: resp.reply_to_advisor || null, changed_opinion: resp.changed_opinion || false,
-      new_position: resp.new_position || null, new_risks: resp.new_risks || [],
+      ...shapedEntry(resp, { speaker: r.advisor.name, isLastRound, founderSpoke: founderNotes.length > 0, cap: MAX_ENTRY_CHARS }),
+      new_risks: resp.new_risks || [],
       confidence_score: resp.confidence_score || 0,
       answerable: resp.answerable !== false,
-      agrees_with: resp.agrees_with || null,
       provider_used: r.data.provider_used, model_used: r.data.model_used,
       // What this turn cost, shown with it (P1).
       cost_usd: Number(r.data.cost_usd) || 0,
@@ -242,9 +253,15 @@ async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvi
       // Changed position in answer to the founder (P1.1): a note to the board
       // or to this advisor, and a turn that answers or names the founder.
       ...(resp.changed_opinion && founderNotes.some((n) => !n.to_advisor_id || n.to_advisor_id === r.advisor.id)
-        && (/founder/i.test(resp.reply_to_advisor || '') || /\bfounder/i.test(resp.message || '')) ? { after_founder_pushback: true } : {}),
+        && (/founder/i.test(resp.answering_who || '') || /founder/i.test(resp.moved_by || '') || /\bfounder/i.test(resp.message || '')) ? { after_founder_pushback: true } : {}),
     };
   }).filter(Boolean);
+  // The checks: flags only, for the Chair and the minutes. A turn that
+  // echoes one before it in the round is flagged, not both.
+  const earlier = transcript.filter((m) => m.round > 1 && m.round < round);
+  return entries.map((e: any) => ({
+    ...e, flags: turnFlags(e, { sameRound: entries, earlier: earlier.filter((m) => m.advisor_id !== e.advisor_id), record, isLastRound }),
+  }));
 }
 
 // Previously this only looked at changed_opinion/new_risks, which stops the
@@ -299,6 +316,7 @@ async function loadDiscussion(db, meeting, ownerId): Promise<any> {
     advisor_name: String(byId.get(r.advisor_id)?.name ?? r.advisor_name ?? '').slice(0, 100),
     role: String(byId.get(r.advisor_id)?.role ?? r.role ?? '').slice(0, 100),
     ...positionWithReason(r), message_type: 'initial',
+    ...(r.would_change_my_mind ? { would_change_my_mind: String(r.would_change_my_mind).slice(0, 500) } : {}),
     reply_to_advisor: null, changed_opinion: false, new_position: null,
     new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
     provider_used: r.provider_used, model_used: r.model_used,
@@ -356,7 +374,7 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
         supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
         isLastRound, convergencePairs, independentResponses: d.independentResponses,
         // Every round works from the same memory as Round 1, not just the profile.
-        profile: meeting.context_package || d.profile,
+        profile: meeting.context_package || d.profile, facts: d.profile,
         founderNotes: notes, challenger: challengerFor(d.meetingAdvisors, round),
         // Each round is its own step, with the whole step's time.
         roundDeadline: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,
@@ -480,7 +498,7 @@ Deno.serve(async (req) => {
 
       const roundMessages = await runOneRound({
         supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
-        isLastRound, convergencePairs, profile: d.profile, independentResponses: d.independentResponses, roundDeadline,
+        isLastRound, convergencePairs, profile: d.profile, facts: d.profile, independentResponses: d.independentResponses, roundDeadline,
       });
 
       if (!roundMessages.length) break;

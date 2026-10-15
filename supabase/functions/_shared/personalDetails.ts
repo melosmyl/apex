@@ -51,6 +51,6 @@ export function ownWords(advisor: Advisor, independentResponses: Advisor[] = [],
     out.push(r.position, r.recommendation, ...(r.key_arguments || []), ...(r.risks || []), ...(r.assumptions || []), ...(r.suggested_actions || []),
       ...(r.missing_information || []).map((m: Advisor) => (typeof m === 'string' ? m : m?.detail)));
   }
-  for (const m of transcript) if (m?.advisor_id === advisor.id) out.push(m.message, m.new_position, ...(m.new_risks || []));
+  for (const m of transcript) if (m?.advisor_id === advisor.id) out.push(m.message, m.new_position, m.position, m.because, m.adds, ...(m.new_risks || []));
   return out;
 }

@@ -158,6 +158,29 @@ await sweep();
 const mD = await waitFor(D, finished, 60_000);
 check(mD?.status === 'complete', 'the Chair still decides: the meeting never sticks at the stop', [mD?.status, mD?.waiting_for_founder]);
 
+// ---- 5. The turn shape (Workstream I, every pace).
+console.log('\n== every turn has its shape, and the Chair hears what failed');
+await script({ marks: ['YOUR TURN HAS A SHAPE', '120 words at most', 'No numbered or bulleted lists', 'Final round: against_me', '[SAME POINT AS ', 'TURNS THAT FAILED A CHECK'] });
+const T = await start('Should we sell at a Christmas fair?', 'quick');
+const mT = await waitFor(T, finished);
+const later2 = (mT?.discussion_transcript || []).filter((x: any) => x.round > 1 && x.message_type !== 'founder_message');
+check(later2.length === 6 && later2.every((x: any) => x.position && x.because && x.stance && Array.isArray(x.flags)),
+  'every discussion turn is saved with its position, reason, stance and checks', later2.map((x: any) => [x.advisor_name, x.stance, x.flags]));
+// The fake answers are word for word the same, and the answer form's first
+// name is the first advisor's own (the reason check is in the unit tests:
+// this company's record holds earlier fake meetings' words).
+check(later2.filter((x: any) => !x.reply_to_advisor).length === 2 && later2.filter((x: any) => !x.reply_to_advisor).every((x: any) => x.flags.includes('answers_no_one'))
+  && later2.every((x: any) => x.flags.some((f: string) => f.startsWith('same_point:')))
+  && later2.filter((x: any) => x.round === 3).every((x: any) => x.flags.some((f: string) => f.startsWith('repeats:'))),
+  'a turn that answers no one, makes the same point as another, or repeats an earlier round, is flagged', later2.map((x: any) => x.flags));
+const tlog = await fakeLog();
+const r2 = tlog.filter((l: any) => l.marked.includes('YOUR TURN HAS A SHAPE'));
+check(r2.length === 6 && r2.every((l: any) => l.marked.includes('120 words at most'))
+  && r2.filter((l: any) => l.marked.includes('Final round: against_me')).length === 3 && r2.filter((l: any) => l.marked.includes('No numbered or bulleted lists')).length === 3,
+  'every advisor is given the shape, the 120-word cap, and the final round\'s extra parts', r2.map((l: any) => l.marked));
+const chairLog = tlog.filter((l: any) => l.who === names.chair && l.marked.includes('TURNS THAT FAILED A CHECK'));
+check(chairLog.length >= 1 && chairLog.some((l: any) => l.marked.includes('[SAME POINT AS ')), 'the Chair sees the failed turns tagged', chairLog.map((l: any) => l.marked));
+
 // The fake data made for this test is removed.
 await admin.from('documents').delete().eq('company_id', co.id);
 await admin.from('tasks').delete().eq('company_id', co.id);

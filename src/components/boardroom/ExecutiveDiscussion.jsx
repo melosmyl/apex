@@ -113,6 +113,12 @@ export function DiscussionMessage({ msg, accent }) {
             </span>
           )}
         </div>
+        {msg.position && msg.round > 1 && (
+          <div className="mb-1.5 text-sm">
+            <p className="font-medium">{msg.position}</p>
+            {msg.because && <p className="text-foreground/90">Why: {msg.because}</p>}
+          </div>
+        )}
         <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{msg.message}</p>
         {msg.new_position && (
           <p className="text-sm italic text-muted-foreground mt-1.5 pl-3 border-l-2 border-primary/30">

@@ -163,7 +163,7 @@ check(settled?.discussion_rounds_completed === 2 && reopen.json?.rounds_target =
 
 // ---- 8. P1.1: a change of position after the founder pushes back is recorded.
 console.log('\n== changing position after the founder pushes back');
-await script({ delayBy: slow(2000), fields: { changed_opinion: Array(40).fill(true), new_position: Array(40).fill('Go ahead with it.'), reply_to_advisor: Array(40).fill('Founder') } });
+await script({ delayBy: slow(2000), fields: { changed_opinion: Array(40).fill(true), new_position: Array(40).fill('Go ahead with it.'), answering_who: Array(40).fill('Founder'), moved_by: Array(40).fill('Founder'), change_because: Array(40).fill('The founder has decided.') } });
 const J = await start('Should we sign the Chelsea lease?');
 await act(J, 'note', { text: "I've decided. Just plan it." });
 const mJ = await waitFor(J, finished);

@@ -6,6 +6,7 @@ import { findChair, resolutionCallFields } from '../_shared/chair.ts';
 import { mergeRepair, normalizeResults, recordPushbackChanges, vagueParts } from '../_shared/resultsStandard.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
+import { chairTags } from '../_shared/turnShape.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
@@ -54,6 +55,13 @@ SPECIFICITY — this is a hard requirement:
 - If you genuinely cannot name a concrete next action, say so and explain what information would make one possible. That is a useful contribution. A vague recommendation is not.
 - Prefer the smallest real action over the most impressive-sounding one. "Call the six people who enquired last month and ask what stopped them" beats "conduct customer discovery research."
 
+TURNS THAT FAILED A CHECK — some turns carry a tag in square brackets:
+- [SAME POINT AS name — count once]: two advisors made the same point in the same round, each on their own. Count it once, for both of them.
+- [REPEATS name'S EARLIER POINT]: the turn repeats what was already said in an earlier round. It adds nothing new.
+- [CHANGE WITHOUT A REASON — counts as their earlier position]: treat the advisor as still holding their earlier position, and list the unexplained change under areas of disagreement.
+- [NO SPECIFIC REASON]: give the turn little weight.
+- A turn tagged NO SPECIFIC REASON, REPEATS or CHANGE WITHOUT A REASON never makes its advisor the one with the most persuasive reasoning.
+
 THE FOUNDER IN THE ROOM — if the founder spoke during this meeting:
 - What the founder said is listed under WHAT THE FOUNDER SAID IN THIS MEETING and marked THE FOUNDER in the transcript. A fact they state about their own business is a company-record fact: treat it as true, never attribute it to an advisor, and never list it as unknown.
 - Their views, preferences and pushback are their opinion, not evidence. Weigh them like any argument. If the board's reasoning still says the founder's preferred idea is weak, the verdict and top issues must say so plainly. Agreeing with the founder because they pushed is a failure.
@@ -99,7 +107,15 @@ function formatTranscriptForChair(transcript) {
       if (msg.reply_to_advisor) text += ` -> responding to ${msg.reply_to_advisor}`;
       if (msg.changed_opinion) text += msg.after_founder_pushback ? ` [CHANGED POSITION AFTER THE FOUNDER SPOKE]` : ` [OPINION CHANGED]`;
       if (msg.agrees_with) text += ` [AGREES WITH ${msg.agrees_with} — nothing to add beyond their reasoning]`;
+      const tags = chairTags(msg.flags);
+      if (tags.length) text += ` ${tags.join(' ')}`;
       text += `: ${msg.message}\n`;
+      if (msg.position && msg.round > 1) text += `  -> Position: ${msg.position}${msg.because ? ` Why: ${msg.because}` : ''}\n`;
+      if (msg.changed_opinion && msg.moved_by) text += `  -> Moved by ${msg.moved_by}: ${msg.change_because || '(no reason given)'}\n`;
+      if (msg.adds) text += `  -> Adds: ${msg.adds}\n`;
+      if (msg.founder_answer) text += `  -> To the founder: ${msg.founder_answer}${msg.treated_as ? ` (took what the founder said as ${msg.treated_as === 'fact' ? 'a fact' : 'their view'})` : ''}\n`;
+      if (msg.against_me) text += `  -> Strongest argument against them: ${msg.against_me}\n`;
+      if (msg.would_change_my_mind) text += `  -> Would change their mind: ${msg.would_change_my_mind}\n`;
       if (msg.changed_opinion && msg.new_position) text += `  -> New position: ${msg.new_position}\n`;
       if (msg.key_arguments?.length) text += `  -> Arguments: ${msg.key_arguments.join('; ')}\n`;
       if (msg.new_risks?.length) text += `  -> New risks: ${msg.new_risks.join('; ')}\n`;

@@ -22,11 +22,21 @@ export const MAX_ROUNDS = 3;
 // for the result than the engine took).
 export function dwellMs(item, { queued = 0, finishing = false } = {}) {
   if (item?.kind === "founder") return 1500;
-  const chars = (item?.message || "").length;
+  const chars = spokenText(item).length;
   const base = Math.min(7000, Math.max(3000, 1500 + chars * 20));
   if (finishing || queued >= 3) return Math.min(base, 2500);
   if (queued >= 1) return Math.min(base, 4500);
   return base;
+}
+
+// What a turn says out loud while it plays: a shaped turn (Workstream I)
+// leads with its position and reason, the full turn sits in the minutes.
+export function shapedTurn(m) {
+  return !!(m?.position && m.round > 1);
+}
+export function spokenText(m) {
+  if (!m) return "";
+  return shapedTurn(m) ? `${m.position}${m.because ? `\nWhy: ${m.because}` : ""}` : m.message || "";
 }
 
 // Everything that plays back, in order: the opening, then each turn.
@@ -64,11 +74,20 @@ export function turnFlags(msg, participants = []) {
   // The advisor's own label of the move ("challenge", "rebuttal"), worded as
   // the move, not as a verdict: models label turns loosely, and a turn that
   // also records agreeing with the same person isn't shown as a challenge.
-  if (["challenge", "rebuttal"].includes(msg.message_type) && target && target !== self && target !== ally) {
-    flags.push({ tone: "disagree", label: `${msg.message_type === "rebuttal" ? "Rebuts" : "Challenges"} ${firstName(target)}` });
+  const checks = Array.isArray(msg.flags) ? msg.flags : [];
+  // A shaped turn says what it does with whose point.
+  if (msg.stance && target && target !== self) {
+    const verb = { disagree: "Disagrees with", build: "Builds on", question: "Questions", agree: "Agrees with" }[msg.stance];
+    if (verb) flags.push({ tone: msg.stance === "disagree" ? "disagree" : msg.stance === "agree" ? "agree" : "neutral", label: `${verb} ${firstName(target)}` });
+  } else {
+    if (["challenge", "rebuttal"].includes(msg.message_type) && target && target !== self && target !== ally) {
+      flags.push({ tone: "disagree", label: `${msg.message_type === "rebuttal" ? "Rebuts" : "Challenges"} ${firstName(target)}` });
+    }
+    if (ally && ally !== self) flags.push({ tone: "agree", label: `Agrees with ${firstName(ally)}` });
   }
-  if (ally && ally !== self) flags.push({ tone: "agree", label: `Agrees with ${firstName(ally)}` });
-  if (msg.changed_opinion) flags.push({ tone: "changed", label: "Changed position" });
+  // A change that names no reason isn't shown as one (the Chair counts the
+  // earlier position).
+  if (msg.changed_opinion && !checks.includes("change_without_reason")) flags.push({ tone: "changed", label: "Changed position" });
   return flags;
 }
 
@@ -76,7 +95,7 @@ export function countsFor(items, participants = []) {
   const turns = items.filter((i) => i.kind === "turn" && !i.unavailable);
   return {
     challenges: turns.filter((m) => turnFlags(m, participants).some((f) => f.tone === "disagree")).length,
-    changed: turns.filter((m) => m.changed_opinion).length,
+    changed: turns.filter((m) => m.changed_opinion && !(Array.isArray(m.flags) && m.flags.includes("change_without_reason"))).length,
   };
 }
 

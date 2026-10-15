@@ -2,7 +2,7 @@ import { formatCost } from "@/lib/money";
 import React from "react";
 import { portraitFor } from "@/lib/portraits";
 import { initialsOf } from "@/lib/advisorLibrary";
-import { turnFlags, countsFor } from "@/lib/meetingPlayback";
+import { turnFlags, countsFor, firstName, shapedTurn } from "@/lib/meetingPlayback";
 
 // "Minutes, as they happen" (meeting mock): each turn as a speech bubble
 // beside the advisor's portrait, with what the turn did ("Challenges
@@ -13,7 +13,39 @@ const FLAG_TONE = {
   disagree: "bg-brand text-brand-foreground border-brand",
   agree: "bg-[hsl(var(--sage))] border-foreground",
   changed: "bg-[hsl(var(--live-fill))] border-foreground",
+  neutral: "border-foreground",
 };
+
+// A shaped turn (Workstream I): whose point it answers, the position and
+// its reason up front, and the full turn folded underneath.
+function ShapedTurn({ m }) {
+  return (
+    <div className="space-y-1.5">
+      {m.reply_to_advisor && m.answering_point && (
+        <p className="font-mono text-[0.72rem] text-muted-foreground">
+          Replying to {m.reply_to_advisor === "Founder" ? "you" : firstName(m.reply_to_advisor)}: "{m.answering_point}"
+        </p>
+      )}
+      {m.founder_answer && (
+        <p className="leading-relaxed"><b className="font-medium">To you:</b> {m.founder_answer}
+          {m.treated_as && <span className="text-sm text-muted-foreground"> · taken as {m.treated_as === "fact" ? "a fact" : "your view"}</span>}</p>
+      )}
+      <p className="font-medium leading-snug">{m.position}</p>
+      {m.because && <p className="leading-relaxed">Why: {m.because}</p>}
+      {m.changed_opinion && m.moved_by && (
+        <p className="text-sm">Moved by {m.moved_by === "Founder" ? "you" : firstName(m.moved_by)}{m.change_because ? `: ${m.change_because}` : ""}</p>
+      )}
+      {m.against_me && <p className="text-sm"><b className="font-medium">Against my view:</b> {m.against_me}</p>}
+      {m.would_change_my_mind && <p className="text-sm"><b className="font-medium">Would change my mind:</b> {m.would_change_my_mind}</p>}
+      {m.message && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-muted-foreground">The full turn</summary>
+          <p className="mt-1.5 whitespace-pre-line leading-relaxed">{m.message}</p>
+        </details>
+      )}
+    </div>
+  );
+}
 
 function Portrait({ name, libraryKey }) {
   const p = portraitFor({ libraryKey, name });
@@ -99,7 +131,9 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">{formatCost(m.cost_usd)}</span>
                 )}
                 {m.after_founder_pushback && (
-                  <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">Changed after you spoke</span>
+                  <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">
+                    {Array.isArray(m.flags) && m.flags.includes("change_without_reason") ? "Gave way after you spoke, no new reason" : "Changed after you spoke"}
+                  </span>
                 )}
                 {m.redone_after && (
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground" title={`The first answer was almost the same as ${m.redone_after}'s, so it was asked again`}>Asked again</span>
@@ -112,7 +146,7 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
                 ))}
               </div>
               <Say tone={m.kind === "opening" ? "chair" : "plain"}>
-                <p className="whitespace-pre-line leading-relaxed">{m.message}</p>
+                {m.kind === "turn" && shapedTurn(m) ? <ShapedTurn m={m} /> : <p className="whitespace-pre-line leading-relaxed">{m.message}</p>}
               </Say>
               {onPin && m.kind === "turn" && (
                 <p className="mt-2 text-sm text-muted-foreground">

@@ -380,6 +380,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
       advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
       provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
       position: resp.position || '', because: resp.because || '', recommendation: resp.recommendation || '',
+      would_change_my_mind: resp.would_change_my_mind || '',
       key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
       risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m: any) => keepOpenProfileField(m, company)),
       suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,

@@ -1,12 +1,14 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { ANTHROPIC_LIMITS, anthropicSchemaStats, fitsAnthropicLimits, forAnthropic, forOpenAI, validateAndParse } from './outputSchema.ts';
 import * as schemas from './answerSchemas.ts';
+import { discussionSchema } from './turnShape.ts';
 
 const ALL: Record<string, unknown> = {
   INDEPENDENT_SCHEMA: schemas.INDEPENDENT_SCHEMA, CHAIR_OPENING_SCHEMA: schemas.CHAIR_OPENING_SCHEMA,
   DISCUSSION_SCHEMA: schemas.DISCUSSION_SCHEMA, FOLLOWUP_SCHEMA: schemas.FOLLOWUP_SCHEMA,
   RESOLUTION_SCHEMA: schemas.RESOLUTION_SCHEMA, TASK_ACK_SCHEMA: schemas.TASK_ACK_SCHEMA,
   ONBOARDING_SCHEMA: schemas.ONBOARDING_SCHEMA, ADMIN_TEST_SCHEMA: schemas.ADMIN_TEST_SCHEMA,
+  TURN_SCHEMA: discussionSchema(['Sofia Marchetti', 'Julian Rhodes', 'Priya Nair', 'Rafael Duarte', 'Victor Hale']),
 };
 
 // OpenAI strict mode: every object closed, every property required.
