@@ -8,7 +8,7 @@ export const PACES = [
   { key: "join", label: "Join the board", hint: "One advisor at a time. Coming soon." },
 ];
 
-// "Sit in" is offered once the system switch is on, or for a test when the
+// "Sit in" is offered once its own system switch is on, or for a test when the
 // address asks for it (?sitIn=1, or the older ?openDoor=1), remembered for
 // the browser tab.
 function sitInAsked() {
@@ -21,16 +21,31 @@ function sitInAsked() {
   }
 }
 
+// The turn shape (Workstream I) for a test, before it's on for everyone:
+// the address asks for it (?turnShape=1), remembered for the browser tab.
+// The server decides; a free visitor never gets it.
+export function turnShapeAsked() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("turnShape") === "1") sessionStorage.setItem("turnShape", "1");
+    return sessionStorage.getItem("turnShape") === "1";
+  } catch {
+    return false;
+  }
+}
+
 // Whether this founder is offered a choice of pace: signed in (free visitors
 // get Ask the board), and Sit in switched on or asked for.
 export function usePaceOffered() {
-  const [asked, setAsked] = useState(sitInAsked);
+  // Both switches are read as soon as the page opens, so they're remembered
+  // for the tab even once the address changes.
+  const [asked, setAsked] = useState(() => { turnShapeAsked(); return sitInAsked(); });
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
     let live = true;
     supabase.auth.getUser().then(({ data }) => { if (live) setSignedIn(!!data?.user && !data.user.is_anonymous); });
     base44.entities.SystemLimits.list().then((rows) => {
-      if (live && rows?.[0]?.founder_in_room === true) setAsked(true);
+      if (live && rows?.[0]?.sit_in === true) setAsked(true);
     }).catch(() => {});
     return () => { live = false; };
   }, []);

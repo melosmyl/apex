@@ -4,7 +4,7 @@ import { distinctRoundOne } from '../_shared/roundOne.ts';
 import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
 import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
-import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
+import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, INDEPENDENT_SCHEMA_SHAPED, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
@@ -379,8 +379,10 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
     return {
       advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
       provider_used: d.provider_used, model_used: d.model_used, used_fallback: d.used_fallback,
-      position: resp.position || '', because: resp.because || '', recommendation: resp.recommendation || '',
-      would_change_my_mind: resp.would_change_my_mind || '',
+      position: resp.position || '', recommendation: resp.recommendation || '',
+      // Asked for, and kept, only with the turn shape on.
+      ...(meeting.turn_shape && resp.because ? { because: resp.because } : {}),
+      ...(meeting.turn_shape && resp.would_change_my_mind ? { would_change_my_mind: resp.would_change_my_mind } : {}),
       key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
       risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m: any) => keepOpenProfileField(m, company)),
       suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
@@ -413,7 +415,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
         // gets; the full list stays in the package later rounds and the Chair use.
         system_instructions: `${advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`}\n${lensFor(advisor)}`,
         company_context: roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage,
-        user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
+        user_question: question, previous_responses: [], output_schema: meeting.turn_shape ? INDEPENDENT_SCHEMA_SHAPED : INDEPENDENT_SCHEMA,
         temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
         personal_details: true, // nothing said yet in this meeting
       }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
@@ -450,7 +452,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
       advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: `${advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`}\n${lensFor(advisor)}`,
       company_context: roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage,
-      meeting_context: note, user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
+      meeting_context: note, user_question: question, previous_responses: [], output_schema: meeting.turn_shape ? INDEPENDENT_SCHEMA_SHAPED : INDEPENDENT_SCHEMA,
       temperature: advisor.temperature, request_type: 'independent_redo', deadline_at: deadlineAt, personal_details: true,
     }).then(data => formatIndependent({ advisor, data })).catch(() => null),
   });
@@ -534,7 +536,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await authClient.auth.getUser();
     if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
 
-    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId, server_driven, await_humans, pace } = body;
+    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId, server_driven, await_humans, pace, turn_shape } = body;
     // The browser may choose the new meeting's id, so its live view can follow
     // exactly this meeting while Round 1 forms. Only a well-formed UUID is
     // accepted; a clash with an existing row simply fails the insert.
@@ -600,6 +602,10 @@ Deno.serve(async (req) => {
         // How the founder holds it: Quick (the default) or Sit in. A visitor
         // on the free meeting always gets Quick.
         pace: !user.is_anonymous && pace === 'sit_in' ? 'sit_in' : 'quick',
+        // The turn shape (Workstream I): on for this meeting when the owner's
+        // switch is on for everyone, or the page asks for it (?turnShape=1)
+        // for a signed-in founder. Otherwise today's turns.
+        turn_shape: !user.is_anonymous && (limits.turn_shape === true || turn_shape === true),
       } : {}),
     }).select().single();
     if (createErr) throw createErr;

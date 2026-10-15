@@ -8,6 +8,7 @@ const ALL: Record<string, unknown> = {
   DISCUSSION_SCHEMA: schemas.DISCUSSION_SCHEMA, FOLLOWUP_SCHEMA: schemas.FOLLOWUP_SCHEMA,
   RESOLUTION_SCHEMA: schemas.RESOLUTION_SCHEMA, TASK_ACK_SCHEMA: schemas.TASK_ACK_SCHEMA,
   ONBOARDING_SCHEMA: schemas.ONBOARDING_SCHEMA, ADMIN_TEST_SCHEMA: schemas.ADMIN_TEST_SCHEMA,
+  INDEPENDENT_SCHEMA_SHAPED: schemas.INDEPENDENT_SCHEMA_SHAPED,
   TURN_SCHEMA: discussionSchema(['Sofia Marchetti', 'Julian Rhodes', 'Priya Nair', 'Rafael Duarte', 'Victor Hale']),
 };
 

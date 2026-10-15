@@ -29,14 +29,25 @@ export function dwellMs(item, { queued = 0, finishing = false } = {}) {
   return base;
 }
 
+// A turn as [what it says, its reason]: a shaped turn's position and
+// reason, a Round 1 position written with its reason (turn shape on), or
+// anything else as it is with no reason, so it shows exactly as before.
+export function splitWhy(m) {
+  if (!m) return ["", null];
+  if (shapedTurn(m)) return [m.position, m.because || null];
+  const t = String(m.message || "");
+  const i = m.round === 1 && m.message_type === "initial" ? t.indexOf("\nWhy: ") : -1;
+  return i > 0 ? [t.slice(0, i), t.slice(i + 6)] : [t, null];
+}
+
 // What a turn says out loud while it plays: a shaped turn (Workstream I)
 // leads with its position and reason, the full turn sits in the minutes.
 export function shapedTurn(m) {
   return !!(m?.position && m.round > 1);
 }
 export function spokenText(m) {
-  if (!m) return "";
-  return shapedTurn(m) ? `${m.position}${m.because ? `\nWhy: ${m.because}` : ""}` : m.message || "";
+  const [said, why] = splitWhy(m);
+  return why ? `${said} ${why}` : said;
 }
 
 // Everything that plays back, in order: the opening, then each turn.
@@ -106,9 +117,6 @@ export function firstName(name = "") {
 // A bubble-sized excerpt: whole sentences up to about `max` characters, or a
 // clean cut at a word.
 export function excerpt(text = "", max = 240) {
-  // A Round 1 position keeps its reason, each part shortened on its own.
-  const why = String(text).indexOf("\nWhy: ");
-  if (why > 0) return `${excerpt(String(text).slice(0, why), max)}\n${excerpt(String(text).slice(why + 1), max)}`;
   const t = String(text).trim();
   if (t.length <= max) return t;
   const cut = t.slice(0, max);

@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
+import { DISCUSSION_SCHEMA } from '../_shared/answerSchemas.ts';
 import { discussionSchema, recordWords, shapedEntry, turnFlags, turnRules } from '../_shared/turnShape.ts';
 import { findChair, withoutChair } from '../_shared/chair.ts';
 import { usedPersonalDetail, ownWords } from '../_shared/personalDetails.ts';
@@ -13,7 +14,10 @@ const MAX_ENTRY_CHARS = 4000;
 // A Round 1 position always carries its reason (owner, 15 October 2026), and
 // later rounds see the advisor's top arguments too, not only the headline.
 // Answers from before the reason was asked for fall back to the first argument.
-function positionWithReason(r) {
+// Only a meeting with the turn shape on (owner's switch) gets either:
+// any other keeps Round 1 exactly as before.
+function positionWithReason(r, shaped) {
+  if (!shaped) return { message: String(r.position || r.recommendation || '').slice(0, MAX_ENTRY_CHARS) };
   const args = (Array.isArray(r.key_arguments) ? r.key_arguments : []).map((a) => String(a).trim()).filter(Boolean);
   const reason = String(r.because || '').trim() || (r.unavailable ? '' : args[0] || '');
   const head = String(r.position || r.recommendation || '').trim();
@@ -149,7 +153,7 @@ function formatTranscript(transcript, currentAdvisorId) {
 }
 
 // What the founder said since the last round (P1), and how to treat it.
-function founderSection(notes, advisor) {
+function founderSection(notes, advisor, shaped = false) {
   if (!notes?.length) return '';
   let text = `THE FOUNDER IS IN THE ROOM. Since the last round they said:\n`;
   notes.forEach(n => {
@@ -160,14 +164,14 @@ function founderSection(notes, advisor) {
   text += `- A fact the founder states about their own business is a fact. Use it, and drop anything you said that it rules out.\n`;
   text += `- A view, preference or pushback from the founder is their opinion, not evidence. If you still disagree, say so plainly and why. The founder is here for honest advice, not agreement; changing your position only because the founder prefers another answer is a failure.\n`;
   text += `- If you change your position, name the new fact or reasoning that changed it. "The founder has decided" or "the founder insists" is not a reason: if that is all that has changed, keep your position and say plainly that you still disagree, then help as far as you honestly can. A change after the founder speaks is shown to the Chair and listed where the room disagreed.\n`;
-  text += `- Answer the founder first: open your message by responding to what they said (or asked you directly), then carry on with the discussion. Set answering_who to "Founder" when you are mainly answering the founder.\n`;
+  text += `- Answer the founder first: open your message by responding to what they said (or asked you directly), then carry on with the discussion. ${shaped ? 'Set answering_who to "Founder"' : 'Set reply_to_advisor to "Founder"'} when you are mainly answering the founder.\n`;
   text += `- Keep arguing with the other advisors too: the founder joined the discussion, they didn't replace it.\n\n`;
   return text;
 }
 
 const CHALLENGER_DUTY = `YOUR DUTY THIS ROUND — THE CHALLENGER: find the weakest point in where the room, or the founder, is heading, and press on it with evidence. Name it, say why it could fail, and what would have to be true for it to work. Don't soften it to be agreeable. If after honest scrutiny it holds up, say so, and say what would change your mind.\n\n`;
 
-function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs, { founderNotes = [], isChallenger = false } = {}) {
+function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs, { founderNotes = [], isChallenger = false, shaped = false } = {}) {
   const ownInitial = transcript.find(m => m.advisor_id === advisor.id && m.round === 1);
   let context = `=== EXECUTIVE BOARD DISCUSSION ===\n`;
   context += `You are in Round ${round} of ${maxRounds} of a structured board discussion.\n\n`;
@@ -187,14 +191,14 @@ function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRou
   if (ownPair) {
     const other = ownPair.names.find(n => n !== advisor.name);
     context += `NOTE: your independent recommendation landed very close to ${other}'s. Do exactly one of two things about this — do not do both, and do not invent a difference that isn't real:\n`;
-    context += `- If you genuinely agree and have nothing to add beyond their reasoning, say so plainly: answering_who "${other}", stance agree, and leave adds empty. Real agreement is a legitimate, valuable outcome — it is not a failure to have a distinct opinion.\n`;
+    context += `- If you genuinely agree and have nothing to add beyond their reasoning, say so plainly ${shaped ? `(answering_who "${other}", stance agree, adds empty)` : `and set agrees_with to "${other}"`}. Real agreement is a legitimate, valuable outcome — it is not a failure to have a distinct opinion.\n`;
     context += `- If you actually see it differently — different risk tolerance, sequencing, cost, or what you'd do first — say so concretely, addressed to ${other} by name. A manufactured distinction to look independent is worse than honest agreement.\n\n`;
   }
-  context += founderSection(founderNotes, advisor);
+  context += founderSection(founderNotes, advisor, shaped);
   if (isChallenger) context += CHALLENGER_DUTY;
-  context += turnRules({ isLastRound, founderSpoke: founderNotes.length > 0 });
+  if (shaped) context += turnRules({ isLastRound, founderSpoke: founderNotes.length > 0 });
   if (isLastRound) {
-    context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. If you are now in agreement with another advisor and have nothing to add, say so: answering_who is their name, stance agree, adds empty.\n`;
+    context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. ${shaped ? 'If you are now in agreement with another advisor and have nothing to add, say so: answering_who is their name, stance agree, adds empty.' : 'If you are now in agreement with another advisor, say so explicitly and set agrees_with to their name.'}\n`;
   } else {
     context += `YOUR TASK: Contribute to the discussion. You may:\n`;
     context += `- Question another advisor's reasoning or ask for evidence\n- Challenge an assumption or identify a weakness\n- Defend your position against criticism\n- Change your opinion if persuaded (explain why)\n- Support another advisor's argument\n- Identify a risk nobody has mentioned\n- Introduce new information or evidence\n- Say the question itself is wrong, and name the question that should be asked instead\n\n`;
@@ -217,12 +221,13 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 // One discussion round: every advisor answers, in parallel, with the
 // discussion so far. Returns the round's messages (failed advisors dropped).
 async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, facts = '', independentResponses, roundDeadline, founderNotes = [], challenger = null }: any) {
-  // The turn shape (Workstream I): "who I'm answering" can only name
-  // someone in this meeting.
-  const schema = discussionSchema(meetingAdvisors.map((a) => a.name));
+  // The turn shape (Workstream I), when the meeting has it on: "who I'm
+  // answering" can only name someone in this meeting. Otherwise today's turn.
+  const shaped = !!meeting.turn_shape;
+  const schema = shaped ? discussionSchema(meetingAdvisors.map((a) => a.name)) : DISCUSSION_SCHEMA;
   const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
     const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs,
-      { founderNotes, isChallenger: !!challenger && challenger.id === advisor.id });
+      { founderNotes, isChallenger: !!challenger && challenger.id === advisor.id, shaped });
     return callAdvisor(supabaseUrl, serviceKey, {
       advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: null, company_context: profile, meeting_context: meetingContext,
@@ -242,7 +247,11 @@ async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvi
     const resp = r.data.response;
     return {
       round, advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
-      ...shapedEntry(resp, { speaker: r.advisor.name, isLastRound, founderSpoke: founderNotes.length > 0, cap: MAX_ENTRY_CHARS }),
+      ...(shaped ? shapedEntry(resp, { speaker: r.advisor.name, isLastRound, founderSpoke: founderNotes.length > 0, cap: MAX_ENTRY_CHARS }) : {
+        message: resp.message || '', message_type: resp.message_type || (isLastRound ? 'final_statement' : 'rebuttal'),
+        reply_to_advisor: resp.reply_to_advisor || null, changed_opinion: resp.changed_opinion || false,
+        new_position: resp.new_position || null, agrees_with: resp.agrees_with || null,
+      }),
       new_risks: resp.new_risks || [],
       confidence_score: resp.confidence_score || 0,
       answerable: resp.answerable !== false,
@@ -253,11 +262,12 @@ async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvi
       // Changed position in answer to the founder (P1.1): a note to the board
       // or to this advisor, and a turn that answers or names the founder.
       ...(resp.changed_opinion && founderNotes.some((n) => !n.to_advisor_id || n.to_advisor_id === r.advisor.id)
-        && (/founder/i.test(resp.answering_who || '') || /founder/i.test(resp.moved_by || '') || /\bfounder/i.test(resp.message || '')) ? { after_founder_pushback: true } : {}),
+        && (/founder/i.test(resp.answering_who || resp.reply_to_advisor || '') || /founder/i.test(resp.moved_by || '') || /\bfounder/i.test(resp.message || '')) ? { after_founder_pushback: true } : {}),
     };
   }).filter(Boolean);
   // The checks: flags only, for the Chair and the minutes. A turn that
   // echoes one before it in the round is flagged, not both.
+  if (!shaped) return entries;
   const earlier = transcript.filter((m) => m.round > 1 && m.round < round);
   return entries.map((e: any) => ({
     ...e, flags: turnFlags(e, { sameRound: entries, earlier: earlier.filter((m) => m.advisor_id !== e.advisor_id), record, isLastRound }),
@@ -315,8 +325,8 @@ async function loadDiscussion(db, meeting, ownerId): Promise<any> {
     round: 1, advisor_id: r.advisor_id,
     advisor_name: String(byId.get(r.advisor_id)?.name ?? r.advisor_name ?? '').slice(0, 100),
     role: String(byId.get(r.advisor_id)?.role ?? r.role ?? '').slice(0, 100),
-    ...positionWithReason(r), message_type: 'initial',
-    ...(r.would_change_my_mind ? { would_change_my_mind: String(r.would_change_my_mind).slice(0, 500) } : {}),
+    ...positionWithReason(r, !!meeting.turn_shape), message_type: 'initial',
+    ...(meeting.turn_shape && r.would_change_my_mind ? { would_change_my_mind: String(r.would_change_my_mind).slice(0, 500) } : {}),
     reply_to_advisor: null, changed_opinion: false, new_position: null,
     new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
     provider_used: r.provider_used, model_used: r.model_used,

@@ -4,6 +4,7 @@ import { Gavel, AlertTriangle, Lightbulb, ChevronDown, ChevronUp, CornerDownRigh
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { Section, Actions, Issues, Disagreements } from "@/components/boardroom/ResultSections";
 import { actionsHeading, resultSections } from "@/lib/meetingResult";
+import { splitWhy } from "@/lib/meetingPlayback";
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/getSharedMeeting`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -70,7 +71,8 @@ function TranscriptEntry({ msg }) {
             <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground"><RefreshCw className="w-2.5 h-2.5" /> Changed position</span>
           )}
         </div>
-        <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{msg.message}</p>
+        <p className="text-sm leading-relaxed text-foreground/90">{msg.round === 1 ? splitWhy(msg)[0] : msg.message}</p>
+{msg.round === 1 && splitWhy(msg)[1] && <p className="text-sm leading-relaxed text-foreground/90">Why: {splitWhy(msg)[1]}</p>}
         {msg.new_position && <p className="text-sm italic text-muted-foreground mt-1.5 pl-3 border-l-2 border-primary/30">New position: {msg.new_position}</p>}
       </div>
       <div className="text-right shrink-0 pt-0.5 text-xs text-muted-foreground">{Math.round(msg.confidence_score || 0)}%</div>

@@ -8,6 +8,7 @@ import { findChair } from "@/lib/chair";
 import { usePin } from "@/components/pins/PinContext";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 import { ChevronDown, ChevronUp, MessageSquare, CornerDownRight, RefreshCw, AlertTriangle, Volume2, Square } from "lucide-react";
+import { splitWhy } from "@/lib/meetingPlayback";
 
 const MESSAGE_TYPE_META = {
   initial: { label: "Initial", className: "bg-secondary text-muted-foreground" },
@@ -81,7 +82,8 @@ export function DiscussionMessage({ msg, accent }) {
             <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">{msg.note_id ? `Said in the meeting${msg.to_name ? ` · to ${msg.to_name}` : ""}` : "Founder Reply"}</span>
           </div>
           <div className="bg-primary/5 rounded-xl p-3 border border-primary/10">
-            <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{msg.message}</p>
+            <p className="text-sm leading-relaxed text-foreground/90">{msg.round === 1 ? splitWhy(msg)[0] : msg.message}</p>
+{msg.round === 1 && splitWhy(msg)[1] && <p className="text-sm leading-relaxed text-foreground/90">Why: {splitWhy(msg)[1]}</p>}
           </div>
         </div>
       </div>
@@ -119,7 +121,8 @@ export function DiscussionMessage({ msg, accent }) {
             {msg.because && <p className="text-foreground/90">Why: {msg.because}</p>}
           </div>
         )}
-        <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-line">{msg.message}</p>
+        <p className="text-sm leading-relaxed text-foreground/90">{msg.round === 1 ? splitWhy(msg)[0] : msg.message}</p>
+{msg.round === 1 && splitWhy(msg)[1] && <p className="text-sm leading-relaxed text-foreground/90">Why: {splitWhy(msg)[1]}</p>}
         {msg.new_position && (
           <p className="text-sm italic text-muted-foreground mt-1.5 pl-3 border-l-2 border-primary/30">
             New position: {msg.new_position}

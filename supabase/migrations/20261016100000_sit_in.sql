@@ -7,12 +7,26 @@
 --   join    "Join the board": one advisor at a time (P1 Stage 2, not built)
 --
 -- The typing hold and screen pacing are no longer used; their columns stay.
+--
+-- The turn shape (Workstream I) has its own switch: a meeting records at its
+-- start whether it uses it (the owner's switch for everyone, off for now, or
+-- ?turnShape=1 for a signed-in founder), and every round and the Chair follow
+-- that. Meetings without it, and every existing meeting, are unchanged.
 
 alter table public.board_meetings
   add column if not exists pace text not null default 'quick'
     check (pace in ('quick', 'sit_in', 'join')),
   -- A Sit in meeting at a stop: no step starts until the founder acts.
-  add column if not exists waiting_for_founder boolean not null default false;
+  add column if not exists waiting_for_founder boolean not null default false,
+  -- This meeting's turns use the turn shape.
+  add column if not exists turn_shape boolean not null default false;
+
+-- The owner's switches, both off: Sit in offered to every signed-in founder
+-- (until then, only with ?sitIn=1), and the turn shape for every signed-in
+-- founder's meeting (until then, only with ?turnShape=1).
+alter table public.system_limits
+  add column if not exists sit_in boolean not null default false,
+  add column if not exists turn_shape boolean not null default false;
 
 -- A meeting the server waits on is never picked up by the sweep, and the
 -- cron job doesn't call it for one; asking for the decision always wins over
@@ -87,6 +101,7 @@ begin
     new.founder_watching_until := null;
     new.pace := 'quick';
     new.waiting_for_founder := false;
+    new.turn_shape := false;
   end if;
   return new;
 end;

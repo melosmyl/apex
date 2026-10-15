@@ -32,9 +32,7 @@ export const INDEPENDENT_SCHEMA = {
   type: 'object',
   properties: {
     position: { type: 'string', description: 'Your overall position on the question' },
-    because: { type: 'string', description: 'One sentence: the main reason for your position, naming something specific to this company or question (a number, a person, a place, or a fact the founder gave)' },
     recommendation: { type: 'string', description: 'Your specific recommendation' },
-    would_change_my_mind: { type: 'string', description: 'One fact that could be checked and would change your mind' },
     key_arguments: { type: 'array', items: { type: 'string' } },
     assumptions: { type: 'array', items: { type: 'string' }, description: 'Empty if none' },
     risks: { type: 'array', items: { type: 'string' }, description: 'Empty if none' },
@@ -56,8 +54,22 @@ export const INDEPENDENT_SCHEMA = {
     suggested_actions: { type: 'array', items: { type: 'string' }, description: 'Empty if none' },
     confidence_score: { type: 'number', description: '0-100' },
   },
-  required: ['position', 'because', 'recommendation', 'would_change_my_mind', 'key_arguments', 'assumptions', 'risks', 'missing_information', 'suggested_actions', 'confidence_score'],
+  required: ['position', 'recommendation', 'key_arguments', 'assumptions', 'risks', 'missing_information', 'suggested_actions', 'confidence_score'],
   'x-core': ['position', 'recommendation', 'key_arguments', 'confidence_score'],
+};
+
+// Round 1 with the turn shape on (owner's switch, Workstream I): every
+// position carries its reason, and what would change the advisor's mind.
+const { position: R1_POSITION, ...R1_REST } = INDEPENDENT_SCHEMA.properties;
+export const INDEPENDENT_SCHEMA_SHAPED = {
+  ...INDEPENDENT_SCHEMA,
+  properties: {
+    position: R1_POSITION,
+    because: { type: 'string', description: 'One sentence: the main reason for your position, naming something specific to this company or question (a number, a person, a place, or a fact the founder gave)' },
+    would_change_my_mind: { type: 'string', description: 'One fact that could be checked and would change your mind' },
+    ...R1_REST,
+  },
+  required: [...INDEPENDENT_SCHEMA.required, 'because', 'would_change_my_mind'],
 };
 
 // The Chair's short opening.

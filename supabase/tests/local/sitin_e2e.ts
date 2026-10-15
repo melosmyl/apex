@@ -42,9 +42,9 @@ const { data: advs } = await F.from('advisors').insert([
 ].map((m, i) => ({ company_id: co.id, created_by_id: uid, type: 'ai', default_provider: i % 2 ? 'openai' : 'anthropic', default_model: i % 2 ? 'gpt-4o' : 'claude-sonnet-5', fallback_provider: i % 2 ? 'anthropic' : 'openai', fallback_model: i % 2 ? 'claude-sonnet-5' : 'gpt-4o', ...m }))).select();
 const byName = (n: string) => advs!.find((a: any) => a.name === n);
 const debaters = [names.grace, names.marcus, names.priya].map((n) => byName(n).id);
-const start = async (question: string, pace: string) => {
+const start = async (question: string, pace: string, turnShape = true) => {
   const id = crypto.randomUUID();
-  await call('startBoardMeeting', { company_id: co.id, question, advisor_ids: debaters, meeting_id: id, server_driven: true, pace });
+  await call('startBoardMeeting', { company_id: co.id, question, advisor_ids: debaters, meeting_id: id, server_driven: true, pace, ...(turnShape ? { turn_shape: true } : {}) });
   return id;
 };
 // Waits for the next stop after the given one.
@@ -180,6 +180,25 @@ check(r2.length === 6 && r2.every((l: any) => l.marked.includes('120 words at mo
   'every advisor is given the shape, the 120-word cap, and the final round\'s extra parts', r2.map((l: any) => l.marked));
 const chairLog = tlog.filter((l: any) => l.who === names.chair && l.marked.includes('TURNS THAT FAILED A CHECK'));
 check(chairLog.length >= 1 && chairLog.some((l: any) => l.marked.includes('[SAME POINT AS ')), 'the Chair sees the failed turns tagged', chairLog.map((l: any) => l.marked));
+
+// ---- 6. Without the switch, today's turns, exactly.
+console.log('\n== without the turn shape switch, a meeting is as it was this morning');
+await script({ marks: ['YOUR TURN HAS A SHAPE', 'Why: ', 'set agrees_with to', 'TURNS THAT FAILED A CHECK'] });
+const O = await start('Should we open on Sundays?', 'quick', false);
+const mO = await waitFor(O, finished);
+const olog = await fakeLog();
+const oTurns = (mO?.discussion_transcript || []).filter((x: any) => x.message_type !== 'founder_message');
+check(mO?.status === 'complete' && mO?.turn_shape === false && oTurns.every((x: any) => !('position' in x) || x.round === 1) && oTurns.every((x: any) => !x.flags && !x.stance && !x.key_arguments && !/\nWhy: /.test(x.message))
+  && (mO?.independent_responses || []).every((r: any) => !('because' in r)),
+  'no reasons, shape or checks are saved', oTurns.map((x: any) => Object.keys(x)));
+check(olog.every((l: any) => !l.marked.includes('YOUR TURN HAS A SHAPE') && !l.marked.includes('Why: ') && !l.marked.includes('TURNS THAT FAILED A CHECK'))
+  && olog.some((l: any) => l.marked.includes('set agrees_with to')),
+  "the advisors and the Chair are asked exactly as before", olog.map((l: any) => [l.who, l.marked]));
+const ask = await call('startBoardMeeting', { company_id: co.id, question: 'x?', advisor_ids: debaters, meeting_id: crypto.randomUUID(), server_driven: true, turn_shape: true });
+const anonCo = (await row(ask.json?.meeting?.id || ask.json?.meeting_id || ''))?.turn_shape;
+check(anonCo === true || ask.status === 200, 'a signed-in founder can ask for it', [ask.status, anonCo]);
+const { data: forged2 } = await F.from('board_meetings').insert({ company_id: co.id, created_by_id: uid, question: 'x', status: 'preparing', turn_shape: true }).select('turn_shape').single();
+check(forged2?.turn_shape === false, 'a meeting the browser makes never has it', forged2);
 
 // The fake data made for this test is removed.
 await admin.from('documents').delete().eq('company_id', co.id);

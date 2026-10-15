@@ -4,7 +4,7 @@ import MeetingStage from "@/components/boardroom/live/MeetingStage";
 import SeatRow from "@/components/boardroom/live/SeatRow";
 import MeetingProgress from "@/components/boardroom/live/MeetingProgress";
 import MeetingMinutes from "@/components/boardroom/live/MeetingMinutes";
-import { MAX_ROUNDS, excerpt, firstName, progressSteps, spokenText, thinkingLineFor, turnFlags } from "@/lib/meetingPlayback";
+import { MAX_ROUNDS, excerpt, firstName, progressSteps, splitWhy, thinkingLineFor, turnFlags } from "@/lib/meetingPlayback";
 import { absenteesByRound } from "@/lib/boardroom";
 
 // A meeting in session, laid out as the owner's meeting mock, showing only
@@ -98,9 +98,10 @@ export default function LiveMeeting({
     bubble = { label: `You · Round ${speaking.round}${speaking.to_name ? ` · to ${firstName(speaking.to_name)}` : ""}`, text: excerpt(speaking.message) };
   } else if (speaking) {
     const flag = turnFlags(speaking, participants)[0];
+    const [said, why] = splitWhy(speaking);
     bubble = {
       label: `${speaking.advisor_name} · Round ${speaking.round}${flag ? ` · ${flag.label.charAt(0).toLowerCase()}${flag.label.slice(1)}` : ""}`,
-      text: excerpt(spokenText(speaking)),
+      text: excerpt(said), why: why ? excerpt(why) : null,
     };
   } else if (phase === "preparing" && !chairOpening && elapsed < 60) {
     bubble = { label: `Opening · ${clock}`, text: `${chairFirst} is opening the meeting while the board writes its first positions. Round 1 usually takes under a minute.` };

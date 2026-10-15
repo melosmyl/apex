@@ -126,11 +126,13 @@ export function isRunningOnServer(m) {
 
 // Starts a meeting the server runs to the end (P0). It answers at once;
 // Round 1 and everything after happen on the server.
-export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId, awaitHumans = false, pace = "quick" }) {
+export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId, awaitHumans = false, pace = "quick", turnShape = false }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
       company_id: companyId, question, advisor_ids: advisorIds,
       server_driven: true, await_humans: awaitHumans, pace,
+      // The turn shape, asked for by the owner's switch (?turnShape=1).
+      ...(turnShape ? { turn_shape: true } : {}),
       // Chosen here so the live view can follow exactly this meeting while
       // Round 1 forms, before the call returns.
       ...(meetingId ? { meeting_id: meetingId } : {}),

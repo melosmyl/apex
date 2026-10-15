@@ -55,13 +55,6 @@ SPECIFICITY — this is a hard requirement:
 - If you genuinely cannot name a concrete next action, say so and explain what information would make one possible. That is a useful contribution. A vague recommendation is not.
 - Prefer the smallest real action over the most impressive-sounding one. "Call the six people who enquired last month and ask what stopped them" beats "conduct customer discovery research."
 
-TURNS THAT FAILED A CHECK — some turns carry a tag in square brackets:
-- [SAME POINT AS name — count once]: two advisors made the same point in the same round, each on their own. Count it once, for both of them.
-- [REPEATS name'S EARLIER POINT]: the turn repeats what was already said in an earlier round. It adds nothing new.
-- [CHANGE WITHOUT A REASON — counts as their earlier position]: treat the advisor as still holding their earlier position, and list the unexplained change under areas of disagreement.
-- [NO SPECIFIC REASON]: give the turn little weight.
-- A turn tagged NO SPECIFIC REASON, REPEATS or CHANGE WITHOUT A REASON never makes its advisor the one with the most persuasive reasoning.
-
 THE FOUNDER IN THE ROOM — if the founder spoke during this meeting:
 - What the founder said is listed under WHAT THE FOUNDER SAID IN THIS MEETING and marked THE FOUNDER in the transcript. A fact they state about their own business is a company-record fact: treat it as true, never attribute it to an advisor, and never list it as unknown.
 - Their views, preferences and pushback are their opinion, not evidence. Weigh them like any argument. If the board's reasoning still says the founder's preferred idea is weak, the verdict and top issues must say so plainly. Agreeing with the founder because they pushed is a failure.
@@ -82,6 +75,14 @@ THE RESULTS — the founder reads these first, in this order, so each must stand
 5. disagreements: where the room genuinely disagreed and it wasn't settled, at most 3, one line each naming who disagreed about what. Real disagreements only; empty if the room agreed. Don't invent one.
 Then confidence_reason: one line on why the confidence is what it is.
 Everything else (reasoning, agreement, assumptions, the minority view) is the full record the founder can open; keep it accurate and don't repeat the results there word for word.`;
+
+// Only for a meeting with the turn shape on, whose turns carry the checks.
+const TURN_CHECKS = `TURNS THAT FAILED A CHECK — some turns carry a tag in square brackets:
+- [SAME POINT AS name — count once]: two advisors made the same point in the same round, each on their own. Count it once, for both of them.
+- [REPEATS name'S EARLIER POINT]: the turn repeats what was already said in an earlier round. It adds nothing new.
+- [CHANGE WITHOUT A REASON — counts as their earlier position]: treat the advisor as still holding their earlier position, and list the unexplained change under areas of disagreement.
+- [NO SPECIFIC REASON]: give the turn little weight.
+- A turn tagged NO SPECIFIC REASON, REPEATS or CHANGE WITHOUT A REASON never makes its advisor the one with the most persuasive reasoning.`;
 
 const REPAIR_INSTRUCTIONS = `You are The Chair. Some of the actions and fixes you wrote are categories of work, not things the founder can actually do. Reword only the numbered items listed, so each names the specific thing to do: who to contact, what to write, which number to find, which customer to ask.
 Use only what was said in this meeting. Never invent a name, number, customer, supplier or fact that isn't in the meeting, and never present an advisor's suggestion as something that already exists. If the meeting doesn't give you enough to name a concrete action, write the smallest concrete step that would get that information (for example, which question to ask whom).
@@ -309,7 +310,7 @@ Deno.serve(async (req) => {
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
       ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       // The same memory every round worked from (P1); older meetings, the profile.
-      system_instructions: CHAIR_INSTRUCTIONS, company_context: meeting.context_package || profile, meeting_context: meetingContext,
+      system_instructions: discussionTranscript.some((m) => Array.isArray(m?.flags)) ? `${CHAIR_INSTRUCTIONS}\n\n${TURN_CHECKS}` : CHAIR_INSTRUCTIONS, company_context: meeting.context_package || profile, meeting_context: meetingContext,
       user_question: meeting.question, previous_responses: [],
       output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',
       // Ends in time for this function to save the resolution and its tasks.

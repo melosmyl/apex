@@ -11,7 +11,7 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
 import OpenDoor from "@/components/boardroom/live/OpenDoor";
-import PaceChoice, { usePaceOffered } from "@/components/boardroom/PaceChoice";
+import PaceChoice, { turnShapeAsked, usePaceOffered } from "@/components/boardroom/PaceChoice";
 import { usePin } from "@/components/pins/PinContext";
 import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
@@ -24,10 +24,11 @@ const LIVE_PHASES = ["preparing", "human_input", "discussion", "resolution"];
 
 // A Round 1 position with its reason, as the server writes it.
 function positionWithReason(r) {
-  const head = (r.position || r.recommendation || "").trim();
-  const reason = (r.because || "").trim()
-    || (r.unavailable ? "" : (r.key_arguments || []).map((a) => String(a).trim()).find(Boolean) || "");
-  return reason ? `${head}\nWhy: ${reason}` : head;
+  // Only an answer given with the turn shape on has a reason: any other
+  // shows exactly as before.
+  const reason = (r.because || "").trim();
+  const head = r.position || r.recommendation || "";
+  return reason ? `${head.trim()}\nWhy: ${reason}` : head;
 }
 
 function toRoundOneMessages(responses = []) {
@@ -294,6 +295,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         awaitHumans: selectedHumanAdvisors.length > 0,
         // Visitors on the free meeting always get Quick.
         pace: !freeAttemptId ? pace : "quick",
+        turnShape: !freeAttemptId && turnShapeAsked(),
       });
       // The Assistant routed this question in from a captured note — the
       // note only learns its meeting_id now that a real meeting exists.
