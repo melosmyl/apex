@@ -22,12 +22,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function buildFollowupContext(founderMessage, transcript, originalQuestion) {
+const cut = (v, n) => String(v ?? '').slice(0, n);
+const ANSWER_WORDS = { yes: 'yes', no: 'no', unsure: 'not sure' };
+
+// The resolution the founder is asking about, and their answers to its
+// questions: advisors were told the founder had read it, but never shown it.
+function resolutionSummary(meeting) {
+  const r = meeting.board_resolution;
+  if (!r || typeof r !== 'object') return '';
+  let text = `=== THE BOARD'S RESOLUTION (what the founder has read) ===\n`;
+  if (r.verdict) text += `Verdict: ${cut(r.verdict, 600)}\n`;
+  if (r.recommended_direction && r.recommended_direction !== r.verdict) text += `Recommended direction: ${cut(r.recommended_direction, 1200)}\n`;
+  const actions = Array.isArray(r.priority_actions) ? r.priority_actions.slice(0, 3) : [];
+  if (actions.length) text += `Next 24 hours:\n${actions.map((a, i) => `${i + 1}. ${cut(a.title, 300)} (${cut(a.assigned_to, 100)})`).join('\n')}\n`;
+  const issues = Array.isArray(r.top_issues) ? r.top_issues.slice(0, 5) : [];
+  if (issues.length) text += `Top issues:\n${issues.map((x, i) => `${i + 1}. ${cut(x.problem, 300)}. Fix: ${cut(x.fix, 300)}`).join('\n')}\n`;
+  const questions = Array.isArray(r.founder_questions) ? r.founder_questions.slice(0, 4) : [];
+  const answers = meeting.founder_answers && typeof meeting.founder_answers === 'object' ? meeting.founder_answers : {};
+  if (questions.length) {
+    text += `Decisions only the founder can make, and their answers so far:\n`;
+    questions.forEach((q, i) => { text += `- ${cut(typeof q === 'string' ? q : q?.question, 300)}: ${ANSWER_WORDS[answers[i]] || 'not answered'}\n`; });
+  }
+  const disagreements = Array.isArray(r.disagreements) ? r.disagreements.slice(0, 3) : [];
+  if (disagreements.length) text += `Where the room disagreed:\n${disagreements.map((d) => `- ${cut(typeof d === 'string' ? d : JSON.stringify(d), 300)}`).join('\n')}\n`;
+  if (meeting.founder_decision && meeting.founder_decision !== 'undecided')
+    text += `The founder's call on it: ${cut(meeting.founder_decision, 40)}${meeting.founder_decision_notes ? `: "${cut(meeting.founder_decision_notes, 500)}"` : ''}\n`;
+  return `${text}\n`;
+}
+
+function buildFollowupContext(founderMessage, transcript, originalQuestion, meeting = {}) {
   let context = `=== FOUNDER FOLLOW-UP ===\n\n`;
   context += `Original board question: ${String(originalQuestion || '').slice(0, 4000)}\n\n`;
+  context += resolutionSummary(meeting);
   context += `The founder has reviewed the board's discussion and resolution, and writes:\n`;
   context += `"${founderMessage}"\n\n`;
-  context += `Your task: Respond directly to the founder's message. Address their concerns, answer their questions, provide additional insights, and if appropriate, revise your recommendation. Be honest and direct — if you disagree with the founder, say so respectfully. Do not simply agree to please them.\n\n`;
+  context += `Your task: Respond directly to the founder's message. Address their concerns, answer their questions, provide additional insights, and if appropriate, revise your recommendation. Be honest and direct — if you disagree with the founder, say so respectfully. Do not simply agree to please them. A fact the founder states about their own business is a fact: use it. Their views and pushback are their opinion, not evidence: change your position only if the reasoning, not the pressure, warrants it.\n\n`;
   context += `=== FULL DISCUSSION TRANSCRIPT ===\n`;
   transcript.forEach(msg => {
     const isFounder = msg.message_type === 'founder_message';
@@ -81,7 +110,9 @@ Deno.serve(async (req) => {
     if (meeting.status !== 'complete' || (meeting.meeting_mode && meeting.meeting_mode !== 'board_debate'))
       return Response.json({ error: 'Follow-up questions are for finished board meetings.' }, { status: 409, headers: corsHeaders });
     await checkUserLimit(db, user.id, 'followup');
-    const followupsSoFar = (meeting.discussion_transcript || []).filter(e => e.advisor_name === 'Founder').length;
+    // Follow-ups after the resolution; what the founder said during the
+    // meeting (P1, notes with an id) doesn't count against them.
+    const followupsSoFar = (meeting.discussion_transcript || []).filter(e => e.advisor_name === 'Founder' && !e.note_id).length;
     if (followupsSoFar >= MAX_FOLLOWUPS_PER_MEETING)
       return Response.json({ error: `This meeting has reached its ${MAX_FOLLOWUPS_PER_MEETING} follow-up questions. Start a new meeting to keep going.` }, { status: 429, headers: corsHeaders });
 
@@ -134,7 +165,7 @@ Deno.serve(async (req) => {
     // if an advisor call fails partway through.
     await db.from('board_meetings').update({ discussion_transcript: updatedTranscript }).eq('id', meeting.id);
 
-    const followupContext = buildFollowupContext(founder_message.trim(), updatedTranscript, meeting.question);
+    const followupContext = buildFollowupContext(founder_message.trim(), updatedTranscript, meeting.question, meeting);
     // What the founder has told us about the company, as every meeting stage gets.
     const { data: company } = await db.from('companies').select('*').eq('id', meeting.company_id).maybeSingle();
     const profile = companyProfile(company) || null;
@@ -145,7 +176,8 @@ Deno.serve(async (req) => {
     const roundResults = await Promise.all(meetingAdvisors.map(advisor =>
       callAdvisor(supabaseUrl, serviceKey, {
         advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-        system_instructions: null, company_context: profile, meeting_context: followupContext,
+        // The same memory the meeting worked from (P1); older meetings, the profile.
+        system_instructions: null, company_context: meeting.context_package || profile, meeting_context: followupContext,
         user_question: meeting.question, previous_responses: [], output_schema: FOLLOWUP_SCHEMA,
         temperature: advisor.temperature, request_type: 'founder_followup', deadline_at: deadlineAt,
         // Their book, hobby or place stay on offer until they've used one.

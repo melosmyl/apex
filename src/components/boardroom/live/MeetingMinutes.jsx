@@ -1,3 +1,4 @@
+import { formatCost } from "@/lib/money";
 import React from "react";
 import { portraitFor } from "@/lib/portraits";
 import { initialsOf } from "@/lib/advisorLibrary";
@@ -54,6 +55,23 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
       </div>
 
       {shown.map((m, i) => {
+        // What the founder said during the meeting (P1): theirs, in the record.
+        if (m.kind === "founder") {
+          return (
+            <article key={i} className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-4 border-t border-border py-4 rise-in">
+              <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-foreground font-display text-sm" aria-hidden="true">You</span>
+              <div className="min-w-0">
+                <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                  <b className="font-display text-[1.05rem] font-medium">You</b>
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">
+                    Round {m.round}{m.to_name ? ` · to ${m.to_name}` : " · to the board"}
+                  </span>
+                </div>
+                <p className="whitespace-pre-line leading-relaxed">{m.message}</p>
+              </div>
+            </article>
+          );
+        }
         const advisor = advisorsByName[m.advisor_name];
         if (m.unavailable) {
           return (
@@ -76,6 +94,12 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
                 <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">
                   {m.kind === "opening" ? "Opening" : m.message_type === "final_statement" ? `Round ${m.round} · closing` : `Round ${m.round}`}
                 </span>
+                {Number.isFinite(m.cost_usd) && (
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">{formatCost(m.cost_usd)}</span>
+                )}
+                {m.challenger && (
+                  <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">Challenger</span>
+                )}
                 {flags.map((f) => (
                   <span key={f.label} className={`rounded-full border-[1.5px] px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em] ${FLAG_TONE[f.tone]}`}>{f.label}</span>
                 ))}

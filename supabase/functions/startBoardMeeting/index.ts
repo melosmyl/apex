@@ -86,9 +86,17 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
     });
     ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not.\n`;
   }
-  if (documents?.length) {
+  // Facts the founder stated in earlier meetings (P1) have their own block,
+  // so they never crowd the founder's other Knowledge out of the ten below.
+  const toldBoard = (documents || []).filter(d => d.category === 'What you told the board');
+  if (toldBoard.length) {
+    ctx += `\nFacts the founder told the board in earlier meetings (their words; the founder may have edited them since):\n`;
+    toldBoard.slice(0, 5).forEach(d => { ctx += `${(d.content || '').slice(0, 600)}\n`; });
+  }
+  const otherDocs = (documents || []).filter(d => d.category !== 'What you told the board');
+  if (otherDocs.length) {
     ctx += `\nRelevant Documents:\n`;
-    documents.slice(0, 10).forEach(d => { ctx += `- ${d.title} (${d.category}): ${(d.content || '').slice(0, 400)}\n`; });
+    otherDocs.slice(0, 10).forEach(d => { ctx += `- ${d.title} (${d.category}): ${(d.content || '').slice(0, 400)}\n`; });
   }
   if (ctx.length > maxSize) ctx = ctx.slice(0, maxSize) + '... [truncated]';
   return ctx;
@@ -279,9 +287,12 @@ async function claimFreeMeeting(db, userId, attemptId) {
 // Everything the board draws on for Round 1, for the meeting's owner.
 async function gather(db, userId, companyId, question): Promise<any> {
   const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
-    // Archived and replaced documents stay out of the meeting.
+    // Archived and replaced documents stay out of the meeting. Facts told to
+    // the board in earlier meetings (P1) are fetched apart, so they never
+    // crowd out the founder's other documents.
     db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
-      .or('status.is.null,status.not.in.(archived,superseded)').order('created_at', { ascending: false }).limit(20),
+      .or('status.is.null,status.not.in.(archived,superseded)').or('category.is.null,category.neq.What you told the board')
+      .order('created_at', { ascending: false }).limit(20),
     db.from('board_meetings').select('*').eq('company_id', companyId).eq('created_by_id', userId).eq('status', 'complete').order('created_at', { ascending: false }).limit(5),
     db.from('projects').select('*').eq('company_id', companyId).eq('created_by_id', userId).order('created_at', { ascending: false }).limit(10),
     db.from('advisors').select('*').eq('company_id', companyId).eq('created_by_id', userId).limit(100),
@@ -289,7 +300,10 @@ async function gather(db, userId, companyId, question): Promise<any> {
     loadOpenCommitments(db, companyId, userId),
     loadProgressionSummary(db, companyId),
   ]);
-  return { documents, meetings, projects, advisors, recalled, commitments, progression };
+  const { data: toldBoard } = await db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
+    .eq('category', 'What you told the board').or('status.is.null,status.not.in.(archived,superseded)')
+    .order('created_at', { ascending: false }).limit(5);
+  return { documents: [...(toldBoard || []), ...(documents || [])], meetings, projects, advisors, recalled, commitments, progression };
 }
 
 // What the board is drawing on, recorded so the founder can see it later.
@@ -343,6 +357,8 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
       key_arguments: resp.key_arguments || [], assumptions: resp.assumptions || [],
       risks: resp.risks || [], missing_information: (resp.missing_information || []).map((m: any) => keepOpenProfileField(m, company)),
       suggested_actions: resp.suggested_actions || [], confidence_score: resp.confidence_score || 0,
+      // What this answer cost, shown with it (P1).
+      cost_usd: Number(d.cost_usd) || 0,
     };
   };
   // Writes only while this run still holds Round 1: a server-run meeting's
@@ -400,7 +416,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
     status: 'independent_complete', independent_responses: independentResponses,
     chair_opening: chairOpening,
     // A server-run meeting's step is over: the next one starts fresh.
-    ...(meeting.driver === 'server' ? { step_claimed_at: null, step_attempts: 0, sweep_count: 0 } : {}),
+    ...(meeting.driver === 'server' ? { step_claimed_at: null, step_attempts: 0, sweep_count: 0, step_finished_at: new Date().toISOString() } : {}),
   }));
   return { independentResponses, chairOpening };
 }
@@ -427,6 +443,7 @@ async function retryRoundOne(db, supabaseUrl, serviceKey, meetingId) {
   const chosen = new Set(m.participant_advisor_ids || []);
   const selectedAdvisors: any[] = withoutChair((advisors || []).filter(a => chosen.has(a.id) && a.type !== 'human'), chair);
   const contextPackage = buildContext(company, documents, recalled.decisions, meetings, projects, commitments, progression, limitsList?.[0]?.max_context_size || 8000);
+  await db.from('board_meetings').update({ context_package: contextPackage }).eq('id', m.id);
   later(runRoundOne({
     db, supabaseUrl, serviceKey, meeting: claimed, company, user, selectedAdvisors, chair, contextPackage,
     previousMeeting: meetings?.[0] || null, startedAt: Date.now(),
@@ -519,7 +536,11 @@ Deno.serve(async (req) => {
       participant_advisor_ids: selectedAdvisors.map(a => a.id),
       status: 'preparing', independent_responses: [], challenge_responses: [],
       memory_context: memoryContext,
-      ...(serverRun ? { driver: 'server', step_claimed_at: new Date().toISOString(), step_attempts: 1, awaiting_human_input: await_humans === true } : {}),
+      ...(serverRun ? {
+        driver: 'server', step_claimed_at: new Date().toISOString(), step_attempts: 1, awaiting_human_input: await_humans === true,
+        // Every later round and the Chair work from this same memory (P1).
+        context_package: contextPackage,
+      } : {}),
     }).select().single();
     if (createErr) throw createErr;
 

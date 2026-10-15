@@ -152,6 +152,39 @@ export async function continueMeeting(meetingId) {
   }
 }
 
+// The founder in the room (P1): a note, typing, carry on, decide now, or one
+// more round. Each answers at once; the server moves the meeting on.
+export async function meetingAction(meetingId, action, extra = {}) {
+  try {
+    const res = await base44.functions.invoke("meetingRun", { action, meeting_id: meetingId, ...extra });
+    if (res.data?.error) throw new Error(res.data.error);
+    return res.data;
+  } catch (e) {
+    throw new Error(meetingErrorMessage(e, "That didn't reach the board just now. Please try again."));
+  }
+}
+
+// What one more round costs, measured: about 8 US cents (14 October 2026).
+export const EXTRA_ROUND_USD = 0.08;
+export const MAX_EXTRA_ROUNDS = 2;
+
+// A meeting between steps, where the founder typing holds the next one.
+export function betweenSteps(m) {
+  if (!m) return false;
+  if (m.status === "independent_complete") return !m.awaiting_human_input;
+  if (m.status === "discussing") return !m.step_claimed_at;
+  return m.status === "discussion_complete";
+}
+
+// What happens to each of the founder's notes: heard in a round, going into
+// the next round, or (after the last round) going to the Chair.
+export function noteStatus(note, m) {
+  const heard = (m?.discussion_transcript || []).find((x) => x.note_id === note.id);
+  if (heard) return { label: `Heard in Round ${heard.round}`, done: true };
+  if (["discussion_complete", "synthesizing"].includes(m?.status) || m?.decide_now) return { label: "Goes to the Chair", done: false };
+  return { label: "Goes into the next round", done: false };
+}
+
 // A meeting that stopped: ask the Chair for the resolution again.
 export async function retryMeeting(meetingId) {
   try {

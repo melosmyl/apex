@@ -10,6 +10,7 @@ import AdvisorSelectionRow from "@/components/boardroom/AdvisorSelectionRow";
 import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
+import OpenDoor from "@/components/boardroom/live/OpenDoor";
 import { usePin } from "@/components/pins/PinContext";
 import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
@@ -19,6 +20,17 @@ import { useAssistant } from "@/lib/AssistantContext";
 const POLL_INTERVAL_MS = 2000;
 // Phases in which the server is running the meeting and the page follows it.
 const LIVE_PHASES = ["preparing", "human_input", "discussion", "resolution"];
+
+// The open door (P1) shows once the system switch is on, or for a test when
+// the address asks for it (?openDoor=1), remembered for the browser tab.
+function openDoorAsked() {
+  try {
+    if (new URLSearchParams(window.location.search).get("openDoor") === "1") sessionStorage.setItem("openDoor", "1");
+    return sessionStorage.getItem("openDoor") === "1";
+  } catch {
+    return false;
+  }
+}
 
 function toRoundOneMessages(responses = []) {
   return responses.map((r) => ({
@@ -77,10 +89,15 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const finishPlayback = useCallback(() => { setShowResult(true); onResultShown?.(); }, [onResultShown]);
   // How many rounds a discussion can run, as the engine reads it.
   const [maxRounds, setMaxRounds] = useState(3);
+  const [openDoor, setOpenDoor] = useState(openDoorAsked);
+  // The meeting row as last seen, for the open door: notes, extra rounds,
+  // whether the board is waiting for the founder.
+  const [liveRow, setLiveRow] = useState(resuming ? loadedMeeting : null);
   useEffect(() => {
     base44.entities.SystemLimits.list().then((rows) => {
       const n = rows?.[0]?.max_discussion_rounds;
       if (Number.isInteger(n) && n > 0) setMaxRounds(n);
+      if (rows?.[0]?.founder_in_room === true) setOpenDoor(true);
     }).catch(() => {});
   }, []);
   // The transcript only ever grows: a slow poll answering after a newer one
@@ -164,6 +181,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     const poll = async () => {
       const { data: m } = await supabase.from("board_meetings").select("*").eq("id", pendingMeetingId).maybeSingle();
       if (cancelled || !m) return;
+      setLiveRow(m);
       if (m.chair_opening) setChairOpening((prev) => prev || m.chair_opening);
       if (m.discussion_transcript?.length) growTranscript(m.discussion_transcript);
       else if (m.independent_responses?.length) growTranscript(toRoundOneMessages(m.independent_responses));
@@ -258,6 +276,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
     resumingRef.current = false;
     const meetingId = crypto.randomUUID();
     setPendingMeetingId(meetingId);
+    setLiveRow(null);
     // In the address, so a refresh or a reopened tab picks the meeting up
     // again. (The free meeting page has its own address.)
     if (!freeAttemptId) {
@@ -372,6 +391,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   // In session (and a finished meeting still playing back): the live room.
   if (phase !== "idle" && !(phase === "result" && showResult)) {
     return (
+      <>
       <LiveMeeting
         phase={phase}
         question={question}
@@ -383,10 +403,14 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         chairOpening={chairOpening}
         advisors={advisors}
         onOpenProfile={openProfile}
-        maxRounds={maxRounds}
+        maxRounds={Number.isInteger(liveRow?.rounds_target) ? liveRow.rounds_target : maxRounds}
         onPin={pinTurn}
         onFinished={finishPlayback}
       />
+      {openDoor && pendingMeetingId && liveRow?.driver === "server" && ["preparing", "discussion", "resolution"].includes(phase) && (
+        <OpenDoor meetingId={pendingMeetingId} row={liveRow} debaters={selectedAiAdvisors} isAnonymous={isAnonymous || !!freeAttemptId} />
+      )}
+      </>
     );
   }
 

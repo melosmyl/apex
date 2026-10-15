@@ -7,7 +7,7 @@ import { dwellMs, playbackItems } from "@/lib/meetingPlayback";
 // A turn's identity: the opening, or who spoke in which round. Round 1
 // answers arrive one by one, in any order, and the transcript is replaced
 // as they do; keying by identity keeps the playback order fixed.
-const keyOf = (i) => (i.kind === "opening" ? "opening" : `${i.round}:${i.advisor_id || i.advisor_name}`);
+const keyOf = (i) => (i.kind === "opening" ? "opening" : i.kind === "founder" ? `founder:${i.note_id}` : `${i.round}:${i.advisor_id || i.advisor_name}`);
 
 export default function useMeetingPlayback({ chairOpening, chairName, transcript, phase }) {
   // Append-only: a turn keeps its place once seen, so nothing already

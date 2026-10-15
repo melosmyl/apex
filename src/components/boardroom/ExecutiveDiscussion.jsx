@@ -78,7 +78,7 @@ export function DiscussionMessage({ msg, accent }) {
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-display text-sm font-medium">You</span>
             <span className="text-xs text-muted-foreground">Founder</span>
-            <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">Founder Reply</span>
+            <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">{msg.note_id ? `Said in the meeting${msg.to_name ? ` · to ${msg.to_name}` : ""}` : "Founder Reply"}</span>
           </div>
           <div className="bg-primary/5 rounded-xl p-3 border border-primary/10">
             <p className="text-sm leading-relaxed text-foreground/90">{msg.message}</p>
@@ -188,7 +188,7 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
   const accentOf = (name) => advisors.find((a) => a.name === name)?.accent || "#7a5c3e";
 
   useEffect(() => {
-    if (transcript.some(m => m.message_type === 'founder_message')) setExpanded(true);
+    if (transcript.some(m => m.message_type === 'founder_message' && !m.note_id)) setExpanded(true);
   }, [transcript]);
 
   const rounds = useMemo(
@@ -272,7 +272,7 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
                 <div key={round}>
                   <div className="flex items-center gap-3 my-4">
                     <div className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
-                      {round === 1 ? "Round 1 — Independent Positions" : roundMessages.some(m => m.message_type === 'founder_message') ? `Round ${round} — Founder Follow-up` : `Round ${round} — Discussion`}
+                      {round === 1 ? "Round 1 — Independent Positions" : roundMessages.some(m => m.message_type === 'founder_message' && !m.note_id) ? `Round ${round} — Founder Follow-up` : `Round ${round} — Discussion`}
                     </div>
                     <div className="flex-1 h-px bg-border/50" />
                   </div>

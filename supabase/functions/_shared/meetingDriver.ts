@@ -55,6 +55,14 @@ export function nextStep(m: any, now = Date.now(), retry = false): Step | null {
   if (!m || m.driver !== 'server') return null;
   const age = (t: string | null) => (t ? now - new Date(t).getTime() : Infinity);
   const claimStale = age(m.step_claimed_at) >= STEP_STALE_MS;
+  // Between steps, the founder typing holds the next one (up to the cap the
+  // server set), and asking for the decision skips the rounds left.
+  const typing = !!m.founder_typing_until && new Date(m.founder_typing_until).getTime() > now;
+  const between = m.status === 'independent_complete' ? !m.awaiting_human_input
+    : m.status === 'discussing' ? !m.step_claimed_at : false;
+  // Typing as the last round ends holds the Chair too, so the note reaches her.
+  if ((between || m.status === 'discussion_complete') && typing) return null;
+  if (between && m.decide_now) return 'synthesis';
   switch (m.status) {
     case 'preparing':
       return m.step_claimed_at && claimStale ? 'round1' : null;
@@ -97,3 +105,49 @@ export const STEP_FUNCTION: Record<Step, string> = {
 };
 
 export const GAVE_UP = 'The board stopped partway through this meeting. Please ask the question again.';
+
+// ---- P1: the founder in the room --------------------------------------
+export const MAX_NOTES = 6;
+export const NOTE_LIMIT = 2000;
+export const MAX_EXTRA_ROUNDS = 2;
+// A typing signal holds the next step this long; the page renews it while
+// the founder types, up to HOLD_CAP_MS after the last step finished.
+export const TYPING_HOLD_MS = 15_000;
+export const HOLD_CAP_MS = 60_000;
+
+// Until when the next step waits for a founder who is typing now.
+export function holdUntil(m: any, now = Date.now()) {
+  const wanted = now + TYPING_HOLD_MS;
+  const running = m.status === 'preparing' || !!m.step_claimed_at;
+  // While a step runs, the hold only matters once it ends: no cap yet.
+  if (running || !m.step_finished_at) return new Date(wanted).toISOString();
+  return new Date(Math.min(wanted, new Date(m.step_finished_at).getTime() + HOLD_CAP_MS)).toISOString();
+}
+
+// The founder's notes no round has taken in yet (a note is taken when it
+// appears in the transcript, by id).
+export function unusedNotes(m: any) {
+  const used = new Set((m?.discussion_transcript || []).map((x: any) => x.note_id).filter(Boolean));
+  return (m?.founder_notes || []).filter((n: any) => !used.has(n.id));
+}
+
+// How many rounds this meeting runs to: the usual, or the target the
+// founder set by asking for one more.
+export const roundsFor = (baseRounds: number, m: any) => (Number.isInteger(m?.rounds_target) && m.rounds_target > 0 ? m.rounds_target : baseRounds);
+
+// The new target when the founder asks for one more round: one past the
+// plan, or one past where a discussion that settled early stopped.
+export function nextTarget(baseRounds: number, m: any) {
+  const done = Math.max(1, m?.discussion_rounds_completed || 0);
+  if (m?.status === 'discussion_complete') return done + 1;
+  return Math.max(roundsFor(baseRounds, m), done) + 1;
+}
+
+// Who has the challenge duty in a discussion round: it rotates, starting
+// with the board's Contrarian (or another sceptic) when one is seated.
+export function challengerFor(advisors: any[], round: number) {
+  if (!advisors?.length) return null;
+  const sceptic = advisors.findIndex((a) => a.library_key === 'contrarian' || /contrarian|sceptic|skeptic|devil/i.test(`${a.role || ''}`));
+  const start = sceptic >= 0 ? sceptic : 0;
+  return advisors[(start + Math.max(0, round - 2)) % advisors.length];
+}

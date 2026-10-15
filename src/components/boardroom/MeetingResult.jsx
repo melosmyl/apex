@@ -18,6 +18,7 @@ import { SITE_URL } from "@/lib/branding";
 import { actionsHeading, resultSections } from "@/lib/meetingResult";
 import TaskDesk from "@/components/tasks/TaskDesk";
 import { useTaskRuns } from "@/lib/taskRuns";
+import { formatCost } from "@/lib/money";
 
 // A finished meeting, in the order the product principles set (M1): the
 // verdict with the founder's call, the next-24-hours actions, the top
@@ -201,6 +202,9 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
         <span className="room-mono">The full meeting</span>
         <span className="h-px flex-1 bg-foreground/30" />
       </div>
+      {result?.cost_usd != null && (
+        <p className="-mt-3 text-center text-xs text-muted-foreground">This meeting cost {formatCost(result.cost_usd)}, every advisor and the Chair included.</p>
+      )}
 
       {onFollowup && (
         <section className="room-card p-5 sm:p-6">

@@ -21,6 +21,7 @@ export const MAX_ROUNDS = 3;
 // (a round of five lands at once; the founder shouldn't wait a minute more
 // for the result than the engine took).
 export function dwellMs(item, { queued = 0, finishing = false } = {}) {
+  if (item?.kind === "founder") return 1500;
   const chars = (item?.message || "").length;
   const base = Math.min(7000, Math.max(3000, 1500 + chars * 20));
   if (finishing || queued >= 3) return Math.min(base, 2500);
@@ -33,7 +34,12 @@ export function playbackItems(chairOpening, chairName, transcript = []) {
   const items = [];
   if (chairOpening) items.push({ kind: "opening", round: 0, advisor_name: chairName, message: chairOpening });
   for (const m of transcript) {
-    if (m.message_type === "founder_message") continue;
+    // What the founder said during the meeting (P1) plays in its place;
+    // follow-ups after the resolution don't belong in the live meeting.
+    if (m.message_type === "founder_message") {
+      if (m.note_id) items.push({ kind: "founder", ...m });
+      continue;
+    }
     items.push({ kind: "turn", ...m });
   }
   return items;

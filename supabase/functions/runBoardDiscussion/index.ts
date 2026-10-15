@@ -17,7 +17,7 @@ const STALE_CLAIM_MS = 10 * 60_000;
 const MIN_ROUND_MS = 30_000;
 import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
-import { STEP_STALE_MS, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
+import { STEP_STALE_MS, challengerFor, handOver, isServiceCall, later, meetingOwner, roundsFor, unusedNotes } from '../_shared/meetingDriver.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
 // startBoardMeeting) — nothing stops two advisors reaching for the same
@@ -112,6 +112,10 @@ function formatTranscript(transcript, currentAdvisorId) {
     const msgs = byRound[round];
     text += `--- Round ${roundNum}${roundNum === 1 ? ' (Independent Positions)' : ' (Discussion)'} ---\n`;
     msgs.forEach(msg => {
+      if (msg.message_type === 'founder_message') {
+        text += `THE FOUNDER (said in the meeting${msg.to_name ? `, to ${msg.to_name}` : ''}): ${msg.message}\n`;
+        return;
+      }
       const isYou = msg.advisor_id === currentAdvisorId;
       const youMarker = isYou ? ' [YOU]' : '';
       const reply = msg.reply_to_advisor ? ` (replying to ${msg.reply_to_advisor})` : '';
@@ -125,7 +129,25 @@ function formatTranscript(transcript, currentAdvisorId) {
   return text;
 }
 
-function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs) {
+// What the founder said since the last round (P1), and how to treat it.
+function founderSection(notes, advisor) {
+  if (!notes?.length) return '';
+  let text = `THE FOUNDER IS IN THE ROOM. Since the last round they said:\n`;
+  notes.forEach(n => {
+    const toYou = n.to_advisor_id && n.to_advisor_id === advisor.id;
+    text += `- "${String(n.text).slice(0, 2000)}"${toYou ? ' [asked of you directly]' : n.to_name ? ` [to ${n.to_name}]` : ' [to the board]'}\n`;
+  });
+  text += `How to treat it:\n`;
+  text += `- A fact the founder states about their own business is a fact. Use it, and drop anything you said that it rules out.\n`;
+  text += `- A view, preference or pushback from the founder is their opinion, not evidence. If you still disagree, say so plainly and why. The founder is here for honest advice, not agreement; changing your position only because the founder prefers another answer is a failure.\n`;
+  text += `- If something was asked of you directly, answer it first. Set reply_to_advisor to "Founder" when you are mainly answering the founder.\n`;
+  text += `- Keep arguing with the other advisors too: the founder joined the discussion, they didn't replace it.\n\n`;
+  return text;
+}
+
+const CHALLENGER_DUTY = `YOUR DUTY THIS ROUND — THE CHALLENGER: find the weakest point in where the room, or the founder, is heading, and press on it with evidence. Name it, say why it could fail, and what would have to be true for it to work. Don't soften it to be agreeable. If after honest scrutiny it holds up, say so, and say what would change your mind.\n\n`;
+
+function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs, { founderNotes = [], isChallenger = false } = {}) {
   const ownInitial = transcript.find(m => m.advisor_id === advisor.id && m.round === 1);
   let context = `=== EXECUTIVE BOARD DISCUSSION ===\n`;
   context += `You are in Round ${round} of ${maxRounds} of a structured board discussion.\n\n`;
@@ -148,6 +170,8 @@ function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRou
     context += `- If you genuinely agree and have nothing to add beyond their reasoning, say so plainly and set agrees_with to "${other}". Real agreement is a legitimate, valuable outcome — it is not a failure to have a distinct opinion.\n`;
     context += `- If you actually see it differently — different risk tolerance, sequencing, cost, or what you'd do first — say so concretely, addressed to ${other} by name. A manufactured distinction to look independent is worse than honest agreement.\n\n`;
   }
+  context += founderSection(founderNotes, advisor);
+  if (isChallenger) context += CHALLENGER_DUTY;
   if (isLastRound) {
     context += `THIS IS THE FINAL ROUND. Provide your final statement: summarise your position after the full discussion, note whether your opinion has changed and why, and state your confidence level. If you are now in agreement with another advisor, say so explicitly and set agrees_with to their name.\n`;
   } else {
@@ -171,9 +195,10 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
 
 // One discussion round: every advisor answers, in parallel, with the
 // discussion so far. Returns the round's messages (failed advisors dropped).
-async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, independentResponses, roundDeadline }: any) {
+async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, independentResponses, roundDeadline, founderNotes = [], challenger = null }: any) {
   const roundResults = await Promise.all(meetingAdvisors.map(advisor => {
-    const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs);
+    const meetingContext = buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRound, convergencePairs,
+      { founderNotes, isChallenger: !!challenger && challenger.id === advisor.id });
     return callAdvisor(supabaseUrl, serviceKey, {
       advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: null, company_context: profile, meeting_context: meetingContext,
@@ -196,6 +221,9 @@ async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvi
       answerable: resp.answerable !== false,
       agrees_with: resp.agrees_with || null,
       provider_used: r.data.provider_used, model_used: r.data.model_used,
+      // What this turn cost, shown with it (P1).
+      cost_usd: Number(r.data.cost_usd) || 0,
+      ...(challenger && challenger.id === r.advisor.id ? { challenger: true } : {}),
     };
   }).filter(Boolean);
 }
@@ -256,6 +284,7 @@ async function loadDiscussion(db, meeting, ownerId): Promise<any> {
     new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
     provider_used: r.provider_used, model_used: r.model_used,
     unavailable: r.unavailable || false,
+    ...(Number.isFinite(Number(r.cost_usd)) && r.cost_usd != null ? { cost_usd: Number(r.cost_usd) } : {}),
   }));
 
   // The server-chosen AI advisors plus the company's human advisors, all
@@ -294,22 +323,58 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
         await db.from('board_meetings').update({ convergence_candidates: convergencePairs }).eq('id', meeting.id);
       }
       const transcript = meeting.discussion_transcript?.length ? meeting.discussion_transcript : d.roundOne;
-      const isLastRound = round >= d.maxRounds;
-      const roundMessages = round > d.maxRounds ? [] : await runOneRound({
-        supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds: d.maxRounds,
-        isLastRound, convergencePairs, profile: d.profile, independentResponses: d.independentResponses,
+      const maxRounds = roundsFor(d.maxRounds, meeting);
+      const isLastRound = round >= maxRounds;
+      // What the founder said since the last round goes into this one, and
+      // into the transcript just before the advisors' answers.
+      const notes = unusedNotes({ ...meeting, discussion_transcript: transcript });
+      const founderEntries = notes.map(n => ({
+        round, advisor_id: null, advisor_name: 'Founder', role: 'Founder', message: n.text, message_type: 'founder_message',
+        note_id: n.id, to_advisor_id: n.to_advisor_id || null, to_name: n.to_name || null, reply_to_advisor: n.to_name || null,
+      }));
+      const roundMessages = round > maxRounds ? [] : await runOneRound({
+        supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
+        isLastRound, convergencePairs, independentResponses: d.independentResponses,
+        // Every round works from the same memory as Round 1, not just the profile.
+        profile: meeting.context_package || d.profile,
+        founderNotes: notes, challenger: challengerFor(d.meetingAdvisors, round),
         // Each round is its own step, with the whole step's time.
         roundDeadline: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,
       });
-      const next = [...transcript, ...roundMessages];
-      const done = isLastRound || !roundMessages.length || discussionSettled(roundMessages, isLastRound, convergencePairs);
-      const { data: saved } = await db.from('board_meetings').update({
-        discussion_transcript: next,
-        ...(roundMessages.length ? { discussion_rounds_completed: round } : {}),
-        status: done ? 'discussion_complete' : 'discussing',
-        step_claimed_at: null, step_attempts: 0, sweep_count: 0,
-        ...(done ? { convergence: convergencePairs.filter(p => stillConverged(p, next)).map(p => ({ advisors: p.names })) } : {}),
-      }).eq('id', meeting.id).eq('status', 'discussing').eq('step_claimed_at', claimedAt).select('id');
+      // A round nobody answered hasn't taken the founder's notes: they go on
+      // to the next round, or to the Chair.
+      const next = roundMessages.length ? [...transcript, ...founderEntries, ...roundMessages] : transcript;
+      // What the founder did while this round ran (asked for the decision,
+      // asked for another round, said something new) decides what's next.
+      // The save holds only if none of that changed since it was read;
+      // otherwise read again and decide again.
+      let saved = null;
+      for (let tries = 0; tries < 3 && !saved?.length; tries++) {
+        const { data: fresh } = await db.from('board_meetings').select('founder_notes, decide_now, rounds_target').eq('id', meeting.id).maybeSingle();
+        const pending = unusedNotes({ founder_notes: fresh?.founder_notes, discussion_transcript: next });
+        const target = roundsFor(d.maxRounds, fresh);
+        // Settled early only if the founder neither spoke nor asked to go further.
+        const belowAsked = Number.isInteger(fresh?.rounds_target) && round < fresh.rounds_target;
+        const done = !!fresh?.decide_now || round >= target || !roundMessages.length
+          || (discussionSettled(roundMessages, isLastRound, convergencePairs) && !founderEntries.length && !pending.length && !belowAsked);
+        let save = db.from('board_meetings').update({
+          discussion_transcript: next, step_finished_at: new Date().toISOString(),
+          ...(roundMessages.length ? { discussion_rounds_completed: round } : {}),
+          status: done ? 'discussion_complete' : 'discussing',
+          step_claimed_at: null, step_attempts: 0, sweep_count: 0,
+          ...(done ? { convergence: convergencePairs.filter(p => stillConverged(p, next)).map(p => ({ advisors: p.names })) } : {}),
+        }).eq('id', meeting.id).eq('status', 'discussing').eq('step_claimed_at', claimedAt);
+        // The last try saves whatever it decided, so the round is never left held.
+        if (tries < 2) {
+          save = save.eq('decide_now', !!fresh?.decide_now);
+          save = fresh?.rounds_target == null ? save.is('rounds_target', null) : save.eq('rounds_target', fresh.rounds_target);
+        }
+        ({ data: saved } = await save.select('id'));
+        // A change by the founder makes the save miss; a lost claim does too,
+        // and then there's nothing left to do.
+        const { data: still } = saved?.length ? { data: null } : await db.from('board_meetings').select('id').eq('id', meeting.id).eq('status', 'discussing').eq('step_claimed_at', claimedAt).maybeSingle();
+        if (!saved?.length && !still) break;
+      }
       if (saved?.length) handOver(meeting.id);
     } catch (e) {
       // Let go of the round; the sweep tries it again (up to the limit).

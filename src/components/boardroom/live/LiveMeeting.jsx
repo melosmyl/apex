@@ -92,6 +92,8 @@ export default function LiveMeeting({
   let bubble;
   if (speaking?.kind === "opening") {
     bubble = { label: `Opening · ${chair.name}`, text: excerpt(speaking.message) };
+  } else if (speaking?.kind === "founder") {
+    bubble = { label: `You · Round ${speaking.round}${speaking.to_name ? ` · to ${firstName(speaking.to_name)}` : ""}`, text: excerpt(speaking.message) };
   } else if (speaking) {
     const flag = turnFlags(speaking, participants)[0];
     bubble = {
