@@ -11,12 +11,14 @@
 //   carry_on (the founder)    stop waiting for them
 //   decide   (the founder)    no more rounds: the Chair resolves now
 //   more     (the founder)    one more round, up to two (not on a free meeting)
+//   watching (the founder)    engaged, and their screen has played up to a
+//                             round: the room keeps pace with them (P1.1)
 //   sweep    (service role)   pg_cron, every minute: meetings nobody moved on
 //                             and steps that stalled
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, accessErrorResponse, checkUserLimit } from '../_shared/access.ts';
-import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, callAsServer, holdUntil, isServiceCall, later, needsSweep, nextStep, nextTarget } from '../_shared/meetingDriver.ts';
+import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, WATCHING_MS, callAsServer, holdUntil, isServiceCall, later, needsSweep, nextStep, nextTarget } from '../_shared/meetingDriver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -124,6 +126,16 @@ Deno.serve(async (req) => {
       if (open && new Date(until).getTime() > Date.now())
         await db.from('board_meetings').update({ founder_typing_until: until }).eq('id', meeting.id).eq('status', meeting.status);
       return json({ ok: true });
+    }
+    if (action === 'watching') {
+      if (!open) return json({ ok: true });
+      // The screen only moves forward; a page reloaded at the start replays
+      // from Round 1, but what the founder already saw stays seen.
+      const seen = Math.max(meeting.founder_seen_round || 0, Math.min(20, Math.max(0, Number(body.seen_round) || 0)));
+      await db.from('board_meetings').update({ founder_seen_round: seen, founder_watching_until: new Date(Date.now() + WATCHING_MS).toISOString() })
+        .eq('id', meeting.id).eq('status', meeting.status);
+      // Caught up, or waited long enough: the room carries on.
+      return json({ step: await advance(db, meeting.id) });
     }
     if (action === 'note') {
       const text = typeof body.text === 'string' ? body.text.trim() : '';

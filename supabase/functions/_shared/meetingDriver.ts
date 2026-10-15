@@ -62,6 +62,13 @@ export function nextStep(m: any, now = Date.now(), retry = false): Step | null {
     : m.status === 'discussing' ? !m.step_claimed_at : false;
   // Typing as the last round ends holds the Chair too, so the note reaches her.
   if ((between || m.status === 'discussion_complete') && typing) return null;
+  // An engaged founder's screen is still playing the last round: the next
+  // round waits for them, up to PACE_CAP_MS (P1.1). Not the Chair.
+  if (between && !m.decide_now && behindScreen(m, now)) return null;
+  // A step that failed is tried again after a pause, however often the
+  // page checks in, so a short outage doesn't use up every try at once.
+  const failedAt = m.step_finished_at ? new Date(m.step_finished_at).getTime() : 0;
+  if (between && !m.decide_now && (m.step_attempts || 0) > 0 && failedAt && now - failedAt < IDLE_GRACE_MS) return null;
   if (between && m.decide_now) return 'synthesis';
   switch (m.status) {
     case 'preparing':
@@ -107,6 +114,21 @@ export const STEP_FUNCTION: Record<Step, string> = {
 export const GAVE_UP = 'The board stopped partway through this meeting. Please ask the question again.';
 
 // ---- P1: the founder in the room --------------------------------------
+// P1.1: once the founder engages, the room keeps pace with their screen.
+export const WATCHING_MS = 15_000;
+export const PACE_CAP_MS = 45_000;
+
+// The founder is engaged and watching, and hasn't yet seen the round that
+// just finished; the wait is capped from when that round ended.
+export function behindScreen(m: any, now = Date.now()) {
+  const watching = !!m?.founder_watching_until && new Date(m.founder_watching_until).getTime() > now;
+  if (!watching) return false;
+  const done = Math.max(1, m.discussion_rounds_completed || 0);
+  if ((m.founder_seen_round || 0) >= done) return false;
+  // A meeting from before this change has no finish time: never held for it.
+  if (!m.step_finished_at) return false;
+  return now - new Date(m.step_finished_at).getTime() < PACE_CAP_MS;
+}
 export const MAX_NOTES = 6;
 export const NOTE_LIMIT = 2000;
 export const MAX_EXTRA_ROUNDS = 2;

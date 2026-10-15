@@ -109,7 +109,7 @@ export function DiscussionMessage({ msg, accent }) {
           <SpeakButton text={msg.message} />
           {msg.changed_opinion && (
             <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
-              <RefreshCw className="w-2.5 h-2.5" /> Changed
+              <RefreshCw className="w-2.5 h-2.5" /> {msg.after_founder_pushback ? "Changed after you spoke" : "Changed"}
             </span>
           )}
         </div>

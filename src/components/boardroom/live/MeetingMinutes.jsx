@@ -80,7 +80,8 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
             </p>
           );
         }
-        const flags = turnFlags(m, participants);
+        // A change after the founder spoke has its own badge, not a second one.
+        const flags = turnFlags(m, participants).filter((f) => !(m.after_founder_pushback && /chang/i.test(f.label)));
         const missedHere = missed.find((x) => lastIndexOfRound[x.round] === i);
         return (
           <React.Fragment key={i}>
@@ -96,6 +97,9 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
                 </span>
                 {Number.isFinite(m.cost_usd) && (
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">{formatCost(m.cost_usd)}</span>
+                )}
+                {m.after_founder_pushback && (
+                  <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">Changed after you spoke</span>
                 )}
                 {m.challenger && (
                   <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">Challenger</span>

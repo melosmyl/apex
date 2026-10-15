@@ -93,6 +93,9 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   // The meeting row as last seen, for the open door: notes, extra rounds,
   // whether the board is waiting for the founder.
   const [liveRow, setLiveRow] = useState(resuming ? loadedMeeting : null);
+  // How far the founder's screen has played, and the pinned box's height,
+  // so the meeting can scroll above it (P1.1).
+  const [seenRound, setSeenRound] = useState(0);
   useEffect(() => {
     base44.entities.SystemLimits.list().then((rows) => {
       const n = rows?.[0]?.max_discussion_rounds;
@@ -406,9 +409,11 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         maxRounds={Number.isInteger(liveRow?.rounds_target) ? liveRow.rounds_target : maxRounds}
         onPin={pinTurn}
         onFinished={finishPlayback}
+        onSeenRound={setSeenRound}
       />
       {openDoor && pendingMeetingId && liveRow?.driver === "server" && ["preparing", "discussion", "resolution"].includes(phase) && (
-        <OpenDoor meetingId={pendingMeetingId} row={liveRow} debaters={selectedAiAdvisors} isAnonymous={isAnonymous || !!freeAttemptId} />
+        <OpenDoor meetingId={pendingMeetingId} row={liveRow} debaters={selectedAiAdvisors} isAnonymous={isAnonymous || !!freeAttemptId}
+          seenRound={seenRound} besideSidebar={!freeAttemptId} />
       )}
       </>
     );

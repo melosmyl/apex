@@ -3,7 +3,7 @@ import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, chairCallFields } from '../_shared/chair.ts';
-import { mergeRepair, normalizeResults, vagueParts } from '../_shared/resultsStandard.ts';
+import { mergeRepair, normalizeResults, recordPushbackChanges, vagueParts } from '../_shared/resultsStandard.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 
@@ -52,6 +52,7 @@ THE FOUNDER IN THE ROOM — if the founder spoke during this meeting:
 - What the founder said is listed under WHAT THE FOUNDER SAID IN THIS MEETING and marked THE FOUNDER in the transcript. A fact they state about their own business is a company-record fact: treat it as true, never attribute it to an advisor, and never list it as unknown.
 - Their views, preferences and pushback are their opinion, not evidence. Weigh them like any argument. If the board's reasoning still says the founder's preferred idea is weak, the verdict and top issues must say so plainly. Agreeing with the founder because they pushed is a failure.
 - Where an advisor answered the founder, judge the answer on its reasoning, not on whether it pleased them.
+- Any advisor marked CHANGED POSITION AFTER THE FOUNDER SPOKE must be listed in disagreements: name them, say that they changed, what they moved from and to, and whether the change followed a stated reason (name it) or only the founder's pressure. Recording the switch matters as much as the switch.
 
 THE RESULTS — the founder reads these first, in this order, so each must stand on its own:
 1. verdict: the room's answer to the question in one plain sentence. Not a summary of the discussion.
@@ -90,7 +91,7 @@ function formatTranscriptForChair(transcript) {
       }
       text += `${msg.advisor_name} (${msg.role})`;
       if (msg.reply_to_advisor) text += ` -> responding to ${msg.reply_to_advisor}`;
-      if (msg.changed_opinion) text += ` [OPINION CHANGED]`;
+      if (msg.changed_opinion) text += msg.after_founder_pushback ? ` [CHANGED POSITION AFTER THE FOUNDER SPOKE]` : ` [OPINION CHANGED]`;
       if (msg.agrees_with) text += ` [AGREES WITH ${msg.agrees_with} — nothing to add beyond their reasoning]`;
       text += `: ${msg.message}\n`;
       if (msg.changed_opinion && msg.new_position) text += `  -> New position: ${msg.new_position}\n`;
@@ -336,6 +337,9 @@ Deno.serve(async (req) => {
         console.error('runChairSynthesis: vague-action repair failed, keeping the original wording:', repairErr.message);
       }
     }
+    // Every change of position after the founder pushed back is listed where
+    // the room disagreed, even if the Chair left it out (P1.1).
+    recordPushbackChanges(resolution, discussionTranscript);
     const priorityActions = resolution.priority_actions;
     const discussionField = discussionTranscript.length > 0
       ? discussionTranscript.map(m => ({ advisor: m.advisor_name, role: m.role, message: m.message, stance: m.message_type }))

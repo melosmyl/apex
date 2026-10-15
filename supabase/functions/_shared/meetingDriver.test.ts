@@ -102,3 +102,42 @@ Deno.test('the challenge duty rotates, starting with the Contrarian when seated'
   assertEquals([2, 3].map((r) => challengerFor([{ id: 'a' }, { id: 'b' }], r)?.id), ['a', 'b']);
   assertEquals(challengerFor([], 2), null);
 });
+
+// ---- P1.1: the room keeps pace with an engaged founder's screen
+import { PACE_CAP_MS, behindScreen } from './meetingDriver.ts';
+
+Deno.test("once engaged, the next round waits for the founder's screen, up to a cap; not the Chair", () => {
+  const watching = new Date(NOW + 10_000).toISOString();
+  const between = { status: 'discussing', step_claimed_at: null, discussion_rounds_completed: 2, step_finished_at: ago(5000), founder_watching_until: watching };
+  assertEquals(nextStep(m({ ...between, founder_seen_round: 1 }), NOW), null);
+  assertEquals(nextStep(m({ ...between, founder_seen_round: 2 }), NOW), 'round');
+  // Waited long enough, or the page went away: carry on.
+  assertEquals(nextStep(m({ ...between, founder_seen_round: 1, step_finished_at: ago(PACE_CAP_MS) }), NOW), 'round');
+  assertEquals(nextStep(m({ ...between, founder_seen_round: 1, founder_watching_until: ago(1) }), NOW), 'round');
+  // Never engaged: full speed, as before.
+  assertEquals(nextStep(m({ ...between, founder_watching_until: null }), NOW), 'round');
+  // The Chair isn't held for the screen, and Decide now isn't either.
+  assertEquals(nextStep(m({ ...between, status: 'discussion_complete', founder_seen_round: 1 }), NOW), 'synthesis');
+  assertEquals(nextStep(m({ ...between, founder_seen_round: 1, decide_now: true }), NOW), 'synthesis');
+  // Round 1: the screen must have finished it.
+  assertEquals(behindScreen({ status: 'independent_complete', discussion_rounds_completed: 0, founder_seen_round: 0, founder_watching_until: watching, step_finished_at: ago(1000) }, NOW), true);
+});
+
+
+Deno.test('a failed step is tried again after a pause, however often the page checks in', () => {
+  const failed = { status: 'discussing', step_claimed_at: null, step_attempts: 1, discussion_rounds_completed: 1 };
+  assertEquals(nextStep(m({ ...failed, step_finished_at: ago(5000) }), NOW), null);
+  assertEquals(nextStep(m({ ...failed, step_finished_at: ago(IDLE_GRACE_MS) }), NOW), 'round');
+  // A step that finished normally (attempts back to 0) moves on at once.
+  assertEquals(nextStep(m({ ...failed, step_attempts: 0, step_finished_at: ago(1000) }), NOW), 'round');
+});
+
+Deno.test('a meeting from before pacing is never held for the screen', () => {
+  assertEquals(behindScreen({ status: 'discussing', discussion_rounds_completed: 2, founder_seen_round: 0, founder_watching_until: new Date(NOW + 10_000).toISOString(), step_finished_at: null }, NOW), false);
+  // A screen ahead of the server (after a reload) isn't behind.
+  assertEquals(behindScreen({ status: 'discussing', discussion_rounds_completed: 2, founder_seen_round: 3, founder_watching_until: new Date(NOW + 10_000).toISOString(), step_finished_at: ago(1000) }, NOW), false);
+});
+
+Deno.test('Decide now after a failed round goes straight to the Chair', () => {
+  assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: null, step_attempts: 1, step_finished_at: ago(2000), decide_now: true }), NOW), 'synthesis');
+});

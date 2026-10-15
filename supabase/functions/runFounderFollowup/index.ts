@@ -56,7 +56,7 @@ function buildFollowupContext(founderMessage, transcript, originalQuestion, meet
   context += resolutionSummary(meeting);
   context += `The founder has reviewed the board's discussion and resolution, and writes:\n`;
   context += `"${founderMessage}"\n\n`;
-  context += `Your task: Respond directly to the founder's message. Address their concerns, answer their questions, provide additional insights, and if appropriate, revise your recommendation. Be honest and direct — if you disagree with the founder, say so respectfully. Do not simply agree to please them. A fact the founder states about their own business is a fact: use it. Their views and pushback are their opinion, not evidence: change your position only if the reasoning, not the pressure, warrants it.\n\n`;
+  context += `Your task: Respond directly to the founder's message. Address their concerns, answer their questions, provide additional insights, and if appropriate, revise your recommendation. Be honest and direct — if you disagree with the founder, say so respectfully. Do not simply agree to please them. A fact the founder states about their own business is a fact: use it. Their views and pushback are their opinion, not evidence: change your position only if the reasoning, not the pressure, warrants it, and if you change it, name the new fact or reasoning. "The founder has decided" is not a reason: if that is all that has changed, keep your position, say plainly that you still disagree, and help as far as you honestly can.\n\n`;
   context += `=== FULL DISCUSSION TRANSCRIPT ===\n`;
   transcript.forEach(msg => {
     const isFounder = msg.message_type === 'founder_message';
@@ -192,6 +192,9 @@ Deno.serve(async (req) => {
         round: nextRound, advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role,
         message: resp.message || '', message_type: resp.message_type || 'rebuttal',
         reply_to_advisor: 'Founder', changed_opinion: resp.changed_opinion || false,
+        // A change of position in answer to the founder is always shown as one (P1.1).
+        ...(resp.changed_opinion ? { after_founder_pushback: true } : {}),
+        cost_usd: Number(r.data.cost_usd) || 0,
         new_position: resp.new_position || null, new_risks: resp.new_risks || [],
         confidence_score: resp.confidence_score || 0,
         provider_used: r.data.provider_used, model_used: r.data.model_used,

@@ -187,6 +187,51 @@ const swG = await (await fetch(`${URL}/functions/v1/meetingRun`, { method: 'POST
 const mG = await waitFor(G, finished);
 check(swG?.moved?.[G] === 'round' && mG?.status === 'complete' && JSON.stringify(rounds(mG)) === '[1,2,3]', 'the sweep moves it on and it finishes', [swG?.moved?.[G], rounds(mG)]);
 
+// ---- 7. P1.1: the room keeps pace with an engaged founder's screen.
+console.log('\n== the room keeps pace with the founder');
+await script({ delayBy: slow(2000) });
+const H = await start('Should we raise the price to £50?');
+await waitFor(H, (m) => m.status === 'discussing' && !!m.step_claimed_at, 60_000);
+// Engaged, and the screen has finished Round 1 only.
+await act(H, 'watching', { seen_round: 1 });
+const r2done = await waitFor(H, (m) => m.discussion_rounds_completed === 2, 60_000);
+await act(H, 'watching', { seen_round: 1 });
+await sleep(3000);
+const paced = await row(H);
+check(r2done?.discussion_rounds_completed === 2 && paced?.status === 'discussing' && !paced?.step_claimed_at && paced?.discussion_rounds_completed === 2,
+  "Round 3 waits while the founder's screen is still on Round 2", [paced?.status, paced?.step_claimed_at, paced?.founder_seen_round]);
+const caught = await act(H, 'watching', { seen_round: 2 });
+const mH = await waitFor(H, finished);
+check(caught.json?.step === 'round' && mH?.status === 'complete' && JSON.stringify(rounds(mH)) === '[1,2,3]', 'once the screen has played Round 2, Round 3 starts', [caught.json, rounds(mH)]);
+const back = await act(H, 'watching', { seen_round: 0 });
+check(back.status === 200, 'a finished meeting ignores the signal', back.status);
+
+console.log('\n== the wait for the screen is capped');
+const I = await start('Should we hire a designer?');
+await waitFor(I, (m) => m.status === 'discussing' && !!m.step_claimed_at, 60_000);
+await act(I, 'watching', { seen_round: 1 });
+await waitFor(I, (m) => m.discussion_rounds_completed === 2, 60_000);
+// The founder's screen stays behind: after 45 seconds the room carries on.
+await sleep(46_000);
+const capped = await act(I, 'watching', { seen_round: 1 });
+const mI = await waitFor(I, finished);
+check(capped.json?.step === 'round' && JSON.stringify(rounds(mI)) === '[1,2,3]', 'after 45 seconds the room carries on anyway', [capped.json, rounds(mI)]);
+
+// ---- 8. P1.1: a change of position after the founder pushes back is recorded.
+console.log('\n== changing position after the founder pushes back');
+await script({ delayBy: slow(2000), fields: { changed_opinion: Array(40).fill(true), new_position: Array(40).fill('Go ahead with it.'), reply_to_advisor: Array(40).fill('Founder') } });
+const J = await start('Should we sign the Chelsea lease?');
+await act(J, 'note', { text: "I've decided. Just plan it." });
+const mJ = await waitFor(J, finished);
+const flagged = (mJ?.discussion_transcript || []).filter((x: any) => x.after_founder_pushback).map((x: any) => x.round);
+check(flagged.length === 3 && flagged.every((r: number) => r === 2), 'changes right after the founder spoke are marked; the same change a round later is not', flagged);
+const dis = mJ?.board_resolution?.disagreements || [];
+check(/changed position after you spoke/.test(dis[0] || '') && [names.grace, names.victor, names.priya].every((n) => dis[0].includes(n)) && dis.includes('fake disagreements'),
+  "all three are listed where the room disagreed, in one line, and the Chair's own line stays", dis);
+const fJ = await call('runFounderFollowup', { meeting_id: J, founder_message: 'Stop hedging.' });
+const fu2 = (await row(J))?.discussion_transcript?.filter((x: any) => x.round > 3 && x.message_type !== 'founder_message') || [];
+check(fJ.status === 200 && fu2.length === 3 && fu2.every((x: any) => x.after_founder_pushback && Number.isFinite(x.cost_usd)), 'in a follow-up too, a change is marked as after the founder pushed back, and each answer records its cost', fu2.map((x: any) => [x.after_founder_pushback, x.cost_usd]));
+
 // The fake data made for this test is removed.
 await script({});
 await admin.from('documents').delete().eq('company_id', co.id);

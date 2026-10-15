@@ -140,6 +140,7 @@ function founderSection(notes, advisor) {
   text += `How to treat it:\n`;
   text += `- A fact the founder states about their own business is a fact. Use it, and drop anything you said that it rules out.\n`;
   text += `- A view, preference or pushback from the founder is their opinion, not evidence. If you still disagree, say so plainly and why. The founder is here for honest advice, not agreement; changing your position only because the founder prefers another answer is a failure.\n`;
+  text += `- If you change your position, name the new fact or reasoning that changed it. "The founder has decided" or "the founder insists" is not a reason: if that is all that has changed, keep your position and say plainly that you still disagree, then help as far as you honestly can. A change after the founder speaks is shown to the Chair and listed where the room disagreed.\n`;
   text += `- If something was asked of you directly, answer it first. Set reply_to_advisor to "Founder" when you are mainly answering the founder.\n`;
   text += `- Keep arguing with the other advisors too: the founder joined the discussion, they didn't replace it.\n\n`;
   return text;
@@ -224,6 +225,10 @@ async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvi
       // What this turn cost, shown with it (P1).
       cost_usd: Number(r.data.cost_usd) || 0,
       ...(challenger && challenger.id === r.advisor.id ? { challenger: true } : {}),
+      // Changed position in answer to the founder (P1.1): a note to the board
+      // or to this advisor, and a turn that answers or names the founder.
+      ...(resp.changed_opinion && founderNotes.some((n) => !n.to_advisor_id || n.to_advisor_id === r.advisor.id)
+        && (/founder/i.test(resp.reply_to_advisor || '') || /\bfounder/i.test(resp.message || '')) ? { after_founder_pushback: true } : {}),
     };
   }).filter(Boolean);
 }
@@ -379,7 +384,7 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
     } catch (e) {
       // Let go of the round; the sweep tries it again (up to the limit).
       console.error(`runBoardDiscussion: round ${round} failed:`, e.message);
-      await db.from('board_meetings').update({ step_claimed_at: null })
+      await db.from('board_meetings').update({ step_claimed_at: null, step_finished_at: new Date().toISOString() })
         .eq('id', meeting.id).eq('status', 'discussing').eq('step_claimed_at', claimedAt);
     }
   })(), `discussion round ${round}`);

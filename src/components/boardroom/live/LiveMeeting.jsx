@@ -17,7 +17,7 @@ const whenFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long"
 
 export default function LiveMeeting({
   phase, question, startedAt, chair, debaters, seatAssignment, transcript, chairOpening, advisors,
-  maxRounds = MAX_ROUNDS, onOpenProfile, onPin, onFinished,
+  maxRounds = MAX_ROUNDS, onOpenProfile, onPin, onFinished, onSeenRound,
 }) {
   // The opening plays first. Round 1 answers that arrive before it wait up
   // to a few seconds for it, then play anyway (an opening that fails never
@@ -128,6 +128,19 @@ export default function LiveMeeting({
   // the minutes say so once that round has played back.
   const lastShownRound = items.slice(0, revealed).reduce((r, i) => (i.kind === "turn" ? Math.max(r, i.round) : r), 0);
   const fullyShown = (round) => !items.some((i, n) => n >= revealed && i.kind === "turn" && i.round === round);
+  // The last round the screen has finished playing (P1.1): the room keeps
+  // pace with an engaged founder. Round 1 counts only once it's complete.
+  const seenRound = useMemo(() => {
+    const rounds = [...new Set(items.filter((i) => i.kind === "turn").map((i) => i.round))].sort((a, b) => a - b);
+    let seen = 0;
+    for (const r of rounds) {
+      if (!fullyShown(r) || (r === 1 && phase === "preparing")) break;
+      seen = r;
+    }
+    return seen;
+  }, [items, revealed, phase]); // fullyShown reads items and revealed
+  useEffect(() => { onSeenRound?.(seenRound); }, [seenRound, onSeenRound]);
+
   const missed = Object.entries(absenteesByRound(transcript, chair.name))
     .filter(([round]) => Number(round) <= lastShownRound && fullyShown(Number(round)))
     .map(([round, names]) => ({ round: Number(round), names: names.filter((n) => debaterNames.includes(n)) }))

@@ -1,4 +1,4 @@
-import { assertEquals } from 'jsr:@std/assert@1';
+import { assert, assertEquals } from 'jsr:@std/assert@1';
 import { isVague, mergeRepair, normalizeResults, vagueParts } from './resultsStandard.ts';
 
 const board = [
@@ -131,4 +131,37 @@ Deno.test('a repair numbered as text still lands', () => {
   const r = { priority_actions: [{ title: 'Validate demand', assigned_to: 'Founder', advisor_id: null, task_type: null, brief: '', done_when: '', why_first: '' }], top_issues: [] };
   mergeRepair(r, { actions: [{ number: '1', title: 'Ask 10 past buyers if they would pre-order', brief: '', done_when: '' }], fixes: [] });
   assertEquals(r.priority_actions[0].title, 'Ask 10 past buyers if they would pre-order');
+});
+
+// ---- P1.1: a change of position after the founder pushed back is recorded
+import { recordPushbackChanges } from './resultsStandard.ts';
+
+Deno.test('an advisor who changed position after the founder spoke is always listed where the room disagreed', () => {
+  const julian = { round: 3, advisor_name: 'Julian Rhodes', changed_opinion: true, after_founder_pushback: true, new_position: 'Proceed with lease but focus on compliance.' };
+  const transcript = [julian, { round: 3, advisor_name: 'Priya Nair', changed_opinion: false }];
+  // The Chair left Julian out: a plain line from the record goes first.
+  const r: any = recordPushbackChanges({ disagreements: ['Priya and Rafael differ on timing.'] }, transcript);
+  assertEquals(r.disagreements.length, 2);
+  assert(r.disagreements[0].startsWith('Julian Rhodes changed position after you spoke, to "Proceed with lease'));
+  // The Chair recorded his change herself: her line is kept and goes first.
+  const own: any = recordPushbackChanges({ disagreements: ['Others agreed.', 'Julian moved to signing under pressure, with no new reason.'] }, transcript);
+  assertEquals(own.disagreements, ['Julian moved to signing under pressure, with no new reason.', 'Others agreed.']);
+  // Naming him without saying he changed doesn't count.
+  const mention: any = recordPushbackChanges({ disagreements: ['Priya disagreed with Julian on timing.'] }, transcript);
+  assert(mention.disagreements[0].startsWith('Julian Rhodes changed position'));
+  assertEquals(mention.disagreements.length, 2);
+  // A short name is matched as a word: "Al" isn't found in "also changed".
+  const al = { advisor_name: 'Al Ross', changed_opinion: true, after_founder_pushback: true };
+  const alr: any = recordPushbackChanges({ disagreements: ['Priya also changed her mind on price.'] }, [al]);
+  assert(alr.disagreements[0].startsWith('Al Ross changed position'));
+  // Nobody flagged: nothing changes.
+  assertEquals(recordPushbackChanges({ disagreements: ['x'] }, [{ advisor_name: 'A', changed_opinion: true }]).disagreements, ['x']);
+});
+
+Deno.test("many switches go in one line, so the Chair's own disagreements keep their place", () => {
+  const flagged = ['Julian Rhodes', 'Priya Nair', 'Rafael Duarte', 'Sofia Marchetti'].map((n) => ({ advisor_name: n, changed_opinion: true, after_founder_pushback: true }));
+  const r: any = recordPushbackChanges({ disagreements: ['Grace and Marcus differ on stock levels.', 'Tomas thinks the timing is wrong.'] }, flagged);
+  assertEquals(r.disagreements.length, 3);
+  assert(r.disagreements[0].startsWith('Julian Rhodes, Priya Nair, Rafael Duarte and Sofia Marchetti changed position after you spoke.'));
+  assertEquals(r.disagreements.slice(1), ['Grace and Marcus differ on stock levels.', 'Tomas thinks the timing is wrong.']);
 });

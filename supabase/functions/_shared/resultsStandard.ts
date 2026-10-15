@@ -133,3 +133,37 @@ export function mergeRepair(resolution: Any, repair: Any, flagged = vagueIndexes
   });
   return resolution;
 }
+
+
+// P1.1: an advisor who changed position right after the founder spoke is
+// always listed under "where the room disagreed". The Chair is told to say
+// whether a reason or the pressure moved them. A Chair line counts only if it
+// names the advisor (as a whole word) and says they changed; anyone she left
+// out goes into one plain line from the record. These come first, and the
+// Chair's other lines keep what room is left, within the usual limit.
+const CHANGE_WORDS = /\b(chang|mov|switch|shift|swung|came round|came around|revers|dropp|abandon|softened|conceded)/i;
+const escape = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function recordPushbackChanges(r: any, transcript: any[]) {
+  const latest = new Map<string, any>();
+  for (const m of transcript || []) if (m?.after_founder_pushback && m.advisor_name) latest.set(m.advisor_name, m);
+  if (!latest.size) return r;
+  const lines: string[] = Array.isArray(r.disagreements) ? r.disagreements.map((d: unknown) => String(d)) : [];
+  const covers = (line: string, name: string) => {
+    const first = name.split(/\s+/)[0];
+    const named = new RegExp(`\\b(${escape(name)}|${escape(first)})\\b`, 'i').test(line);
+    return named && CHANGE_WORDS.test(line);
+  };
+  const chairs: string[] = [], missing: any[] = [];
+  for (const [name, m] of latest) {
+    const at = lines.findIndex((l) => covers(l, name));
+    if (at >= 0) { if (!chairs.includes(lines[at])) chairs.push(lines[at]); } else missing.push(m);
+  }
+  const rest = lines.filter((l) => !chairs.includes(l));
+  const added = missing.length === 0 ? [] : [
+    missing.length === 1
+      ? `${missing[0].advisor_name} changed position after you spoke${missing[0].new_position ? `, to "${String(missing[0].new_position).trim().slice(0, 300)}"` : ''}. Check the minutes for whether a reason or the pressure moved them.`
+      : `${missing.map((m) => m.advisor_name).join(', ').replace(/, ([^,]*)$/, ' and $1')} changed position after you spoke. Check the minutes for whether a reason or the pressure moved them.`,
+  ];
+  r.disagreements = [...added, ...chairs, ...rest].slice(0, LIMITS.disagreements);
+  return r;
+}
