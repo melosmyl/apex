@@ -46,6 +46,7 @@ function toRoundOneMessages(responses = []) {
     new_risks: r.risks || [],
     confidence_score: r.confidence_score || 0,
     unavailable: r.unavailable || false,
+    redone_after: r.redone_after || null,
   }));
 }
 

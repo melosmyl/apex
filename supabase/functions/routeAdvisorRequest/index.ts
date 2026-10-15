@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
     const { advisor_id, advisor_override, company_id, meeting_id, system_instructions, company_context, meeting_context,
       user_question, previous_responses, output_schema, temperature, max_output_length, request_type, user_id, model_tier, anonymous,
-      deadline_at, personal_details, model_override, task_run_id } = await req.json();
+      deadline_at, personal_details, model_override, task_run_id, same_provider_only } = await req.json();
 
     if ((!advisor_id && !advisor_override) || !user_question)
       return Response.json({ error: 'advisor_id (or advisor_override) and user_question are required' }, { status: 400, headers: corsHeaders });
@@ -125,6 +125,30 @@ Deno.serve(async (req) => {
       fbModel = model;
       provider = cheap.provider;
       model = cheap.model;
+    }
+
+    // Some calls must stay with their provider (the Chair's resolution is
+    // always Claude's): no backup from another provider, so a failure is
+    // reported rather than quietly answered by a different model.
+    if (same_provider_only === true) {
+      // Not even the approved-model check may swap it for another provider.
+      if (provider !== requested.provider) {
+        const reason = `${requested.provider} is not available for this call (switched off in the model settings?)`;
+        // Logged like any failed call, so the provider alert sees it too.
+        await insertUsageLog(db, {
+          user_id: user_id || null, company_id: company_id || null, meeting_id: meeting_id || null, advisor_id: advisor_id || null,
+          provider: requested.provider, model: requested.model, request_type: request_type || 'unknown',
+          input_size: 0, output_size: 0, thinking_size: 0, estimated_cost: 0, latency_ms: Date.now() - startedAt,
+          status: 'error', error_code: reason,
+          attempts: [{ provider: requested.provider, model: requested.model, outcome: 'api_error', error: reason }],
+          model_substitution: substitution, anonymous: anonymous === true,
+        });
+        return Response.json({ error: 'This advisor was temporarily unavailable.', reason }, { status: 503, headers: corsHeaders });
+      }
+      if (fbProvider && fbProvider !== provider) {
+        fbProvider = undefined;
+        fbModel = undefined;
+      }
     }
 
     // The advisor's book, hobby and place, only when the caller offers them

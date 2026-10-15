@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { embedText } from '../_shared/embeddings.ts';
+import { distinctRoundOne } from '../_shared/roundOne.ts';
 import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
 import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
@@ -36,6 +37,31 @@ async function loadProgressionSummary(db, companyId) {
     completed: nodes.filter(n => doneIds.has(n.id)).map(n => n.label),
     next: nodes.filter(n => !doneIds.has(n.id)).slice(0, 3).map(n => n.label),
   };
+}
+
+// Round 1 (anti-convergence): each advisor answers from their own speciality,
+// and sees only the open commitments that are theirs. Everyone getting the
+// same overdue list made every answer open with the same checklist.
+function lensFor(advisor) {
+  const role = String(advisor.role || 'advisor').slice(0, 100);
+  return `\nYOUR LENS: you are this board's ${role}. Answer from your own speciality first: what does this question look like from where you sit that the others won't see? The rest of the board covers their own areas, so don't open with the checklist every advisor would give (validate demand, check compliance, secure suppliers) unless it is truly your speciality. If you agree with an obvious point, say so in a line and spend the rest of your answer on your own angle.\n`;
+}
+
+function commitmentsFor(advisor, commitments) {
+  const mine = (commitments || []).filter(c => c.advisor_id === advisor.id
+    || (!c.advisor_id && String(c.assigned_to || '').trim().toLowerCase() === String(advisor.name || '').trim().toLowerCase()));
+  const others = (commitments || []).length - mine.length;
+  let text = '';
+  if (mine.length) {
+    text += `\nCommitments from earlier meetings that are yours to deliver, still open:\n`;
+    mine.forEach(c => {
+      const overdue = c.days_open >= OVERDUE_AFTER_DAYS ? ' [OVERDUE]' : '';
+      text += `- "${c.title}", agreed ${c.days_open} day${c.days_open === 1 ? '' : 's'} ago after the meeting on "${c.meeting_question}"${overdue}\n`;
+    });
+    text += `Mention one only where it bears on this question.\n`;
+  }
+  if (others > 0) text += `\n(The founder has ${others} other open commitment${others === 1 ? '' : 's'} from earlier meetings; the Chair keeps track of them. Leave them to their owners unless one decides your answer.)\n`;
+  return text;
 }
 
 function buildContext(company, documents, decisions, meetings, projects, commitments, progression, maxSize) {
@@ -327,7 +353,7 @@ function buildMemoryContext(recalled, decisions, commitments) {
 
 // Round 1: every advisor answers on their own, in parallel, and the Chair
 // opens. Ends with the meeting at independent_complete.
-async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, previousMeeting, startedAt }: any) {
+async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments, previousMeeting, startedAt }: any) {
   const company_id = meeting.company_id;
   const question = meeting.question;
   // Model calls end in time for this function to save their answers.
@@ -382,7 +408,10 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
     Promise.all(selectedAdvisors.map(advisor =>
       callAdvisor(supabaseUrl, serviceKey, {
         advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-        system_instructions: advisor.system_instructions, company_context: contextPackage,
+        // Their own lens, and their own commitments on top of what everyone
+        // gets; the full list stays in the package later rounds and the Chair use.
+        system_instructions: `${advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`}\n${lensFor(advisor)}`,
+        company_context: roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage,
         user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
         temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
         personal_details: true, // nothing said yet in this meeting
@@ -409,7 +438,21 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
   // list the slowest advisors last. The live view follows turns by who
   // gave them, not by position, so it isn't affected.
   const rank = new Map<string, number>(selectedAdvisors.map((a: any, i: number) => [a.id, i]));
-  const independentResponses = [...arrived].sort((a, b) => (rank.get(a.advisor_id) ?? 0) - (rank.get(b.advisor_id) ?? 0));
+  let independentResponses = [...arrived].sort((a, b) => (rank.get(a.advisor_id) ?? 0) - (rank.get(b.advisor_id) ?? 0));
+
+  // Two advisors who came back with near-identical answers: the later one is
+  // asked once more, for their own view (at most two re-asks, only with time
+  // left). A board that says one sentence four times isn't a board.
+  independentResponses = await distinctRoundOne({
+    responses: independentResponses, selectedAdvisors, deadlineAt,
+    ask: (advisor, note) => callAdvisor(supabaseUrl, serviceKey, {
+      advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+      system_instructions: `${advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`}\n${lensFor(advisor)}`,
+      company_context: roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage,
+      meeting_context: note, user_question: question, previous_responses: [], output_schema: INDEPENDENT_SCHEMA,
+      temperature: advisor.temperature, request_type: 'independent_redo', deadline_at: deadlineAt, personal_details: true,
+    }).then(data => formatIndependent({ advisor, data })).catch(() => null),
+  });
 
   // A free-meeting retry may have superseded it meanwhile.
   await ours(db.from('board_meetings').update({
@@ -443,9 +486,10 @@ async function retryRoundOne(db, supabaseUrl, serviceKey, meetingId) {
   const chosen = new Set(m.participant_advisor_ids || []);
   const selectedAdvisors: any[] = withoutChair((advisors || []).filter(a => chosen.has(a.id) && a.type !== 'human'), chair);
   const contextPackage = buildContext(company, documents, recalled.decisions, meetings, projects, commitments, progression, limitsList?.[0]?.max_context_size || 8000);
+  const roundOneContext = buildContext(company, documents, recalled.decisions, meetings, projects, [], progression, limitsList?.[0]?.max_context_size || 8000);
   await db.from('board_meetings').update({ context_package: contextPackage }).eq('id', m.id);
   later(runRoundOne({
-    db, supabaseUrl, serviceKey, meeting: claimed, company, user, selectedAdvisors, chair, contextPackage,
+    db, supabaseUrl, serviceKey, meeting: claimed, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments,
     previousMeeting: meetings?.[0] || null, startedAt: Date.now(),
   }).then(() => handOver(m.id)), 'Round 1 retry');
   return { started: true };
@@ -525,6 +569,9 @@ Deno.serve(async (req) => {
     }
 
     const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
+    // Round 1's shared part: everything but the commitments, which each
+    // advisor gets only for their own.
+    const roundOneContext = buildContext(company, documents, decisions, meetings, projects, [], progression, limits.max_context_size || 8000);
     const memoryContext = buildMemoryContext(recalled, decisions, commitments);
 
     // A meeting the server runs (P0) moves on by itself; one started by an
@@ -547,7 +594,7 @@ Deno.serve(async (req) => {
     // The last meeting that actually reached a resolution: an abandoned,
     // failed or superseded one never happened as far as the Chair knows.
     const previousMeeting = meetings?.[0] || null;
-    const roundOne = { db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, previousMeeting };
+    const roundOne = { db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments, previousMeeting };
 
     if (serverRun) {
       // Round 1 runs after this answers, so a closed tab doesn't stop it;

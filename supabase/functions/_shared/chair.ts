@@ -56,6 +56,19 @@ export function chairCallFields(chair: Advisor | null) {
     : { advisor_override: BUILT_IN_CHAIR, system_instructions: BUILT_IN_CHAIR.system_instructions };
 }
 
+// The resolution is always written by Claude (owner's rule): on the Chair's
+// own Claude model, or Claude Sonnet 5.5 if her row names another provider,
+// and never handed to another provider when Claude fails.
+export const RESOLUTION_MODEL = { provider: 'anthropic', model: 'claude-sonnet-5-5' };
+export function resolutionCallFields(chair: Advisor | null) {
+  const own = chair ?? BUILT_IN_CHAIR;
+  return {
+    ...chairCallFields(chair),
+    ...(own.default_provider === 'anthropic' ? {} : { model_override: RESOLUTION_MODEL }),
+    same_provider_only: true,
+  };
+}
+
 export function chairName(chair: Advisor | null): string {
   return chair?.name || BUILT_IN_CHAIR.name;
 }

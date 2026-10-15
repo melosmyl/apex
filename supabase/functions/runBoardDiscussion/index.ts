@@ -290,6 +290,7 @@ async function loadDiscussion(db, meeting, ownerId): Promise<any> {
     provider_used: r.provider_used, model_used: r.model_used,
     unavailable: r.unavailable || false,
     ...(Number.isFinite(Number(r.cost_usd)) && r.cost_usd != null ? { cost_usd: Number(r.cost_usd) } : {}),
+    ...(r.redone_after ? { redone_after: String(r.redone_after).slice(0, 100) } : {}),
   }));
 
   // The server-chosen AI advisors plus the company's human advisors, all

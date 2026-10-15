@@ -9,7 +9,7 @@ export const OVERDUE_AFTER_DAYS = 14;
 // carries this company_id isn't trusted to belong to it (see _shared/access.ts).
 export async function loadOpenCommitments(db, companyId, ownerId) {
   const { data, error } = await db.from('tasks')
-    .select('id, title, status, created_at, board_meetings!inner(question, created_by_id)')
+    .select('id, title, status, created_at, advisor_id, assigned_to, board_meetings!inner(question, created_by_id)')
     .eq('company_id', companyId)
     .eq('created_by_id', ownerId)
     .eq('board_meetings.created_by_id', ownerId)
@@ -28,5 +28,7 @@ export async function loadOpenCommitments(db, companyId, ownerId) {
     status: t.status,
     days_open: Math.max(0, Math.floor((now - new Date(t.created_at).getTime()) / 86400000)),
     meeting_question: t.board_meetings?.question || 'a previous meeting',
+    advisor_id: t.advisor_id || null,
+    assigned_to: t.assigned_to || null,
   }));
 }

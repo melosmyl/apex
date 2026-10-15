@@ -3,8 +3,9 @@ import { AlertTriangle, X } from "lucide-react";
 import { supabase } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 
-// Surfaces provider_health_alerts (populated every 15 min by a Postgres cron
-// job, see 20260809180000_provider_health_alerts.sql) on the Admin page only:
+// Surfaces provider_health_alerts (provider failures from the providerHealth
+// function every 5 min, 20261015160000_provider_alerts.sql; spend alerts from
+// check_free_meeting_spend) on the Admin page only:
 // these are operational signals for the owner. Founder pages never show
 // them, even to an admin; a founder whose meeting fails gets a plain message
 // inside the meeting instead. Born from a real
@@ -38,18 +39,39 @@ export default function ProviderHealthBanner() {
 
   const visible = alerts.filter((a) => !dismissedIds.has(a.id));
   if (!visible.length) return null;
+  // Happening now (seen in the last hour) in red; older ones folded away, so
+  // a live failure never hides among months of old alerts.
+  const live = visible.filter((a) => Date.now() - new Date(a.last_seen).getTime() < 60 * 60_000);
+  const old = visible.filter((a) => !live.includes(a));
+  const when = (t) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div>
-      {visible.map((a) => (
-        <div key={a.id} className="bg-amber-100 border-b border-amber-300 px-4 py-2 flex items-center gap-3 text-sm text-amber-900">
-          <AlertTriangle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-          <span className="flex-1 min-w-0">{a.message}</span>
-          <button onClick={() => acknowledge(a)} className="shrink-0 p-1 hover:bg-amber-200 rounded-md transition-colors" title="Acknowledge">
-            <X className="w-3.5 h-3.5" />
+      {live.map((a) => (
+        <div key={a.id} role="alert" className="flex items-start gap-3 border-b border-red-300 bg-red-100 px-4 py-3 text-sm text-red-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+          <span className="min-w-0 flex-1">
+            <b className="font-semibold">Happening now.</b> {a.message}
+            <span className="mt-0.5 block text-xs text-red-800">Since {when(a.first_seen)} · last seen {when(a.last_seen)}{a.emailed_at ? ` · emailed ${when(a.emailed_at)}` : ""}</span>
+          </span>
+          <button onClick={() => acknowledge(a)} className="shrink-0 rounded-md p-1 transition-colors hover:bg-red-200" title="Acknowledge">
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       ))}
+      {old.length > 0 && (
+        <details className="border-b border-border bg-secondary px-4 py-2 text-sm text-muted-foreground">
+          <summary className="cursor-pointer">Earlier alerts ({old.length}), not seen in the last hour</summary>
+          <ul className="mt-2 space-y-1.5">
+            {old.map((a) => (
+              <li key={a.id} className="flex items-start gap-2">
+                <span className="min-w-0 flex-1">{a.message} <span className="text-xs">(last seen {when(a.last_seen)})</span></span>
+                <button onClick={() => acknowledge(a)} className="shrink-0 rounded-md p-1 hover:bg-accent" title="Acknowledge"><X className="h-3 w-3" /></button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

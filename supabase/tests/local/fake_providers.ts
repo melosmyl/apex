@@ -128,6 +128,7 @@ async function anthropic(body: any): Promise<Response> {
     native: !!body.output_config?.format, pasted: String(body.system).includes('JSON structure'), temperature: body.temperature, stream: body.stream });
   if (mode === 'overload529') return Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 529, headers: { 'retry-after': '1' } });
   if (mode === 'reject400') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'output_config.format.schema: unsupported' } }, { status: 400 });
+  if (mode === 'credit400') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.' } }, { status: 400 });
   if (delayBy[sp.who]) await sleep(delayBy[sp.who]);
   const answer = JSON.stringify(sample(schema, '', sp.book));
   const input = Math.ceil((String(body.system).length + JSON.stringify(body.messages).length) / 4);
@@ -198,5 +199,7 @@ Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);
   if (url.pathname.endsWith('/chat/completions')) return openai(body);
   if (url.pathname.endsWith('/embeddings')) return embeddings(body);
+  // Alert emails (providerHealth), recorded instead of sent.
+  if (url.pathname.endsWith('/emails')) { log.push({ kind: 'email', to: body.to, subject: body.subject, text: body.text }); return Response.json({ id: crypto.randomUUID() }); }
   return new Response('not found', { status: 404 });
 });

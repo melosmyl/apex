@@ -101,6 +101,9 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
                 {m.after_founder_pushback && (
                   <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">Changed after you spoke</span>
                 )}
+                {m.redone_after && (
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground" title={`The first answer was almost the same as ${m.redone_after}'s, so it was asked again`}>Asked again</span>
+                )}
                 {m.challenger && (
                   <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">Challenger</span>
                 )}

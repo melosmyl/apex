@@ -2,7 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
-import { findChair, chairCallFields } from '../_shared/chair.ts';
+import { findChair, resolutionCallFields } from '../_shared/chair.ts';
 import { mergeRepair, normalizeResults, recordPushbackChanges, vagueParts } from '../_shared/resultsStandard.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
@@ -11,7 +11,13 @@ import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/me
 const STALE_CLAIM_MS = 10 * 60_000;
 // Shown to the founder when the Chair couldn't write a server-run meeting's
 // resolution; the page offers to try again.
-const CHAIR_FAILED = "The Chair couldn't write the resolution this time.";
+const CHAIR_DOWN = "Claude, who writes every resolution, couldn't be reached just now, so the Chair hasn't written it rather than hand it to another model. Nothing from the meeting is lost: try again in a few minutes.";
+const CHAIR_FAILED = "The Chair couldn't finish the resolution this time (it took too long or came back incomplete). Nothing from the meeting is lost: try again.";
+// Which of the two the founder sees, from why the call failed.
+const failureFor = (e) => {
+  const why = String(e?.reason || e?.message || '');
+  return /credit balance|insufficient_quota|invalid x-api-key|\b401\b|\b403\b|overload|\b529\b|\b429\b|rate.?limit|not available for this call|api_error|ECONN|fetch failed|error sending request|connection (failed|refused|reset|closed)|\bHTTP 5\d\d\b/i.test(why) ? CHAIR_DOWN : CHAIR_FAILED;
+};
 
 // The vague-action repair only runs with this much of the deadline left.
 const REPAIR_MIN_MS = 25_000;
@@ -159,7 +165,8 @@ async function callAdvisor(supabaseUrl, serviceKey, payload) {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `routeAdvisorRequest failed (${res.status})`);
+  // The reason travels with the error, so the founder is told the right thing.
+  if (!res.ok) throw Object.assign(new Error(data.error || `routeAdvisorRequest failed (${res.status})`), { reason: data.reason || '' });
   return data;
 }
 
@@ -283,7 +290,7 @@ Deno.serve(async (req) => {
     }
 
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
-      ...chairCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+      ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       // The same memory every round worked from (P1); older meetings, the profile.
       system_instructions: CHAIR_INSTRUCTIONS, company_context: meeting.context_package || profile, meeting_context: meetingContext,
       user_question: meeting.question, previous_responses: [],
@@ -325,7 +332,7 @@ Deno.serve(async (req) => {
     if (vague.length && repairDeadline - Date.now() > REPAIR_MIN_MS) {
       try {
         const repair = await callAdvisor(supabaseUrl, serviceKey, {
-          ...chairCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
+          ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
           system_instructions: REPAIR_INSTRUCTIONS, company_context: meeting.context_package || profile,
           meeting_context: `${meetingContext}\n\n=== YOUR RESULTS ===\nActions:\n${resolution.priority_actions.map((a, i) => `${i + 1}. ${a.title} (${a.assigned_to})`).join('\n')}\nIssues and fixes:\n${resolution.top_issues.map((x, i) => `${i + 1}. ${x.problem}: fix: ${x.fix}`).join('\n')}\n\nReword only these, which are too vague to act on:\n${vague.map((v) => `- ${v}`).join('\n')}`,
           user_question: meeting.question, previous_responses: [],
@@ -452,7 +459,7 @@ Deno.serve(async (req) => {
     }, { headers: corsHeaders });
   } catch (error) {
     if (claimedMeetingId && dbForRelease) {
-      await claimMine(dbForRelease.from('board_meetings').update({ status: 'failed', ...(serverRun ? { failure_reason: CHAIR_FAILED } : {}) })
+      await claimMine(dbForRelease.from('board_meetings').update({ status: 'failed', ...(serverRun ? { failure_reason: failureFor(error) } : {}) })
         .eq('id', claimedMeetingId).eq('status', 'synthesizing'));
     }
     const denied = accessErrorResponse(error, corsHeaders);

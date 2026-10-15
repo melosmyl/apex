@@ -38,6 +38,8 @@ const DEBATER: CallPolicy = {
 
 const POLICIES: Record<string, CallPolicy> = {
   independent: DEBATER,
+  // A Round 1 answer asked again because it copied another advisor's.
+  independent_redo: DEBATER,
   founder_followup: DEBATER,
   // The admin "Test advisor" button tests what a meeting would run.
   admin_test: DEBATER,

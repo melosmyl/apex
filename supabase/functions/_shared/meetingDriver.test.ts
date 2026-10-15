@@ -141,3 +141,15 @@ Deno.test('a meeting from before pacing is never held for the screen', () => {
 Deno.test('Decide now after a failed round goes straight to the Chair', () => {
   assertEquals(nextStep(m({ status: 'discussing', step_claimed_at: null, step_attempts: 1, step_finished_at: ago(2000), decide_now: true }), NOW), 'synthesis');
 });
+
+// ---- The resolution is Claude's (owner, 15 October 2026)
+import { resolutionCallFields } from './chair.ts';
+
+Deno.test("the Chair's resolution always goes to Claude, with no other provider as backup", () => {
+  const onGpt: any = resolutionCallFields({ id: 'c', default_provider: 'openai', default_model: 'gpt-4o', system_instructions: 'x' });
+  assertEquals([onGpt.model_override, onGpt.same_provider_only], [{ provider: 'anthropic', model: 'claude-sonnet-5-5' }, true]);
+  const onClaude: any = resolutionCallFields({ id: 'c', default_provider: 'anthropic', default_model: 'claude-sonnet-5-5', system_instructions: 'x' });
+  assertEquals([onClaude.model_override, onClaude.same_provider_only], [undefined, true]);
+  const builtIn: any = resolutionCallFields(null);
+  assertEquals([builtIn.advisor_override?.default_provider, builtIn.same_provider_only], ['anthropic', true]);
+});
