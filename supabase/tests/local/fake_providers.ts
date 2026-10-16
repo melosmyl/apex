@@ -10,6 +10,9 @@ let mentionBy: string[] = [];
 // Extra time (ms) before a given speaker answers, to mimic a slow advisor:
 // { "Grace Bennett": 12000 }. Matched on the persona's "You are <name>".
 let delayBy: Record<string, number> = {};
+// Speakers (by name) whose every call fails on both providers, as if out of
+// credit everywhere: { "failFor": ["Priya Shah"] }.
+let failFor: string[] = [];
 const log: any[] = [];
 // Answers to give for a field, in order, one per request that asks for it:
 // { "priority_actions": [[...], [...]] } returns the first list to the first
@@ -128,6 +131,7 @@ async function anthropic(body: any): Promise<Response> {
     native: !!body.output_config?.format, pasted: String(body.system).includes('JSON structure'), temperature: body.temperature, stream: body.stream });
   if (mode === 'overload529') return Response.json({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }, { status: 529, headers: { 'retry-after': '1' } });
   if (mode === 'reject400') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'output_config.format.schema: unsupported' } }, { status: 400 });
+  if (failFor.includes(sp.who)) return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API (scripted for this speaker).' } }, { status: 400 });
   if (mode === 'credit400') return Response.json({ type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.' } }, { status: 400 });
   if (delayBy[sp.who]) await sleep(delayBy[sp.who]);
   const answer = JSON.stringify(sample(schema, '', sp.book));
@@ -167,6 +171,7 @@ async function openai(body: any): Promise<Response> {
   const sp = speaker(String(body.messages?.[0]?.content));
   log.push({ marked: marked(JSON.stringify(body.messages)), provider: 'openai', who: sp.who, offered: sp.offered, mentioned: !!sp.book, mugQuote: sp.mugQuote, mode, model: body.model, max_tokens: body.max_tokens, format: rf?.type, strict: rf?.json_schema?.strict, temperature: body.temperature });
   if (mode === 'overload529') return Response.json({ error: { message: 'busy', type: 'server_error' } }, { status: 503 });
+  if (failFor.includes(sp.who)) return Response.json({ error: { message: 'You exceeded your current quota (scripted for this speaker).', type: 'insufficient_quota' } }, { status: 429 });
   if (delayBy[sp.who]) await sleep(delayBy[sp.who]);
   const content = mode === 'refusal' ? null : JSON.stringify(sample(schema, '', sp.book));
   return Response.json({
@@ -193,7 +198,7 @@ function embeddings(body: any): Response {
 
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
-  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; fields = s.fields || {}; marks = s.marks || []; research = s.research || {}; log.length = 0; return Response.json({ ok: true }); }
+  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; failFor = s.failFor || []; fields = s.fields || {}; marks = s.marks || []; research = s.research || {}; log.length = 0; return Response.json({ ok: true }); }
   if (url.pathname === '/__log') return Response.json(log);
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);

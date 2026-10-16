@@ -86,3 +86,17 @@ export async function callAdvisorWithRetry(
   const f = last as Extract<Attempt, { ok: false }>;
   throw new AdvisorCallError('This advisor was temporarily unavailable.', f.status, f.reason);
 }
+
+// Why an advisor gave no turn, in plain words for the meeting record
+// (owner, 16 October 2026: a missing turn says why in the meeting itself).
+export function plainUnavailableReason(detail: unknown) {
+  const d = String(detail ?? '');
+  if (/credit balance|insufficient_quota|billing/i.test(d)) return "the AI provider's account was out of credit";
+  if (/invalid x-api-key|\b401\b|api key/i.test(d)) return 'the AI provider refused our key';
+  if (/declined|refus/i.test(d)) return 'the model declined to answer';
+  if (/overload|\b529\b|\b429\b|rate.?limit|busy/i.test(d)) return 'the AI service was overloaded';
+  if (/timed out|out of time|deadline|silence|stalled|took too long|TimeoutError|aborted/i.test(d)) return 'it ran out of time';
+  if (/never reached|before reaching the model|didn't connect|HTTP 5\d\d|upstream|WORKER|no answer/i.test(d)) return "the connection to the advisor failed, and failed again when we retried";
+  if (/invalid response|schema|cut off|truncated|incomplete/i.test(d)) return 'the answer came back incomplete';
+  return "the advisor couldn't be reached";
+}

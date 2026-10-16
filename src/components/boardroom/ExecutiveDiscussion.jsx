@@ -64,7 +64,9 @@ export function DiscussionMessage({ msg, accent }) {
             <ProfileTrigger name={msg.advisor_name} role={msg.role}><span className="font-display text-sm font-medium text-muted-foreground">{msg.advisor_name}</span></ProfileTrigger>
             <span className="text-xs text-muted-foreground">{msg.role}</span>
           </div>
-          <UnavailableNotice>Could not be reached — gave no position. The board continued without them.</UnavailableNotice>
+          <UnavailableNotice>
+            {msg.round === 1 ? "Gave no position" : "Gave no view this round"}{msg.unavailable_reason ? `: ${msg.unavailable_reason}` : " (couldn't be reached)"}. The board continued without them.
+          </UnavailableNotice>
         </div>
       </div>
     );

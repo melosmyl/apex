@@ -121,7 +121,7 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
         if (m.unavailable) {
           return (
             <p key={i} className="border-t border-border py-3 text-sm italic text-muted-foreground">
-              {m.advisor_name} couldn't give a view in Round {m.round}.
+              {m.advisor_name} couldn't give a view in Round {m.round}{m.unavailable_reason ? `: ${m.unavailable_reason}` : ""}.
             </p>
           );
         }

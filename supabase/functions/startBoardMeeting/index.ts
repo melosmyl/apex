@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { callAdvisorWithRetry } from '../_shared/advisorCall.ts';
+import { callAdvisorWithRetry, plainUnavailableReason } from '../_shared/advisorCall.ts';
 import { embedText } from '../_shared/embeddings.ts';
 import { distinctRoundOne } from '../_shared/roundOne.ts';
 import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
@@ -379,8 +379,9 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
         position: 'This advisor was temporarily unavailable.', recommendation: 'No recommendation available.',
         key_arguments: [], assumptions: [], risks: [], missing_information: [], suggested_actions: [], confidence_score: 0,
         unavailable: true,
-        // Why, so a silent advisor can be traced.
-        ...(r.reason || r.error ? { unavailable_reason: String(r.reason || r.error).slice(0, 300) } : {}),
+        // Why, in the meeting itself: in plain words, and the detail.
+        unavailable_reason: plainUnavailableReason(r.reason || r.error),
+        ...(r.reason || r.error ? { unavailable_detail: String(r.reason || r.error).slice(0, 300) } : {}),
       };
     }
     const resp = d.response;

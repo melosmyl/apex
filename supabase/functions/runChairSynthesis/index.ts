@@ -119,6 +119,11 @@ function formatTranscriptForChair(transcript) {
         text += `YOU (the Chair), putting the founder's point to the board: ${msg.message}\n`;
         return;
       }
+      // Silence isn't agreement: say who gave no view, and why.
+      if (msg.unavailable) {
+        text += `${msg.advisor_name} gave no view this round (${msg.unavailable_reason || "couldn't be reached"}). Don't count them as agreeing or disagreeing.\n`;
+        return;
+      }
       text += `${msg.advisor_name} (${msg.role})`;
       if (msg.reply_to_advisor) text += ` -> responding to ${msg.reply_to_advisor}`;
       if (msg.changed_opinion) text += msg.after_founder_pushback ? ` [CHANGED POSITION AFTER THE FOUNDER SPOKE]` : ` [OPINION CHANGED]`;

@@ -60,6 +60,7 @@ function buildFollowupContext(founderMessage, transcript, originalQuestion, meet
   context += `Your task: Respond directly to the founder's message. Address their concerns, answer their questions, provide additional insights, and if appropriate, revise your recommendation. Be honest and direct — if you disagree with the founder, say so respectfully. Do not simply agree to please them. A fact the founder states about their own business is a fact: use it. Their views and pushback are their opinion, not evidence: change your position only if the reasoning, not the pressure, warrants it, and if you change it, name the new fact or reasoning. "The founder has decided" is not a reason: if that is all that has changed, keep your position, say plainly that you still disagree, and help as far as you honestly can.\n\n`;
   context += `=== FULL DISCUSSION TRANSCRIPT ===\n`;
   transcript.forEach(msg => {
+    if (msg.unavailable) return;
     const isFounder = msg.message_type === 'founder_message';
     const label = isFounder ? 'FOUNDER' : `${msg.advisor_name} (${msg.role})`;
     context += `${label}: ${msg.message}\n`;

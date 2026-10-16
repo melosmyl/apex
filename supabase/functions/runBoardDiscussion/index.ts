@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { callAdvisorWithRetry } from '../_shared/advisorCall.ts';
+import { callAdvisorWithRetry, plainUnavailableReason } from '../_shared/advisorCall.ts';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { DISCUSSION_SCHEMA } from '../_shared/answerSchemas.ts';
@@ -142,6 +142,10 @@ function formatTranscript(transcript, currentAdvisorId) {
       }
       if (msg.message_type === 'chair_tabling') {
         text += `THE CHAIR (putting the founder's point to the board): ${msg.message}\n`;
+        return;
+      }
+      if (msg.unavailable) {
+        text += `(${msg.advisor_name} couldn't give a view this round.)\n`;
         return;
       }
       const isYou = msg.advisor_id === currentAdvisorId;
@@ -308,6 +312,13 @@ async function runOneRound({ db = null, supabaseUrl, serviceKey, meeting, user, 
   // their notes in the meeting: a specific reason names some of it. (Not the
   // earlier meetings' advice, which would make any stock phrase count.)
   const record = recordWords(facts || '', meeting.question || '', ...founderNotes.map((n) => n.text || ''));
+  // A failed advisor leaves an entry saying why (owner, 16 October 2026),
+  // never counted as a turn.
+  const missing = (r: any) => ({
+    round, advisor_id: r.advisor.id, advisor_name: r.advisor.name, role: r.advisor.role, message: '', message_type: 'unavailable',
+    unavailable: true, unavailable_reason: plainUnavailableReason(r.reason || r.error),
+    ...(r.reason || r.error ? { unavailable_detail: String(r.reason || r.error).slice(0, 300) } : {}),
+  });
   const toEntry = (r: any) => {
     if (r.error || !r.data?.response) return null;
     const resp = r.data.response;
@@ -336,9 +347,10 @@ async function runOneRound({ db = null, supabaseUrl, serviceKey, meeting, user, 
     };
   };
   let entries: any[] = roundResults.map(toEntry).filter(Boolean);
+  const missingEntries = roundResults.filter((r: any) => r.error || !r.data?.response).map(missing);
   // The checks: flags only, for the Chair and the minutes. A turn that
   // echoes one before it in the round is flagged, not both.
-  if (!shaped) return entries;
+  if (!shaped) return [...entries, ...missingEntries];
   // The challenger's seat must challenge (owner, 16 October 2026): a round
   // with no turn disagreeing with a named advisor, with a reason, asks the
   // challenger once more (not the advisor a note was addressed to: their
@@ -354,10 +366,10 @@ async function runOneRound({ db = null, supabaseUrl, serviceKey, meeting, user, 
         ? { ...again, challenge_redo: true, cost_usd: (Number(again.cost_usd) || 0) + (Number(first?.cost_usd) || 0) } : e));
     }
   }
-  const earlier = transcript.filter((m) => m.round > 1 && m.round < round);
-  return entries.map((e: any) => ({
+  const earlier = transcript.filter((m) => m.round > 1 && m.round < round && !m.unavailable);
+  return [...entries.map((e: any) => ({
     ...e, flags: turnFlags(e, { sameRound: entries, earlier: earlier.filter((m) => m.advisor_id !== e.advisor_id), record, isLastRound }),
-  }));
+  })), ...missingEntries];
 }
 
 // Previously this only looked at changed_opinion/new_risks, which stops the
@@ -417,6 +429,7 @@ async function loadDiscussion(db, meeting, ownerId): Promise<any> {
     new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
     provider_used: r.provider_used, model_used: r.model_used,
     unavailable: r.unavailable || false,
+    ...(r.unavailable && r.unavailable_reason ? { unavailable_reason: String(r.unavailable_reason).slice(0, 200) } : {}),
     ...(Number.isFinite(Number(r.cost_usd)) && r.cost_usd != null ? { cost_usd: Number(r.cost_usd) } : {}),
     ...(r.redone_after ? { redone_after: String(r.redone_after).slice(0, 100) } : {}),
   }));
@@ -490,7 +503,10 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
       });
       // A round nobody answered hasn't taken the founder's notes: they go on
       // to the next round, or to the Chair.
-      const next = roundMessages.length ? [...transcript, ...founderEntries, ...roundMessages] : transcript;
+      // A round counts once someone answered; a missing advisor's entry
+      // (saying why) isn't an answer.
+      const answered = roundMessages.filter((m) => !m.unavailable);
+      const next = answered.length ? [...transcript, ...founderEntries, ...roundMessages] : transcript;
       // What the founder did while this round ran (asked for the decision,
       // asked for another round, said something new) decides what's next.
       // The save holds only if none of that changed since it was read;
@@ -502,14 +518,14 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
         const target = roundsFor(d.maxRounds, fresh);
         // Settled early only if the founder neither spoke nor asked to go further.
         const belowAsked = Number.isInteger(fresh?.rounds_target) && round < fresh.rounds_target;
-        const done = !!fresh?.decide_now || round >= target || !roundMessages.length
-          || (discussionSettled(roundMessages, isLastRound, convergencePairs) && !founderEntries.length && !pending.length && !belowAsked);
+        const done = !!fresh?.decide_now || round >= target || !answered.length
+          || (discussionSettled(answered, isLastRound, convergencePairs) && !founderEntries.length && !pending.length && !belowAsked);
         let save = db.from('board_meetings').update({
           discussion_transcript: next, step_finished_at: new Date().toISOString(),
           // Sit in: the meeting stops after every round, the last one too,
           // until the founder acts. Not when they've asked for the decision.
           waiting_for_founder: meeting.pace === 'sit_in' && !fresh?.decide_now,
-          ...(roundMessages.length ? { discussion_rounds_completed: round } : {}),
+          ...(answered.length ? { discussion_rounds_completed: round } : {}),
           status: done ? 'discussion_complete' : 'discussing',
           step_claimed_at: null, step_attempts: 0, sweep_count: 0,
           ...(done ? { convergence: convergencePairs.filter(p => stillConverged(p, next)).map(p => ({ advisors: p.names })) } : {}),
@@ -610,14 +626,14 @@ Deno.serve(async (req) => {
         isLastRound, convergencePairs, profile: d.profile, facts: d.profile, independentResponses: d.independentResponses, roundDeadline,
       });
 
-      if (!roundMessages.length) break;
+      if (!roundMessages.some((m) => !m.unavailable)) break;
       transcript = [...transcript, ...roundMessages];
 
       await db.from('board_meetings').update({
         discussion_transcript: transcript, discussion_rounds_completed: round,
       }).eq('id', meeting.id);
 
-      if (discussionSettled(roundMessages, isLastRound, convergencePairs)) break;
+      if (discussionSettled(roundMessages.filter((m) => !m.unavailable), isLastRound, convergencePairs)) break;
     }
 
     const finalConvergence = convergencePairs.filter(p => stillConverged(p, transcript));
