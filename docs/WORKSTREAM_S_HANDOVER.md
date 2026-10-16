@@ -12,6 +12,7 @@ Workstreams P and T have merged into main.
 | Migration | Step | What |
 |---|---|---|
 | `20261016120000_s0_display_names` | S0 | A display name on profiles; set only through `set_my_display_name()`; filled from a name given at sign-up (Google) |
+| `20261016130000_s1_keep_work` | S1 | Company content no longer deleted with the account of the person who made it (companies still go with their founder until S2); `former_members` keeps the name of someone who leaves work behind; `decided_by`, `approved_by_user_id` recorded by the database; `tasks.assignee_user_id`; who made a row can't be changed |
 
 At merge time, check that these still come after main's newest migration, and after the
 workspace's (`20261016110000`–`20261016110800`); renumber if not.
@@ -25,6 +26,25 @@ workspace's (`20261016110000`–`20261016110800`); renumber if not.
   Google sign-in lands on the home page instead.
 - **For S5 (invites):** the sign-up email's link still goes to the site's home page; invites will
   pass the return path through it (`emailRedirectTo` plus `next=` in the email template).
+
+## Follow-ups owed by later steps
+
+- **S2:** `remember_departing_member` decides "a company that isn't theirs" by `companies.created_by_id`;
+  rewrite it for membership (owner role), and replace the companies' account cascade with an
+  explicit "delete companies this person solely owns" step.
+- **S3:** `taskRun` should pass `approved_by_user_id: user.id` when it saves an accepted result (the
+  database lets the server say who approved).
+- **S6:** check `tasks.assignee_user_id` is a member of the task's company before it's used.
+- **Names of people who left** are cleared when a company is deleted (which happens nightly, through
+  the anonymous clean-up), so a name can outlast its last trace by up to a day. If that needs to be
+  tighter, run the same clean-up from a nightly job.
+- **Privacy notice:** say that when someone leaves, their name stays on work they did for a company
+  (decided by, approved by, made by), until that company's data is deleted.
+- **Optional, with the owner's yes:** a read-only count in production of rows whose creator differs
+  from their company's creator (from Base44 imports or admin edits); such rows now outlive the
+  creator's account.
+- **Unrelated, found in review:** `src/components/documents/DocumentManager.jsx:109` writes
+  `"founder"` into a uuid column, so adding a document there fails (main session).
 
 ## Testing locally
 
