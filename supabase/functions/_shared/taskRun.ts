@@ -3,6 +3,7 @@
 // sees it. Draft and Plan for now; Research and Calculate come with web
 // search (Stage 3).
 // deno-lint-ignore-file no-explicit-any
+import { plainMissingInfo } from './resultsStandard.ts';
 
 export const RUNNABLE_TYPES = ['draft', 'plan', 'research', 'calculate'] as const;
 // The two that research the web first (Stage 3), on Opus 5.5.
@@ -121,7 +122,8 @@ export function openQuestions(resolution: any, answers: any = null): { unknown: 
     if (answer && t) { decided.push(`${t} ${answer}.`); settled.add(t); return ''; }
     return q;
   });
-  const unknown = [...asList(r.missing_information), ...questions, ...asList(r.discussion_evaluation?.uncertain_assumptions)]
+  // Older resolutions may carry internal field names: in plain words here.
+  const unknown = [...asList(r.missing_information).map(plainMissingInfo), ...questions, ...asList(r.discussion_evaluation?.uncertain_assumptions)]
     .map((x) => str(text(x), 300)).filter((t) => t && !settled.has(t));
   return { unknown: [...new Set(unknown)].slice(0, 8), decided: decided.slice(0, 4) };
 }

@@ -170,18 +170,29 @@ export function recordPushbackChanges(r: any, transcript: any[]) {
 }
 
 // Missing information in the founder's words (owner, 16 October 2026): the
-// company record's internal field names never show. Where a gap has a place
-// the founder can see and edit, it says where; the others have none yet, so
-// nothing is said.
+// company record's internal field names never show. Where a gap has a page
+// the founder can see and edit, it says where, next to it; the others have
+// none yet, so nothing is said. Older items may be {detail, profile_field}.
 const FIELD_HOME: Record<string, string> = { industry: 'in your company settings under Industry' };
-export function plainMissingInfo(text: unknown): string {
-  let t = String(text ?? '');
-  let home = '';
-  const keyed = (key: string) => { if (!home && FIELD_HOME[key]) home = FIELD_HOME[key]; return ''; };
-  t = t.replace(/\s*[([]\s*profile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?\s*[)\]]/gi, (_m, k) => keyed(k.toLowerCase()));
-  t = t.replace(/\s*\bprofile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?/gi, (_m, k) => keyed(k.toLowerCase()));
-  t = t.replace(/\s*[([]["']?([a-z]+(?:_[a-z]+)+)["']?[)\]]/g, (m, k) => (PROFILE_FIELD_KEYS.includes(k) ? keyed(k) : m));
-  t = t.replace(/\s+([.,;:?!])/g, '$1').replace(/\s{2,}/g, ' ').trim();
-  if (!t) return '';
-  return home ? `${t.replace(/[.?!]$/, '')} (${home})${/[?]$/.test(t) ? '?' : '.'}` : t;
+const PLAIN_FIELD: Record<string, string> = {
+  industry: 'industry', business_model: 'business model', solo_founder: 'whether you work alone', team_size: 'team size',
+  target_customer: 'target customer', primary_market: 'main market', available_capital: 'capital', available_time: 'time',
+  existing_assets: 'assets', immediate_goal: 'immediate goal', confidence_gaps: 'confidence gaps', deadlines: 'deadlines', country: 'country',
+};
+export function plainMissingInfo(item: unknown): string {
+  let t = String(typeof item === 'string' ? item : (item as Any)?.detail ?? '');
+  const home = (key: string) => (FIELD_HOME[key.toLowerCase()] ? ` (${FIELD_HOME[key.toLowerCase()]})` : '');
+  const isKey = (key: string) => PROFILE_FIELD_KEYS.includes(key.toLowerCase());
+  t = t.replace(/\s*[([]\s*profile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?\s*[)\]]/gi, (_m, k) => home(k));
+  t = t.replace(/\s*\bprofile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?/gi, (_m, k) => home(k));
+  t = t.replace(/\s*[([]\s*["']?([A-Za-z_]+)["']?\s*[)\]]/g, (m, k) => (isKey(k) ? home(k) : m));
+  t = t.replace(/\b([A-Za-z]+(?:_[A-Za-z]+)+)\b/g, (m, k) => (isKey(k) ? PLAIN_FIELD[k.toLowerCase()] : m));
+  return t.replace(/\s+([.,;:?!])/g, '$1').replace(/([?!])\./g, '$1').replace(/\s{2,}/g, ' ').trim();
+}
+
+// The company record as the Chair reads it: the gaps the board may ask about,
+// without their internal keys or the instruction to report them by key.
+export function withoutFieldKeys(context: string | null) {
+  if (!context) return context;
+  return context.replace(/ \[profile_field: "[a-z_]+"\]/g, '').replace(/If knowing one of these would materially change your answer[^\n]*\n?/, '');
 }

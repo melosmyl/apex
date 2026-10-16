@@ -3,7 +3,7 @@ import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, resolutionCallFields } from '../_shared/chair.ts';
-import { mergeRepair, normalizeResults, plainMissingInfo, recordPushbackChanges, vagueParts } from '../_shared/resultsStandard.ts';
+import { mergeRepair, normalizeResults, plainMissingInfo, recordPushbackChanges, vagueParts, withoutFieldKeys } from '../_shared/resultsStandard.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 import { chairTags } from '../_shared/turnShape.ts';
@@ -320,13 +320,15 @@ Deno.serve(async (req) => {
     // debater in a converged group, or, with the turn shape on, nobody
     // disagreeing with anyone in the last round.
     const debaterNames = [...new Set(discussionTranscript.filter((m) => m.round > 1 && m.advisor_id && m.message_type !== 'chair_tabling').map((m) => m.advisor_name))];
-    const converged = new Set(convergence.flatMap((c) => c.advisors || []));
+    // Every debater paired with every other (camps or a chain don't count),
+    // or every last-round turn agreeing.
+    const pairs = new Set(convergence.map((c) => [...(c.advisors || [])].sort().join('|')));
+    const allPaired = debaterNames.every((a, i) => debaterNames.slice(i + 1).every((b) => pairs.has([a, b].sort().join('|'))));
     const lastRound = Math.max(0, ...discussionTranscript.map((m) => Number(m.round) || 0));
     const lastTurns = discussionTranscript.filter((m) => m.round === lastRound && m.advisor_id && m.message_type !== 'chair_tabling');
-    const wholeBoardAgreed = debaterNames.length > 1 && (debaterNames.every((n) => converged.has(n))
-      || (lastTurns.length > 1 && lastTurns.every((m) => m.stance && m.stance !== 'disagree')));
+    const wholeBoardAgreed = debaterNames.length > 1 && (allPaired || (lastTurns.length > 1 && lastTurns.every((m) => m.stance === 'agree')));
     if (wholeBoardAgreed) {
-      meetingContext += `\n\n=== THE WHOLE BOARD AGREED ===\nEvery advisor ended up in the same place. As AGREEMENT IS NOT EVIDENCE above says, that is a reason for lower confidence, not a strength: say so in your reasoning and confidence_reason.\n`;
+      meetingContext += `\n\n=== THE WHOLE BOARD AGREED ===\nEvery advisor ended up in the same place. That is a reason for lower confidence, not a strength: say so in your reasoning and confidence_reason.\n`;
     }
     if (convergence.length) {
       meetingContext += `\n\n=== CONVERGED ADVISORS ===\nThese advisors' recommendations genuinely converged during this discussion — present each group's shared recommendation once, attributed to all named, per the CONVERGENCE instruction:\n`;
@@ -336,7 +338,7 @@ Deno.serve(async (req) => {
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
       ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       // The same memory every round worked from (P1); older meetings, the profile.
-      system_instructions: CHAIR_INSTRUCTIONS, company_context: meeting.context_package || profile,
+      system_instructions: CHAIR_INSTRUCTIONS, company_context: withoutFieldKeys(meeting.context_package || profile),
       meeting_context: `${RESOLUTION_RULES}\n\n${discussionTranscript.some((m) => Array.isArray(m?.flags)) ? `${TURN_CHECKS}\n\n` : ''}${meetingContext}`,
       user_question: meeting.question, previous_responses: [],
       output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',

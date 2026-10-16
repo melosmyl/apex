@@ -1,5 +1,5 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { isVague, mergeRepair, normalizeResults, plainMissingInfo, vagueParts } from './resultsStandard.ts';
+import { isVague, mergeRepair, normalizeResults, plainMissingInfo, vagueParts, withoutFieldKeys } from './resultsStandard.ts';
 
 const board = [
   { id: 'c', name: 'Margaret Ashford', role: 'The Chair', library_key: 'chair', type: 'ai', company_id: 'co' },
@@ -172,6 +172,16 @@ Deno.test('missing information never shows internal field names; where a gap has
   assertEquals(plainMissingInfo('How much capital is there (available_capital).'), 'How much capital is there.');
   assertEquals(plainMissingInfo('Who buys the dinner sets now?'), 'Who buys the dinner sets now?');
   assertEquals(plainMissingInfo('(profile_field: deadlines)'), '');
+  assertEquals(plainMissingInfo('What existing_assets do you have?'), 'What assets do you have?');
+  assertEquals(plainMissingInfo('How big is the team (Team_Size)?'), 'How big is the team?');
+  assertEquals(plainMissingInfo('Which sector (industry)? Also the team (team_size).'), 'Which sector (in your company settings under Industry)? Also the team.');
+  assertEquals(plainMissingInfo({ detail: 'Where do you sell? (profile_field: country)', profile_field: 'country' }), 'Where do you sell?');
+  assertEquals(plainMissingInfo('Cash flow (cash_flow) by month'), 'Cash flow (cash_flow) by month');
   // Ordinary words in brackets stay.
   assertEquals(plainMissingInfo('Stall fees (per day) at Spitalfields'), 'Stall fees (per day) at Spitalfields');
+});
+
+Deno.test("the Chair reads the company record without its field keys", () => {
+  const ctx = 'Facts.\nNot yet on file about this company (short by design):\n- what they already have [profile_field: "existing_assets"]\nIf knowing one of these would materially change your answer, ask with the exact profile_field key. Most won\'t be.\nProgress.';
+  assertEquals(withoutFieldKeys(ctx), 'Facts.\nNot yet on file about this company (short by design):\n- what they already have\nProgress.');
 });

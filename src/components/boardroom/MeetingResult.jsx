@@ -257,7 +257,7 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
                   <p className="text-sm">{resolution.minority_opinion}</p>
                 </div>
               )}
-              <List title="Missing information" items={(resolution.missing_information || []).map((it) => plainMissingInfo(typeof it === "string" ? it : it?.detail)).filter(Boolean)} />
+              <List title="Missing information" items={(resolution.missing_information || []).map(plainMissingInfo).filter(Boolean)} />
               {resolution.recommended_experiment && (
                 <div>
                   <h4 className="room-mono mb-2">An experiment worth running</h4>

@@ -17,6 +17,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { plainMissingInfo } from '../_shared/resultsStandard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +35,7 @@ function curateIndependent(r: any) {
     key_arguments: r.key_arguments || [],
     assumptions: r.assumptions || [],
     risks: r.risks || [],
-    missing_information: (r.missing_information || []).map((m: any) => (typeof m === 'string' ? m : m.detail)),
+    missing_information: (r.missing_information || []).map(plainMissingInfo).filter(Boolean),
     confidence_score: r.confidence_score || 0,
     unavailable: !!r.unavailable,
   };
@@ -120,7 +121,7 @@ Deno.serve(async (req: Request) => {
       main_risks: resolution.main_risks || meeting.risks || [],
       minority_opinion: resolution.minority_opinion || meeting.minority_opinion || null,
       assumptions: resolution.assumptions || [],
-      missing_information: (resolution.missing_information || []).map((m: any) => (typeof m === 'string' ? m : m.detail)),
+      missing_information: (resolution.missing_information || []).map(plainMissingInfo).filter(Boolean),
       overall_confidence_score: resolution.overall_confidence_score || meeting.confidence_score || null,
       independent_responses: (meeting.independent_responses || []).map(curateIndependent),
       challenge_responses: (meeting.challenge_responses || []).map(curateChallenge),
