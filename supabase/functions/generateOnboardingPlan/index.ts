@@ -108,9 +108,10 @@ Deno.serve(async (req) => {
           // full onboarding schema 4/4 with "Invalid response format" — a
           // real schema-complexity limit (2 required nested array-of-object
           // fields), not billing. Revisit if the schema is ever simplified.
-          // Every seat on Claude, GPT-4o as backup (owner, 16 October 2026).
-          default_provider: 'anthropic', default_model: 'claude-sonnet-5-5',
-          fallback_provider: 'openai', fallback_model: 'gpt-4o',
+          // This is the onboarding plan's writer, not an advisor's seat: it
+          // stays on GPT-4o when every seat moved to Claude (16 October 2026).
+          default_provider: 'openai', default_model: 'gpt-4o',
+          fallback_provider: 'anthropic', fallback_model: 'claude-sonnet-5',
           temperature: 0.7,
         },
         user_id: user.id,

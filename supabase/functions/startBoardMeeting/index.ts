@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { callAdvisorWithRetry } from '../_shared/advisorCall.ts';
 import { embedText } from '../_shared/embeddings.ts';
 import { distinctRoundOne } from '../_shared/roundOne.ts';
 import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
@@ -277,15 +278,10 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
   }
 }
 
-async function callAdvisor(supabaseUrl, serviceKey, payload) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `routeAdvisorRequest failed (${res.status})`);
-  return data;
+// One advisor's call: tried once more if it fails without being refused,
+// and logged here if it never reached the model (_shared/advisorCall.ts).
+function callAdvisor(supabaseUrl, serviceKey, payload, opts: any = {}) {
+  return callAdvisorWithRetry(supabaseUrl, serviceKey, payload, opts);
 }
 
 // The free meeting, enforced here rather than trusted to the browser: an
@@ -374,7 +370,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
   // than waiting for the slowest advisor. Saves run one after another (no
   // write overtakes another) and only while the meeting is still forming.
   // While the meeting forms they're kept in arrival order.
-  const formatIndependent = (r: { advisor: any; data?: any; error?: string }) => {
+  const formatIndependent = (r: { advisor: any; data?: any; error?: string; reason?: string }) => {
     const d = r.data;
     if (r.error || !d?.response) {
       return {
@@ -383,6 +379,8 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
         position: 'This advisor was temporarily unavailable.', recommendation: 'No recommendation available.',
         key_arguments: [], assumptions: [], risks: [], missing_information: [], suggested_actions: [], confidence_score: 0,
         unavailable: true,
+        // Why, so a silent advisor can be traced.
+        ...(r.reason || r.error ? { unavailable_reason: String(r.reason || r.error).slice(0, 300) } : {}),
       };
     }
     const resp = d.response;
@@ -428,8 +426,9 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
         user_question: question, previous_responses: [], output_schema: meeting.turn_shape ? INDEPENDENT_SCHEMA_SHAPED : INDEPENDENT_SCHEMA,
         temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
         personal_details: true, // nothing said yet in this meeting
-      }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }))
-        .then((r: { advisor: any; data?: any; error?: string }) => {
+      }, { db, provider: advisor.default_provider, model: advisor.default_model })
+        .then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message, reason: err.reason }))
+        .then((r: { advisor: any; data?: any; error?: string; reason?: string }) => {
           arrived.push(formatIndependent(r));
           saveProgress({ independent_responses: [...arrived] });
         })
@@ -464,7 +463,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
       company_context: roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage,
       meeting_context: note, user_question: question, previous_responses: [], output_schema: meeting.turn_shape ? INDEPENDENT_SCHEMA_SHAPED : INDEPENDENT_SCHEMA,
       temperature: advisor.temperature, request_type: 'independent_redo', deadline_at: deadlineAt, personal_details: true,
-    }).then(data => formatIndependent({ advisor, data })).catch(() => null),
+    }, { db, provider: advisor.default_provider, model: advisor.default_model }).then(data => formatIndependent({ advisor, data })).catch(() => null),
   });
 
   // Asked for the decision while Round 1 ran: no stop after it.

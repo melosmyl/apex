@@ -75,7 +75,7 @@ const r3 = await fn('runChairSynthesis', { meeting_id: s3.json?.meeting_id });
 check(r3.json?.status === 'complete', 'the built-in Chair writes the resolution');
 const u3 = await usage(s3.json?.meeting_id);
 const chairCalls = u3.filter((u: any) => u.request_type === 'chair_opening' || u.request_type === 'chair_synthesis');
-check(chairCalls.length === 2 && chairCalls.every((u: any) => u.advisor_id === null && u.model === 'claude-sonnet-5'), 'opening and resolution come from the built-in Chair, on Claude', chairCalls);
+check(chairCalls.length === 2 && chairCalls.every((u: any) => u.advisor_id === null && u.model === 'claude-sonnet-5-5'), 'opening and resolution come from the built-in Chair, on Claude', chairCalls);
 
 // ---- 4. A meeting started before the change still holds her Round 1 answer.
 console.log('\n== meeting already in progress');

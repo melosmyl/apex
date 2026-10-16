@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { callAdvisorWithRetry } from '../_shared/advisorCall.ts';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { DISCUSSION_SCHEMA } from '../_shared/answerSchemas.ts';
@@ -239,15 +240,10 @@ function buildDiscussionContext(advisor, transcript, round, maxRounds, isLastRou
   return context;
 }
 
-async function callAdvisor(supabaseUrl, serviceKey, payload) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `routeAdvisorRequest failed (${res.status})`);
-  return data;
+// One advisor's call: tried once more if it fails without being refused,
+// and logged here if it never reached the model (_shared/advisorCall.ts).
+function callAdvisor(supabaseUrl, serviceKey, payload, opts: any = {}) {
+  return callAdvisorWithRetry(supabaseUrl, serviceKey, payload, opts);
 }
 
 // A note to the board, put to the board by the Chair in one sentence (owner,
@@ -283,7 +279,7 @@ const TABLED_SCHEMA = {
 
 // One discussion round: every advisor answers, in parallel, with the
 // discussion so far. Returns the round's messages (failed advisors dropped).
-async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, facts = '', independentResponses, roundDeadline, founderNotes = [], challenger = null }: any) {
+async function runOneRound({ db = null, supabaseUrl, serviceKey, meeting, user, meetingAdvisors, transcript, round, maxRounds, isLastRound, convergencePairs, profile, facts = '', independentResponses, roundDeadline, founderNotes = [], challenger = null }: any) {
   // The turn shape (Workstream I), when the meeting has it on: "who I'm
   // answering" can only name someone in this meeting. Otherwise today's turn.
   const shaped = !!meeting.turn_shape;
@@ -304,7 +300,7 @@ async function runOneRound({ supabaseUrl, serviceKey, meeting, user, meetingAdvi
       temperature: advisor.temperature, request_type: requestType, deadline_at: roundDeadline,
       // Their book, hobby or place stay on offer until they've used one.
       personal_details: !usedPersonalDetail(advisor, ownWords(advisor, independentResponses, transcript)),
-    }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message }));
+    }, { db, provider: advisor.default_provider, model: advisor.default_model }).then(data => ({ advisor, data })).catch(err => ({ advisor, error: err.message, reason: err.reason }));
   };
   const roundResults = await Promise.all(meetingAdvisors.map((advisor) => ask(advisor)));
 
@@ -484,7 +480,7 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
         message_type: 'chair_tabling', tabled_note_id: n.id,
       }] : [])]);
       const roundMessages = round > maxRounds ? [] : await runOneRound({
-        supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
+        db, supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
         isLastRound, convergencePairs, independentResponses: d.independentResponses,
         // Every round works from the same memory as Round 1, not just the profile.
         profile: meeting.context_package || d.profile, facts: d.profile,
@@ -610,7 +606,7 @@ Deno.serve(async (req) => {
       const isLastRound = round === maxRounds || timeLeft - roundShare < MIN_ROUND_MS;
 
       const roundMessages = await runOneRound({
-        supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
+        db, supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
         isLastRound, convergencePairs, profile: d.profile, facts: d.profile, independentResponses: d.independentResponses, roundDeadline,
       });
 
