@@ -59,7 +59,7 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
   // Notes no round has answered yet: at the last stop, carrying on gives
   // them one more round (while extra rounds are left).
   const heard = new Set((row?.discussion_transcript || []).map((x) => x.note_id).filter(Boolean));
-  const unheard = (row?.founder_notes || []).filter((n) => !heard.has(n.id));
+  const unheard = (row?.founder_notes || []).filter((n) => !heard.has(n.id) && !n.withdrawn_at && !n.before_meeting);
 
   // The whole page keeps room at the bottom for the bar (and the keyboard
   // under it), so everything, footer included, can scroll above it.
@@ -93,12 +93,13 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
   };
 
   // Where a note goes from here, in plain words.
-  const whereItGoes = (lastRoundDone || lastRoundRunning) && !roundsLeft ? "It goes to the Chair for the decision."
+  const whereItGoes = status === "preparing" ? "It goes to the board at the first stop."
+    : (lastRoundDone || lastRoundRunning) && !roundsLeft ? "It goes to the Chair for the decision."
     : row?.turn_shape && unheard.length ? "One note goes into each round: this one waits for the round after your earlier note."
     : !(lastRoundDone || lastRoundRunning) ? "The board answers it first in the next round."
     : lastRoundDone ? `The board answers it in one more round (about ${formatCost(EXTRA_ROUND_USD)}).`
     : `This is the board's last planned round. When it stops, carry on and they answer it in one more round (about ${formatCost(EXTRA_ROUND_USD)}).`;
-  const notes = row?.founder_notes || [];
+  const notes = (row?.founder_notes || []).filter((n) => !n.before_meeting);
 
   // Rendered on the page body: the meeting's own containers animate in with
   // a transform, which would otherwise pin a "fixed" bar to them instead of
@@ -121,14 +122,25 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
             : null}
         </div>
 
+        {status === "preparing" && (
+          <p className="mb-2 text-sm text-muted-foreground">Round 1 is blind: each advisor answers alone. Your note goes to the board at the first stop.</p>
+        )}
+
         {notes.length > 0 && (
           <ul className="mb-2 max-h-20 space-y-1 overflow-y-auto text-sm">
             {notes.map((n) => {
               const s = noteStatus(n, row);
               return (
-                <li key={n.id} className="flex flex-wrap gap-x-2">
-                  <span className="min-w-0 flex-1 truncate">"{n.text}"{n.to_name ? ` (to ${firstName(n.to_name)})` : ""}</span>
+                <li key={n.id} className="flex flex-wrap items-baseline gap-x-2">
+                  <span className={`min-w-0 flex-1 truncate ${n.withdrawn_at ? "text-muted-foreground line-through" : ""}`}>"{n.text}"{n.to_name ? ` (to ${firstName(n.to_name)})` : ""}</span>
                   <span className="room-mono text-muted-foreground">{s.label}</span>
+                  {/* Not heard yet: it can be taken back, and never reaches the board. */}
+                  {!s.done && !chairBusy && (
+                    <button type="button" className="border-b border-foreground text-xs disabled:opacity-50" disabled={!!busy}
+                      onClick={() => run("withdraw", { note_id: n.id })}>
+                      {busy === "withdraw" ? "Withdrawing…" : "Withdraw"}
+                    </button>
+                  )}
                 </li>
               );
             })}

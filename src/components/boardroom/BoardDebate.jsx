@@ -11,9 +11,9 @@ import MeetingResult from "@/components/boardroom/MeetingResult";
 import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
 import OpenDoor from "@/components/boardroom/live/OpenDoor";
-import PaceChoice, { turnShapeAsked, usePaceOffered } from "@/components/boardroom/PaceChoice";
+import PaceChoice, { BeforeNote, turnShapeAsked, usePaceOffered } from "@/components/boardroom/PaceChoice";
 import { usePin } from "@/components/pins/PinContext";
-import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
+import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, beforeMeetingNote, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
 import { useAdvisorProfile } from "@/components/advisors/AdvisorProfilePanel";
 import { useAssistant } from "@/lib/AssistantContext";
@@ -51,7 +51,7 @@ function toRoundOneMessages(responses = []) {
 
 
 
-export default function BoardDebate({ company, companyId, advisors, initialQuestion, initialPace, initialSelectedIds, onSelectionChange, loadedMeeting, autoStart, onResult, onResultShown, routeFromNoteId, freeAttemptId }) {
+export default function BoardDebate({ company, companyId, advisors, initialQuestion, initialPace, initialBefore, initialSelectedIds, onSelectionChange, loadedMeeting, autoStart, onResult, onResultShown, routeFromNoteId, freeAttemptId }) {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState(null);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -91,6 +91,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const [maxRounds, setMaxRounds] = useState(3);
   const paceOffered = usePaceOffered();
   const [pace, setPace] = useState(initialPace || "quick");
+  const [beforeNote, setBeforeNote] = useState(initialBefore || "");
   // The meeting row as last seen, for the open door: notes, extra rounds,
   // whether the board is waiting for the founder.
   const [liveRow, setLiveRow] = useState(resuming ? loadedMeeting : null);
@@ -296,6 +297,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         // Visitors on the free meeting always get Quick.
         pace: !freeAttemptId ? pace : "quick",
         turnShape: !freeAttemptId && turnShapeAsked(),
+        beforeNote: !freeAttemptId && paceOffered ? beforeNote : "",
       });
       // The Assistant routed this question in from a captured note — the
       // note only learns its meeting_id now that a real meeting exists.
@@ -410,6 +412,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         onOpenProfile={openProfile}
         maxRounds={Number.isInteger(liveRow?.rounds_target) ? liveRow.rounds_target : maxRounds}
         onPin={pinTurn}
+        before={beforeMeetingNote(liveRow)}
         onFinished={finishPlayback}
         waitingForYou={!!liveRow?.waiting_for_founder}
       />
@@ -447,6 +450,7 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
                 <button key={p} onClick={() => setQuestion(p)} className="text-xs text-left text-muted-foreground bg-secondary hover:bg-accent rounded-2xl px-3 py-1.5 transition-colors">{p}</button>
               ))}
             </div>
+            {paceOffered && !freeAttemptId && <BeforeNote value={beforeNote} onChange={setBeforeNote} className="mt-4" />}
             {paceOffered && !freeAttemptId && <PaceChoice pace={pace} onChange={setPace} className="mt-4" />}
             <Button onClick={start} disabled={!question.trim() || !debaterCountOk} variant="primary" className="w-full mt-4 h-11">
               <Landmark className="w-4 h-4" /> Convene the board

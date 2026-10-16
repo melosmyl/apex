@@ -17,7 +17,7 @@ const whenFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long"
 
 export default function LiveMeeting({
   phase, question, startedAt, chair, debaters, seatAssignment, transcript, chairOpening, advisors,
-  maxRounds = MAX_ROUNDS, onOpenProfile, onPin, onFinished, waitingForYou = false,
+  maxRounds = MAX_ROUNDS, onOpenProfile, onPin, onFinished, waitingForYou = false, before = null,
 }) {
   // The opening plays first. Round 1 answers that arrive before it wait up
   // to a few seconds for it, then play anyway (an opening that fails never
@@ -195,6 +195,7 @@ export default function LiveMeeting({
         missed={missed}
         onPin={onPin}
         onOpen={open}
+        before={before}
       />
     </div>
   );

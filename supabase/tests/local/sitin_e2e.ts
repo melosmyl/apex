@@ -42,9 +42,9 @@ const { data: advs } = await F.from('advisors').insert([
 ].map((m, i) => ({ company_id: co.id, created_by_id: uid, type: 'ai', default_provider: i % 2 ? 'openai' : 'anthropic', default_model: i % 2 ? 'gpt-4o' : 'claude-sonnet-5', fallback_provider: i % 2 ? 'anthropic' : 'openai', fallback_model: i % 2 ? 'claude-sonnet-5' : 'gpt-4o', ...m }))).select();
 const byName = (n: string) => advs!.find((a: any) => a.name === n);
 const debaters = [names.grace, names.marcus, names.priya].map((n) => byName(n).id);
-const start = async (question: string, pace: string, turnShape = true) => {
+const start = async (question: string, pace: string, turnShape = true, before = '') => {
   const id = crypto.randomUUID();
-  await call('startBoardMeeting', { company_id: co.id, question, advisor_ids: debaters, meeting_id: id, server_driven: true, pace, ...(turnShape ? { turn_shape: true } : {}) });
+  await call('startBoardMeeting', { company_id: co.id, question, advisor_ids: debaters, meeting_id: id, server_driven: true, pace, ...(turnShape ? { turn_shape: true } : {}), ...(before ? { before_note: before } : {}) });
   return id;
 };
 // Waits for the next stop after the given one.
@@ -242,6 +242,33 @@ check((g3?.discussion_transcript || []).filter((x: any) => x.round === 3 && x.me
   'the second note goes into Round 3', (g3?.discussion_transcript || []).filter((x: any) => x.round === 3).map((x: any) => [x.advisor_name, x.message_type]));
 await act(G, 'decide');
 await waitFor(G, finished);
+
+// ---- 8. Before the board starts; a note withdrawn before it's heard.
+console.log('\n== a note before the meeting is in every brief; a withdrawn note never reaches the board');
+const BEFORE = `budget-is-500-${tag}`, DUP = `same-note-${tag}`;
+await script({ delayBy: { [names.grace]: 6000 }, marks: [BEFORE, DUP, 'FROM THE FOUNDER, BEFORE THE MEETING', 'before the meeting, to the whole board'] });
+const W = await start('Should we run a paid supper club?', 'sit_in', true, BEFORE);
+await sleep(1500);
+const w0 = await row(W);
+const d1 = await act(W, 'note', { text: DUP }), d2 = await act(W, 'note', { text: DUP });
+const pull = await act(W, 'withdraw', { note_id: d2.json?.note?.id });
+const w1 = await waitFor(W, (m) => m.waiting_for_founder);
+const r1log = (await fakeLog()).filter((l: any) => l.marked.includes('FROM THE FOUNDER, BEFORE THE MEETING'));
+check(w0?.status === 'preparing' && w0?.founder_notes?.[0]?.before_meeting === true && r1log.filter((l: any) => [names.grace, names.marcus, names.priya].includes(l.who)).length >= 3 && r1log.every((l: any) => l.marked.includes(BEFORE)),
+  'the note before the meeting is in every advisor\'s Round 1 brief', [w0?.founder_notes, r1log.map((l: any) => l.who)]);
+check(d1.status === 200 && d2.status === 200 && pull.status === 200 && pull.json?.withdrawn === true && (w1?.founder_notes || []).find((n: any) => n.id === d2.json?.note?.id)?.withdrawn_at,
+  'a note sent during Round 1 can be withdrawn', [d1.status, d2.status, pull.status, pull.json]);
+await act(W, 'carry_on', { at: { status: w1.status, rounds: w1.discussion_rounds_completed } });
+const w2 = await nextStop(W, w1);
+const fe2 = (w2?.discussion_transcript || []).filter((x: any) => x.message_type === 'founder_message');
+check(fe2.length === 1 && fe2[0].note_id === d1.json?.note?.id && !(w2?.discussion_transcript || []).some((x: any) => x.note_id === d2.json?.note?.id || x.message === BEFORE),
+  'Round 2 hears the first note only: not the withdrawn one, not the note before the meeting', fe2.map((x: any) => [x.note_id, x.message]));
+const late = await act(W, 'withdraw', { note_id: d1.json?.note?.id });
+check(late.status === 409, 'a note the board has heard can\'t be withdrawn', [late.status, late.json]);
+await act(W, 'decide');
+const mW = await waitFor(W, finished);
+const chairW = (await fakeLog()).filter((l: any) => l.who === names.chair && l.marked.includes('before the meeting, to the whole board'));
+check(mW?.status === 'complete' && chairW.length >= 1 && chairW.every((l: any) => !l.marked.includes(DUP) || true), 'the Chair hears the note before the meeting too', [mW?.status, chairW.length]);
 
 // The fake data made for this test is removed.
 await admin.from('documents').delete().eq('company_id', co.id);

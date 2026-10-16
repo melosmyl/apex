@@ -7,7 +7,7 @@ import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.t
 import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, INDEPENDENT_SCHEMA_SHAPED, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
-import { STEP_STALE_MS, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
+import { NOTE_LIMIT, STEP_STALE_MS, beforeMeetingSection, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -497,8 +497,9 @@ async function retryRoundOne(db, supabaseUrl, serviceKey, meetingId) {
   const chair = findChair(advisors);
   const chosen = new Set(m.participant_advisor_ids || []);
   const selectedAdvisors: any[] = withoutChair((advisors || []).filter(a => chosen.has(a.id) && a.type !== 'human'), chair);
-  const contextPackage = buildContext(company, documents, recalled.decisions, meetings, projects, commitments, progression, limitsList?.[0]?.max_context_size || 8000);
-  const roundOneContext = buildContext(company, documents, recalled.decisions, meetings, projects, [], progression, limitsList?.[0]?.max_context_size || 8000);
+  const before = beforeMeetingSection(m.founder_notes);
+  const contextPackage = buildContext(company, documents, recalled.decisions, meetings, projects, commitments, progression, limitsList?.[0]?.max_context_size || 8000) + before;
+  const roundOneContext = buildContext(company, documents, recalled.decisions, meetings, projects, [], progression, limitsList?.[0]?.max_context_size || 8000) + before;
   await db.from('board_meetings').update({ context_package: contextPackage }).eq('id', m.id);
   later(runRoundOne({
     db, supabaseUrl, serviceKey, meeting: claimed, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments,
@@ -536,7 +537,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await authClient.auth.getUser();
     if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
 
-    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId, server_driven, await_humans, pace, turn_shape } = body;
+    const { company_id, question, advisor_ids, attempt_id, meeting_id: requestedId, server_driven, await_humans, pace, turn_shape, before_note } = body;
     // The browser may choose the new meeting's id, so its live view can follow
     // exactly this meeting while Round 1 forms. Only a well-formed UUID is
     // accepted; a clash with an existing row simply fails the insert.
@@ -580,10 +581,19 @@ Deno.serve(async (req) => {
       if (denied) return Response.json({ error: denied }, { status: 403, headers: corsHeaders });
     }
 
-    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000);
+    // "Before the board starts" (owner, 16 October 2026): facts or
+    // constraints for every advisor's brief before Round 1, kept as a note
+    // given before the meeting. A signed-in founder's, on a meeting the
+    // server runs.
+    const beforeText = typeof before_note === 'string' ? before_note.trim() : '';
+    if (beforeText.length > NOTE_LIMIT) return Response.json({ error: `Keep it under ${NOTE_LIMIT} characters.` }, { status: 400, headers: corsHeaders });
+    const beforeNotes = beforeText && !user.is_anonymous && server_driven === true
+      ? [{ id: crypto.randomUUID(), text: beforeText, before_meeting: true, to_advisor_id: null, to_name: null, at: new Date().toISOString() }] : [];
+    const before = beforeMeetingSection(beforeNotes);
+    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000) + before;
     // Round 1's shared part: everything but the commitments, which each
     // advisor gets only for their own.
-    const roundOneContext = buildContext(company, documents, decisions, meetings, projects, [], progression, limits.max_context_size || 8000);
+    const roundOneContext = buildContext(company, documents, decisions, meetings, projects, [], progression, limits.max_context_size || 8000) + before;
     const memoryContext = buildMemoryContext(recalled, decisions, commitments);
 
     // A meeting the server runs (P0) moves on by itself; one started by an
@@ -606,6 +616,7 @@ Deno.serve(async (req) => {
         // switch is on for everyone, or the page asks for it (?turnShape=1)
         // for a signed-in founder. Otherwise today's turns.
         turn_shape: !user.is_anonymous && (limits.turn_shape === true || turn_shape === true),
+        ...(beforeNotes.length ? { founder_notes: beforeNotes } : {}),
       } : {}),
     }).select().single();
     if (createErr) throw createErr;

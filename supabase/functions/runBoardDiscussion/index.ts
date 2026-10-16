@@ -448,8 +448,11 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
     .eq('id', meeting.id).eq('step_attempts', meeting.step_attempts || 0).eq('awaiting_human_input', false)
     .or(`status.eq.independent_complete,and(status.eq.discussing,step_claimed_at.is.null),and(status.eq.discussing,step_claimed_at.lt.${staleBefore})`);
   claim = meeting.discussion_rounds_completed == null ? claim.is('discussion_rounds_completed', null) : claim.eq('discussion_rounds_completed', meeting.discussion_rounds_completed);
-  const { data: claimed } = await claim.select('id');
+  const { data: claimed } = await claim.select('id, founder_notes');
   if (!claimed?.length) return { started: false };
+  // The notes as they were when this round took the step: one withdrawn
+  // just before is left out.
+  meeting = { ...meeting, founder_notes: claimed[0].founder_notes };
 
   later((async () => {
     const startedAt = Date.now();

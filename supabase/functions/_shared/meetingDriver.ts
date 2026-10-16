@@ -122,10 +122,29 @@ export const MAX_NOTES = 6;
 export const NOTE_LIMIT = 2000;
 export const MAX_EXTRA_ROUNDS = 2;
 // The founder's notes no round has taken in yet (a note is taken when it
-// appears in the transcript, by id).
+// appears in the transcript, by id). A withdrawn note never is, and a note
+// given before the meeting is in every advisor's brief already.
 export function unusedNotes(m: any) {
   const used = new Set((m?.discussion_transcript || []).map((x: any) => x.note_id).filter(Boolean));
-  return (m?.founder_notes || []).filter((n: any) => !used.has(n.id));
+  return (m?.founder_notes || []).filter((n: any) => !used.has(n.id) && !n.withdrawn_at && !n.before_meeting);
+}
+
+// The note(s) the round now being written took when it started: the unheard
+// notes sent before its claim (one, with the turn shape on). Those can't be
+// withdrawn any more.
+export function notesInRunningRound(m: any) {
+  if (m?.status !== 'discussing' || !m.step_claimed_at) return [];
+  const claimed = new Date(m.step_claimed_at).getTime();
+  const taken = unusedNotes(m).filter((n: any) => new Date(n.at).getTime() < claimed);
+  return m.turn_shape ? taken.slice(0, 1) : taken;
+}
+
+// What the founder told the board before it started (the Boardroom's
+// "Before the board starts"), for every advisor's brief.
+export function beforeMeetingSection(notes: any[] = []) {
+  const before = (notes || []).filter((n: any) => n?.before_meeting && !n.withdrawn_at && String(n.text || '').trim());
+  if (!before.length) return '';
+  return `\nFROM THE FOUNDER, BEFORE THE MEETING (facts and constraints they want every advisor to have from the start):\n${before.map((n: any) => `- "${String(n.text).slice(0, 2000)}"`).join('\n')}\nA fact they state about their own business is a fact: use it. A preference is their view: weigh it, and say so if you disagree.\n`;
 }
 
 // How many rounds this meeting runs to: the usual, or the target the

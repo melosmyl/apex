@@ -58,7 +58,7 @@ Deno.test("the sweep's thresholds match the cron job's filter in the migration",
 });
 
 // ---- P1: the founder in the room
-import { challengerFor, nextTarget, roundsFor, unusedNotes } from './meetingDriver.ts';
+import { beforeMeetingSection, challengerFor, nextTarget, notesInRunningRound, roundsFor, unusedNotes } from './meetingDriver.ts';
 
 
 
@@ -136,4 +136,21 @@ Deno.test("the cron job never calls the sweep for a meeting at a stop, and count
   const job = sql.slice(sql.indexOf("'meeting-run-sweep'"));
   assertEquals((job.match(/\(not waiting_for_founder or decide_now\)/g) || []).length, 3);
   assert(job.includes("updated_at > now() - interval '1 day'") && !job.includes("created_at > now()"));
+});
+
+Deno.test("a withdrawn note and the note before the meeting never go into a round", () => {
+  const notes = [
+    { id: 'b', text: 'Budget is 500', before_meeting: true, at: ago(9 * 60_000) },
+    { id: 'n1', text: 'first', at: ago(5 * 60_000) },
+    { id: 'n2', text: 'again', at: ago(4 * 60_000), withdrawn_at: ago(3 * 60_000) },
+    { id: 'n3', text: 'later', at: ago(10_000) },
+  ];
+  assertEquals(unusedNotes({ founder_notes: notes, discussion_transcript: [] }).map((n: any) => n.id), ['n1', 'n3']);
+  // The round written now took what was sent before it started: one with the turn shape on.
+  const running = { status: 'discussing', step_claimed_at: ago(60_000), founder_notes: notes, discussion_transcript: [], turn_shape: true };
+  assertEquals(notesInRunningRound(running).map((n: any) => n.id), ['n1']);
+  assertEquals(notesInRunningRound({ ...running, status: 'independent_complete', step_claimed_at: null }), []);
+  const brief = beforeMeetingSection(notes);
+  assert(brief.includes('FROM THE FOUNDER, BEFORE THE MEETING') && brief.includes('Budget is 500') && !brief.includes('first'));
+  assertEquals(beforeMeetingSection([{ ...notes[0], withdrawn_at: ago(1) }]), '');
 });

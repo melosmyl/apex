@@ -309,10 +309,11 @@ Deno.serve(async (req) => {
     // said after the last round (it reached no advisor, so it comes here).
     // Read as the claim saw it: a note can land between the first read and
     // the claim, and none can after it.
-    const founderNotes = (claimed?.[0]?.founder_notes || meeting.founder_notes || []).slice(0, 10);
+    // A withdrawn note never reaches the Chair (owner, 16 October 2026).
+    const founderNotes = (claimed?.[0]?.founder_notes || meeting.founder_notes || []).filter((n) => !n?.withdrawn_at).slice(0, 10);
     if (founderNotes.length) {
       meetingContext = `=== WHAT THE FOUNDER SAID IN THIS MEETING (company record) ===\n${founderNotes.map(n =>
-        `- "${String(n.text).slice(0, 2000)}"${n.to_name ? ` (to ${String(n.to_name).slice(0, 100)})` : ''}`).join('\n')}\n\n${meetingContext}`;
+        `- "${String(n.text).slice(0, 2000)}"${n.before_meeting ? ' (before the meeting, to the whole board)' : n.to_name ? ` (to ${String(n.to_name).slice(0, 100)})` : ''}`).join('\n')}\n\n${meetingContext}`;
     }
 
     const convergence = meeting.convergence || [];

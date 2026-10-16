@@ -126,13 +126,15 @@ export function isRunningOnServer(m) {
 
 // Starts a meeting the server runs to the end (P0). It answers at once;
 // Round 1 and everything after happen on the server.
-export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId, awaitHumans = false, pace = "quick", turnShape = false }) {
+export async function startMeeting({ companyId, question, advisorIds, freeAttemptId, meetingId, awaitHumans = false, pace = "quick", turnShape = false, beforeNote = "" }) {
   try {
     const res = await base44.functions.invoke("startBoardMeeting", {
       company_id: companyId, question, advisor_ids: advisorIds,
       server_driven: true, await_humans: awaitHumans, pace,
       // The turn shape, asked for by the owner's switch (?turnShape=1).
       ...(turnShape ? { turn_shape: true } : {}),
+      // "Before the board starts": in every advisor's brief before Round 1.
+      ...(beforeNote.trim() ? { before_note: beforeNote.trim() } : {}),
       // Chosen here so the live view can follow exactly this meeting while
       // Round 1 forms, before the call returns.
       ...(meetingId ? { meeting_id: meetingId } : {}),
@@ -177,6 +179,9 @@ export const MAX_EXTRA_ROUNDS = 2;
 export function noteStatus(note, m) {
   const heard = (m?.discussion_transcript || []).find((x) => x.note_id === note.id);
   if (heard) return { label: `Heard in Round ${heard.round}`, done: true };
+  if (note.withdrawn_at) return { label: "Withdrawn", done: true };
+  // Round 1 is blind: a note sent while it's written goes in at the first stop.
+  if (m?.status === "preparing") return { label: "Goes to the board at the first stop", done: false };
   if (m?.decide_now || m?.status === "synthesizing") return { label: "Goes to the Chair", done: false };
   // With the turn shape on, one note goes into each round: a later one waits
   // (while rounds are still to come).
@@ -223,4 +228,9 @@ export async function runFounderFollowup(meetingId, founderMessage) {
   } catch (e) {
     throw new Error(meetingErrorMessage(e, "Your board couldn't answer just now. Please try again in a moment."));
   }
+}
+// What the founder told the board before it started ("Before the board
+// starts"), shown at the top of the minutes and the full record.
+export function beforeMeetingNote(m) {
+  return (m?.founder_notes || []).find((n) => n?.before_meeting && !n.withdrawn_at && n.text) || null;
 }

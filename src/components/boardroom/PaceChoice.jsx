@@ -73,3 +73,23 @@ export default function PaceChoice({ pace, onChange, className = "" }) {
     </fieldset>
   );
 }
+
+// "Before the board starts" (owner, 16 October 2026): facts or constraints
+// every advisor should have before Round 1, which is blind.
+export function BeforeNote({ value, onChange, className = "" }) {
+  return (
+    <div className={className}>
+      <label htmlFor="before-the-board" className="mb-1 block text-sm font-medium">Before the board starts <span className="font-normal text-muted-foreground">(optional)</span></label>
+      <textarea
+        id="before-the-board"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={2}
+        maxLength={2000}
+        placeholder="Facts or limits every advisor should know first, like a budget, a date or what you've already tried."
+        className="block w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm"
+      />
+      <p className="mt-1 text-xs text-muted-foreground">Each advisor gets this before Round 1, which they answer alone.</p>
+    </div>
+  );
+}

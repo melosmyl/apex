@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { MAX_DEBATERS, MIN_DEBATERS, MAX_AI_ADVISORS, MEETING_HINT, suggestedQuestionsFor } from "@/lib/boardroom";
 import BoardTable from "@/components/boardroom/BoardTable";
 import LastMeetingStrip from "@/components/boardroom/LastMeetingStrip";
-import PaceChoice, { usePaceOffered } from "@/components/boardroom/PaceChoice";
+import PaceChoice, { BeforeNote, usePaceOffered } from "@/components/boardroom/PaceChoice";
 
 // The Boardroom's front page (Workstream L, from the boardroom mock): who's
 // at the table, with attending/benched on each seat; the question box with
@@ -28,6 +28,7 @@ export default function BoardroomHome({ company, companyId, advisors, attendingI
   const [showOtherModes, setShowOtherModes] = useState(false);
   const paceOffered = usePaceOffered();
   const [pace, setPace] = useState("quick");
+  const [beforeNote, setBeforeNote] = useState("");
 
   // Resurfacing's real trigger point: this is where a founder actually
   // composes their question in the normal flow (BoardDebate's own idle
@@ -56,7 +57,7 @@ export default function BoardroomHome({ company, companyId, advisors, attendingI
 
   const submit = () => {
     if (!question.trim() || !enough) return;
-    onStartDebate(question, attendingIds, paceOffered ? pace : "quick");
+    onStartDebate(question, attendingIds, paceOffered ? pace : "quick", paceOffered ? beforeNote : "");
   };
 
   return (
@@ -87,7 +88,8 @@ export default function BoardroomHome({ company, companyId, advisors, attendingI
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
             }}
           />
-          {paceOffered && <PaceChoice pace={pace} onChange={setPace} className="mt-2 border-t border-border pt-3" />}
+          {paceOffered && <BeforeNote value={beforeNote} onChange={setBeforeNote} className="mt-2 border-t border-border pt-3" />}
+          {paceOffered && <PaceChoice pace={pace} onChange={setPace} className="mt-3" />}
           <div className="mt-2 flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm text-muted-foreground">
               {enough ? (paceOffered && pace === "sit_in" ? SIT_IN_HINT : MEETING_HINT) : aiOthers.length < MIN_DEBATERS ? (

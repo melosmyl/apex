@@ -10,12 +10,13 @@
 //   carry_on (the founder)    Sit in: the board may go on to the next step
 //   decide   (the founder)    no more rounds: the Chair resolves now
 //   more     (the founder)    one more round, up to two (not on a free meeting)
+//   withdraw (the founder)    a note the board hasn't heard yet never reaches it
 //   sweep    (service role)   pg_cron, every minute: meetings nobody moved on
 //                             and steps that stalled
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, accessErrorResponse, checkUserLimit } from '../_shared/access.ts';
-import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, callAsServer, isServiceCall, later, needsSweep, nextStep, nextTarget, unusedNotes } from '../_shared/meetingDriver.ts';
+import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, callAsServer, isServiceCall, later, needsSweep, nextStep, nextTarget, notesInRunningRound, unusedNotes } from '../_shared/meetingDriver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -177,7 +178,7 @@ Deno.serve(async (req) => {
       const { data: added, error } = await db.rpc('append_founder_note', { p_meeting_id: meeting.id, p_note: note, p_max: MAX_NOTES });
       if (error) throw error;
       if (!added) {
-        const full = (meeting.founder_notes || []).length >= MAX_NOTES;
+        const full = (meeting.founder_notes || []).filter((n: any) => !n.withdrawn_at && !n.before_meeting).length >= MAX_NOTES;
         return json({ error: full ? `You can add up to ${MAX_NOTES} notes in one meeting.` : 'The Chair is already writing up. Ask the board after the resolution.' }, 409);
       }
       // Otherwise, and in a Quick meeting, a note after the last round goes
@@ -188,6 +189,23 @@ Deno.serve(async (req) => {
       }
       await release(db, meeting.id);
       return json({ note, step: await advance(db, meeting.id), to_chair: meeting.status === 'discussion_complete' });
+    }
+    if (action === 'withdraw') {
+      // A note the board hasn't heard (owner, 16 October 2026): withdrawn, it
+      // never reaches the board, the Chair or a new round. Only while nothing
+      // has taken it: not once heard, not while the round now being written
+      // has it, not once the Chair is writing.
+      const id = typeof body.note_id === 'string' ? body.note_id : '';
+      const note = (meeting.founder_notes || []).find((n: any) => n.id === id && !n.before_meeting);
+      if (!note) return json({ error: "That note isn't in this meeting." }, 404);
+      if (note.withdrawn_at) return json({ withdrawn: true });
+      if ((meeting.discussion_transcript || []).some((e: any) => e.note_id === id)) return json({ error: 'The board has already heard it.' }, 409);
+      if (!open) return json({ error: meeting.status === 'synthesizing' ? 'The Chair already has it.' : 'This meeting has finished.' }, 409);
+      if (notesInRunningRound(meeting).some((n: any) => n.id === id)) return json({ error: 'The board is hearing it in the round being written now.' }, 409);
+      const { data: done, error } = await db.rpc('withdraw_founder_note', { p_meeting_id: meeting.id, p_note_id: id, p_status: meeting.status, p_claimed_at: meeting.step_claimed_at });
+      if (error) throw error;
+      if (!done) return json({ error: 'The meeting moved on just then. Please try again.' }, 409);
+      return json({ withdrawn: true });
     }
     if (action === 'carry_on') {
       // A note that arrived while the last round was being written hasn't

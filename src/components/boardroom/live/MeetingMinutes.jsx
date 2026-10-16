@@ -73,7 +73,7 @@ function Say({ children, tone = "plain" }) {
   );
 }
 
-export default function MeetingMinutes({ items, revealed, thinking = [], chairWriting = null, advisorsByName = {}, participants = [], missed = [], onPin, onOpen }) {
+export default function MeetingMinutes({ items, revealed, thinking = [], chairWriting = null, advisorsByName = {}, participants = [], missed = [], onPin, onOpen, before = null }) {
   const shown = items.slice(0, revealed);
   const counts = countsFor(shown, participants);
   // Where each round's last shown turn is, so a note about who missed that
@@ -88,6 +88,16 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
           {counts.challenges} {counts.challenges === 1 ? "challenge" : "challenges"} · {counts.changed} changed {counts.changed === 1 ? "position" : "positions"}
         </span>
       </div>
+
+      {before && (
+        <article className="grid grid-cols-[52px_minmax(0,1fr)] items-start gap-4 border-t border-border py-4">
+          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border-2 border-foreground font-display text-sm" aria-hidden="true">You</span>
+          <div className="min-w-0">
+            <span className="mb-1.5 block font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">From the founder, before the meeting</span>
+            <p className="whitespace-pre-line leading-relaxed">{before.text}</p>
+          </div>
+        </article>
+      )}
 
       {shown.map((m, i) => {
         // What the founder said during the meeting (P1): theirs, in the record.

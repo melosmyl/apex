@@ -16,6 +16,7 @@ import { base44 } from "@/api/base44Client";
 import { toast } from "@/components/ui/use-toast";
 import { SITE_URL } from "@/lib/branding";
 import { actionsHeading, plainMissingInfo, resultSections } from "@/lib/meetingResult";
+import { beforeMeetingNote } from "@/lib/boardroom";
 import TaskDesk from "@/components/tasks/TaskDesk";
 import { useTaskRuns } from "@/lib/taskRuns";
 import { formatCost } from "@/lib/money";
@@ -274,6 +275,12 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
             <BoardMemoryNote memoryContext={result.memory_context} companyId={companyId} />
             <BoardUncertaintyNote resolution={resolution} />
 
+            {beforeMeetingNote(result) && (
+              <div>
+                <h4 className="room-mono mb-2">From the founder, before the meeting</h4>
+                <p className="whitespace-pre-line text-sm">{beforeMeetingNote(result).text}</p>
+              </div>
+            )}
             <ExecutiveDiscussion transcript={result.discussion_transcript || []} evaluation={resolution.discussion_evaluation} advisors={advisors} meetingId={meetingId} companyId={companyId} meetingTitle={meetingTitle} />
 
             {independent.length > 0 && (
