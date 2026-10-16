@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { callAdvisorWithRetry } from '../_shared/advisorCall.ts';
 import { requireOwnedRow, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS, MAX_FOLLOWUPS_PER_MEETING } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { FOLLOWUP_SCHEMA } from '../_shared/answerSchemas.ts';
@@ -67,15 +68,11 @@ function buildFollowupContext(founderMessage, transcript, originalQuestion, meet
   return context;
 }
 
-async function callAdvisor(supabaseUrl, serviceKey, payload) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `routeAdvisorRequest failed (${res.status})`);
-  return data;
+// One call to an advisor or the Chair: tried once more if it never reached
+// the model (_shared/advisorCall.ts), so a hiccup between our functions
+// doesn't lose the answer.
+function callAdvisor(supabaseUrl, serviceKey, payload, opts: any = {}) {
+  return callAdvisorWithRetry(supabaseUrl, serviceKey, payload, opts);
 }
 
 Deno.serve(async (req) => {

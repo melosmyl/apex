@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { callAdvisorWithRetry } from '../_shared/advisorCall.ts';
 import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
@@ -190,16 +191,11 @@ async function foundersFacts(supabaseUrl, serviceKey, notes, { company_id, meeti
     .map((f) => String(f).trim()).filter(Boolean).slice(0, 10).map((f) => f.slice(0, 500));
 }
 
-async function callAdvisor(supabaseUrl, serviceKey, payload) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  // The reason travels with the error, so the founder is told the right thing.
-  if (!res.ok) throw Object.assign(new Error(data.error || `routeAdvisorRequest failed (${res.status})`), { reason: data.reason || '' });
-  return data;
+// One call to an advisor or the Chair: tried once more if it never reached
+// the model (_shared/advisorCall.ts), so a hiccup between our functions
+// doesn't lose the answer.
+function callAdvisor(supabaseUrl, serviceKey, payload, opts: any = {}) {
+  return callAdvisorWithRetry(supabaseUrl, serviceKey, payload, opts);
 }
 
 Deno.serve(async (req) => {

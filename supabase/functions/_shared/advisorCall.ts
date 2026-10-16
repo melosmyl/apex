@@ -2,11 +2,14 @@
 // advisor doesn't go silent on a meeting because of a hiccup between our own
 // functions (owner, 16 October 2026: two turns lost, no trace of either).
 //
-// - A failure that isn't a refusal (a gateway or worker error, an answer that
-//   isn't JSON, a dropped connection, the provider failing on both models) is
-//   tried once more after a short pause, while there's time in the step.
-// - A failure that never reached the model is logged here, as routeAdvisorRequest
-//   couldn't log it, so the provider alert and the record see it.
+// - A call that never reached the model (a gateway or worker error, an
+//   answer that isn't JSON, a dropped connection) is tried once more after a
+//   short pause, while there's time in the step. One that reached the model
+//   and failed there has already had its own retries and backup model, so it
+//   isn't paid for again.
+// - A call that never reached the model is logged here (routeAdvisorRequest
+//   couldn't), as an internal failure: the record shows it, and the provider
+//   alert doesn't blame Claude or OpenAI for it.
 // - The error carries why, for the caller to keep.
 // deno-lint-ignore-file no-explicit-any
 import { insertUsageLog } from './llmCall.ts';
@@ -26,13 +29,15 @@ export class AdvisorCallError extends Error {
 
 type Attempt = { ok: true; data: any } | { ok: false; status: number; reason: string; logged: boolean };
 
-async function once(url: string, serviceKey: string, payload: any, fetchImpl: typeof fetch): Promise<Attempt> {
+async function once(url: string, serviceKey: string, payload: any, fetchImpl: typeof fetch, timeoutMs: number | null): Promise<Attempt> {
   let res: Response;
   try {
     res = await fetchImpl(`${url}/functions/v1/routeAdvisorRequest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
       body: JSON.stringify(payload),
+      // A hung gateway can't outlast the step.
+      ...(timeoutMs != null ? { signal: AbortSignal.timeout(Math.max(5_000, timeoutMs)) } : {}),
     });
   } catch (e) {
     return { ok: false, status: 0, reason: `the call didn't connect: ${(e as Error).message}`, logged: false };
@@ -60,20 +65,22 @@ export async function callAdvisorWithRetry(
   let last: Attempt | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (attempt > 0) await sleep(RETRY_PAUSE_MS);
-    const r = await once(supabaseUrl, serviceKey, payload, fetchImpl);
+    const r = await once(supabaseUrl, serviceKey, payload, fetchImpl, until != null ? until - now() + 10_000 : null);
     if (r.ok) return { ...r.data, ...(attempt > 0 ? { retried: true } : {}) };
     last = r;
-    if (!r.logged && db) {
+    // Reached the model and failed there (already retried and backed up),
+    // or refused: no second try.
+    if (r.logged || refusal(r.status)) break;
+    if (db) {
       await insertUsageLog(db, {
         user_id: payload.user_id || null, company_id: payload.company_id || null, meeting_id: payload.meeting_id || null,
-        advisor_id: payload.advisor_id || null, provider: provider || 'unknown', model: model || 'unknown',
+        advisor_id: payload.advisor_id || null, provider: 'internal', model: model || 'unknown',
         request_type: payload.request_type || 'unknown', input_size: 0, output_size: 0, thinking_size: 0, estimated_cost: 0,
-        latency_ms: 0, status: 'error', error_code: `call failed before reaching the model: ${r.reason}`,
-        attempts: [{ provider: provider || 'unknown', model: model || 'unknown', outcome: 'api_error', error: `before reaching the model: ${r.reason}` }],
+        latency_ms: 0, status: 'error', error_code: `call failed before reaching the model (${provider || 'unknown'} advisor): ${r.reason}`,
+        attempts: [{ provider: 'internal', model: model || 'unknown', outcome: 'caller_error', error: 'the call never reached the model' }],
         anonymous: payload.anonymous === true,
       }).catch(() => {});
     }
-    if (refusal(r.status)) break;
     if (until != null && until - now() < RETRY_NEEDS_MS) break;
   }
   const f = last as Extract<Attempt, { ok: false }>;
