@@ -47,8 +47,8 @@ export default function ExecutiveTeam() {
       strengths: lib.strengths, weaknesses: lib.weaknesses, blind_spots: lib.weaknesses, expertise: lib.expertise,
       personality_traits: lib.personality_traits, accent: lib.accent, ...characterFields(lib),
       system_instructions: config.system_instructions,
-      default_provider: config.default_provider || "openai", default_model: config.default_model || "gpt-4o",
-      fallback_provider: config.fallback_provider, fallback_model: config.fallback_model,
+      default_provider: config.default_provider || "anthropic", default_model: config.default_model || "claude-sonnet-5-5",
+      fallback_provider: config.fallback_provider || "openai", fallback_model: config.fallback_model || "gpt-4o",
       temperature: config.temperature ?? 0.7, maximum_output_length: config.maximum_output_length ?? 2000,
       is_premium: config.is_premium || false, is_active: true, version: 1,
     });
