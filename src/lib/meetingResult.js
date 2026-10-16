@@ -14,6 +14,24 @@ export const CALLS = [
   { value: "reject", label: "Reject" },
 ];
 
+// Each call's reason box (owner, 16 October 2026: a reason for all three).
+export const CALL_REASON = {
+  accept: "Why? (optional)",
+  modify: "What would you change?",
+  reject: "Why not? (optional)",
+};
+
+// A Decision Centre record follows the founder's call on the meeting: the
+// call is the one record of what was decided. No call: still open.
+const CALL_WORDS = /^(Accepted|Modified|Rejected) the board's recommendation/;
+export function decisionFromCall(call, notes) {
+  const reason = String(notes || "").trim();
+  if (call === "accept") return { status: "decided", decision_taken: `Accepted the board's recommendation${reason ? `: ${reason}` : ""}` };
+  if (call === "modify") return { status: "decided", decision_taken: `Modified the board's recommendation${reason ? `: ${reason}` : ""}` };
+  if (call === "reject") return { status: "decided", decision_taken: `Rejected the board's recommendation${reason ? `: ${reason}` : ""}` };
+  return { status: "pending", decision_taken: null };
+}
+
 export const ANSWERS = [
   { value: "yes", label: "Yes" },
   { value: "no", label: "No" },
@@ -66,4 +84,15 @@ export function plainMissingInfo(item) {
   t = t.replace(/\s*[([]\s*["']?([A-Za-z_]+)["']?\s*[)\]]/g, (m, k) => (isKey(k) ? home(k) : m));
   t = t.replace(/\b([A-Za-z]+(?:_[A-Za-z]+)+)\b/g, (m, k) => (isKey(k) ? PLAIN_FIELD[k.toLowerCase()] : m));
   return t.replace(/\s+([.,;:?!])/g, "$1").replace(/([?!])\./g, "$1").replace(/\s{2,}/g, " ").trim();
+}
+
+// The change to one Decision Centre record when the call changes: the
+// founder's own words there are kept (only text this page wrote is
+// replaced), and a reviewed record stays reviewed.
+export function decisionPatch(record, call, notes) {
+  const own = !!String(record?.decision_taken || "").trim() && !CALL_WORDS.test(record.decision_taken);
+  const next = decisionFromCall(call, notes);
+  if (call) return { status: record?.status === "reviewed" ? "reviewed" : "decided", ...(own ? {} : { decision_taken: next.decision_taken }) };
+  if (own || record?.status === "reviewed") return null;
+  return next;
 }

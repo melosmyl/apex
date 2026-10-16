@@ -7,6 +7,7 @@ import {
   TrendingUp, CircleDot
 } from "lucide-react";
 import OpenCommitmentsWidget from "@/components/dashboard/OpenCommitmentsWidget";
+import OpenCallsWidget from "@/components/dashboard/OpenCallsWidget";
 import ProgressionTree from "@/components/dashboard/ProgressionTree";
 
 export default function Dashboard() {
@@ -17,13 +18,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     (async () => {
-      const [decisions, tasks, docs, meetings] = await Promise.all([
+      const [decisions, tasks, docs, meetings, records] = await Promise.all([
         base44.entities.Decision.filter({ company_id: companyId }, "-created_date", 5),
         base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200),
         base44.entities.Document.filter({ company_id: companyId }, "-created_date", 200),
         base44.entities.BoardMeeting.filter({ company_id: companyId }, "-created_date", 200),
+        // Calls made in the Decision Centre count as made.
+        base44.entities.Decision.filter({ company_id: companyId }, "-created_date", 200),
       ]);
-      setData({ decisions, tasks, docs, meetings });
+      setData({ decisions, tasks, docs, meetings, records });
     })();
   }, [companyId]);
 
@@ -154,6 +157,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <OpenCallsWidget meetings={allMeetings} records={data?.records || []} companyId={companyId} />
       <OpenCommitmentsWidget tasks={allTasks} meetings={allMeetings} companyId={companyId} />
 
       {/* The Progression Tree — replaces MilestoneTracker (self-reported)

@@ -12,6 +12,7 @@ import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
 import OpenDoor from "@/components/boardroom/live/OpenDoor";
 import PaceChoice, { BeforeNote, turnShapeAsked, usePaceOffered } from "@/components/boardroom/PaceChoice";
+import { decisionFromCall } from "@/lib/meetingResult";
 import { usePin } from "@/components/pins/PinContext";
 import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, beforeMeetingNote, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
@@ -335,6 +336,9 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
   const resultMeetingId = result?.meeting_id || result?.id;
 
   const recordDecision = async () => {
+    // The call as saved now (made on this page after the result loaded).
+    const row = await base44.entities.BoardMeeting.get(resultMeetingId).catch(() => null);
+    const call = ["accept", "modify", "reject"].includes(row?.founder_decision) ? row.founder_decision : null;
     const d = await base44.entities.Decision.create({
       company_id: companyId, meeting_id: resultMeetingId, question,
       participants: result?.independent_responses?.map((r) => r.advisor_name) || [],
@@ -342,7 +346,8 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
       final_recommendation: result?.board_resolution?.recommended_direction,
       risks: result?.board_resolution?.main_risks || [],
       confidence_level: result?.board_resolution?.overall_confidence_score,
-      status: "pending",
+      // It follows the founder's call on the meeting: still open until made.
+      ...decisionFromCall(call, row?.founder_decision_notes),
     });
     embedDecisionInBackground(d.id);
     navigate(`/company/${companyId}/decisions?id=${d.id}`);

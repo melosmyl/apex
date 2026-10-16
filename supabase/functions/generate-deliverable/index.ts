@@ -8,6 +8,7 @@ import { buildFinancialModelWorkbook, runExcelQualityChecks } from '../_shared/b
 import { buildPdfReport } from '../_shared/buildPdfReport.ts';
 import { buildDocxReport, runDocxQualityChecks } from '../_shared/buildDocxReport.ts';
 import { buildPptxDeck, runPptxQualityChecks } from '../_shared/buildPptxDeck.ts';
+import { callLine, withCalls } from '../_shared/founderCalls.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,7 +89,9 @@ function buildCompanyContext(company, decisions, projects, knowledgeDocs) {
   if (company.priorities?.length) ctx += `Strategic priorities: ${company.priorities.join(', ')}\n`;
   if (decisions?.length) {
     ctx += `\nRecent decisions:\n`;
-    decisions.slice(0, 5).forEach((d) => { ctx += `- ${d.question}: ${d.final_recommendation || d.summary || 'N/A'}\n`; });
+    // Each with the founder's call: a recommendation they haven't acted on
+    // isn't a decision (owner, 16 October 2026).
+    decisions.slice(0, 5).forEach((d) => { ctx += `- ${d.question}: ${callLine(d)} Recommended: ${String(d.final_recommendation || d.summary || 'N/A').slice(0, 400)}\n`; });
   }
   if (projects?.length) {
     ctx += `\nActive projects:\n`;
@@ -148,7 +151,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'company_id and document_type are required' }, { status: 400, headers: corsHeaders });
 
     // Load context
-    const [company, task, advisor, decisions, projects, knowledgeDocs] = await Promise.all([
+    const [company, task, advisor, decisionRows, projects, knowledgeDocs] = await Promise.all([
       db.from('companies').select('*').eq('id', company_id).single().then((r) => r.data),
       task_id ? db.from('tasks').select('*').eq('id', task_id).single().then((r) => r.data) : Promise.resolve(null),
       advisor_id ? db.from('advisors').select('*').eq('id', advisor_id).single().then((r) => r.data) : Promise.resolve(null),
@@ -158,6 +161,7 @@ Deno.serve(async (req) => {
     ]);
 
     if (!company) return Response.json({ error: 'Company not found' }, { status: 404, headers: corsHeaders });
+    const decisions = (await withCalls(db, user.id, { decisions: decisionRows })).decisions;
 
     // Spec generation runs through an advisor persona; fall back to any AI
     // advisor on the company when the deliverable was not assigned to one.

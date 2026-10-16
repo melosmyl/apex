@@ -7,6 +7,7 @@ import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.t
 import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, INDEPENDENT_SCHEMA_SHAPED, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
+import { callOf, openCallsForOpening, openCallsSentence, pastMeetingsSection, pastResolutionsSection, withCalls } from '../_shared/founderCalls.ts';
 import { NOTE_LIMIT, STEP_STALE_MS, beforeMeetingSection, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 
 const corsHeaders = {
@@ -84,22 +85,10 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
     if (progression.next.length) ctx += `Next up: ${progression.next.join(', ')}\n`;
     ctx += `Reference it explicitly if directly relevant to this question — e.g. this question depends on something not yet unlocked, or the answer should build on something they just achieved. Don't force it in if it isn't relevant — most questions won't touch it.\n`;
   }
-  if (decisions?.length) {
-    ctx += `\nPast decisions related to this question (most relevant first):\n`;
-    decisions.slice(0, 5).forEach(d => {
-      const when = d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'date unknown';
-      ctx += `- [${when}] ${d.question}: ${d.final_recommendation || d.summary || 'N/A'}\n`;
-    });
-    ctx += `MEMORY PRINCIPLE — this is mandatory, not optional:\n`;
-    ctx += `- You MUST state explicitly whether your recommendation is consistent with these past decisions or departs from them.\n`;
-    ctx += `- If it departs, say so directly, name the decision, and explain what has changed to justify reversing it. A board that quietly contradicts its own past decisions is worse than useless.\n`;
-    ctx += `- If it is consistent, say which decision it builds on.\n`;
-    ctx += `- If none of them genuinely bear on this question, say that explicitly rather than staying silent.\n`;
-  }
-  if (meetings?.length) {
-    ctx += `\nPrevious Board Meetings:\n`;
-    meetings.slice(0, 3).forEach(m => { ctx += `- Q: ${m.question} -> ${m.recommendation || m.executive_summary || 'N/A'}\n`; });
-  }
+  // Past resolutions and meetings, each with the founder's call: a
+  // recommendation they haven't acted on is never a decision.
+  ctx += pastResolutionsSection(decisions);
+  ctx += pastMeetingsSection(meetings);
   if (projects?.length) {
     ctx += `\nActive Projects:\n`;
     projects.slice(0, 5).forEach(p => { ctx += `- ${p.name} (${p.status}): ${p.description || ''}\n`; });
@@ -133,6 +122,13 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
 // cannot be embedded or nothing clears the similarity floor, so a board meeting
 // never fails because memory is unavailable.
 async function recallRelatedDecisions(db, companyId, ownerId, question) {
+  const recalled = await recallDecisionRows(db, companyId, ownerId, question);
+  // Each with its meeting's call, which is the record of what was decided.
+  recalled.decisions = (await withCalls(db, ownerId, { decisions: recalled.decisions })).decisions;
+  return recalled;
+}
+
+async function recallDecisionRows(db, companyId, ownerId, question) {
   let recencyFallback = [];
   try {
     const { data } = await db.from('decisions').select('*')
@@ -151,10 +147,12 @@ async function recallRelatedDecisions(db, companyId, ownerId, question) {
     // match_decisions searches by company only; keep the owner's own rows.
     const ownIds = new Set();
     if (matches?.length) {
-      const { data: owned } = await db.from('decisions').select('id')
+      // With what the match leaves out: the meeting it came from and its state.
+      const { data: owned } = await db.from('decisions').select('id, meeting_id, status, decision_taken')
         .in('id', matches.map((m) => m.id)).eq('created_by_id', ownerId);
+      const ownById = new Map((owned || []).map((o) => [o.id, o]));
       for (const o of owned || []) ownIds.add(o.id);
-      const mine = matches.filter((m) => ownIds.has(m.id));
+      const mine = matches.filter((m) => ownIds.has(m.id)).map((m) => ({ ...m, ...ownById.get(m.id) }));
       if (mine.length) return { decisions: mine, retrieval: 'relevance' };
     }
   } catch (e) {
@@ -209,7 +207,7 @@ function firstMeetingWelcomePrompt(company, newQuestion, debaterNames) {
   return prompt;
 }
 
-async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, companyId, userId, anonymous, meetingId, newQuestion, previousMeeting, debaterNames, deadlineAt }) {
+async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, companyId, userId, anonymous, meetingId, newQuestion, previousMeeting, openMeetings = [], debaterNames, deadlineAt }) {
   const completedTasks = previousMeeting ? await loadRecentlyCompletedTasks(db, companyId, userId, previousMeeting.created_at) : [];
 
   let prompt;
@@ -218,12 +216,17 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
   } else {
     prompt = `You are opening this board meeting for ${company.name}, before the founder's actual question is addressed.\n\n`;
     prompt += `IMPORTANT: today's question is "${newQuestion}" — do NOT discuss, answer, or reference it. That is the rest of the board's job, not yours here. Your only job is a brief status check on what has happened since the last meeting.\n\n`;
-    prompt += `Last meeting's question was: "${previousMeeting.question}" (already resolved — do not re-litigate it, only reference what came after it).\n`;
+    const lastCall = callOf(previousMeeting);
+    prompt += `Last meeting's question was: "${previousMeeting.question}" (do not re-litigate it, only reference what came after it).\n`;
     const lastDirection = previousMeeting.board_resolution?.recommended_direction || previousMeeting.recommendation;
-    if (lastDirection) prompt += `What the board resolved then: "${String(lastDirection).slice(0, 1500)}". If you mention it, describe it accurately; never restate it as something else.\n`;
-    if (previousMeeting.founder_decision && previousMeeting.founder_decision !== 'undecided') {
-      prompt += `The founder's response to that resolution: ${previousMeeting.founder_decision}${previousMeeting.founder_decision_notes ? ` — "${previousMeeting.founder_decision_notes}"` : ''}\n`;
+    if (lastDirection) prompt += `What the board recommended then: "${String(lastDirection).slice(0, 1500)}". If you mention it, describe it accurately as a recommendation; never restate it as something else.\n`;
+    if (lastCall.state !== 'open') {
+      prompt += `The founder's call on it: ${lastCall.state}${lastCall.reason ? ` — "${lastCall.reason}"` : ''}\n`;
+    } else {
+      prompt += `The founder hasn't decided on it yet: it is open, not a resolution that stands.\n`;
     }
+    // Older calls still open (the last meeting's is above).
+    prompt += openCallsForOpening(openMeetings.filter((m) => m.id !== previousMeeting.id));
     if (completedTasks.length) {
       prompt += `\nCompleted since then:\n`;
       completedTasks.forEach(t => { prompt += `- ${t.title}\n`; });
@@ -231,7 +234,7 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
     } else {
       prompt += `\nNothing has been marked done since then — a short, honest "quiet since we last met" is fine. Do not invent progress that didn't happen.\n`;
     }
-    prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question. Never chase, never ask about outstanding or overdue items — that is handled elsewhere now; this is acknowledgment only.`;
+    prompt += `\nKeep the whole thing to 2-4 sentences, your own voice as Chair, no filler, and no mention of today's actual question. Name any call the founder hasn't made yet as open, in one plain line. Otherwise never chase, never ask about outstanding or overdue items — that is handled elsewhere now; this is acknowledgment only.`;
     prompt += `\n${OPENING_WORDING}`;
   }
 
@@ -262,13 +265,15 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
       const namedAll = !!stated && completedTasks.every(t => stated.includes(t.title));
       if (!namedAll) {
         console.error('Chair opening fell back to templated recap: model did not name every completed item verbatim.');
-        return templatedCompletedRecap(completedTasks);
+        // The open calls are named in the fallback too.
+        return templatedCompletedRecap(completedTasks) + openCallsSentence(openMeetings);
       }
     }
     return stated;
   } catch (e) {
     console.error('Chair opening failed, falling back to templated recap if there is work to name:', e.message);
-    return completedTasks.length ? templatedCompletedRecap(completedTasks) : null;
+    const open = openCallsSentence(openMeetings).trim();
+    return completedTasks.length ? templatedCompletedRecap(completedTasks) + openCallsSentence(openMeetings) : open || null;
   }
 }
 
@@ -329,7 +334,10 @@ async function gather(db, userId, companyId, question): Promise<any> {
   const { data: toldBoard } = await db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
     .eq('category', 'What you told the board').or('status.is.null,status.not.in.(archived,superseded)')
     .order('created_at', { ascending: false }).limit(5);
-  return { documents: [...(toldBoard || []), ...(documents || [])], meetings, projects, advisors, recalled, commitments, progression };
+  // Each past meeting with a call made in the Decision Centre, if that's
+  // where the founder made it.
+  const withRecords = (await withCalls(db, userId, { meetings: meetings || [] })).meetings;
+  return { documents: [...(toldBoard || []), ...(documents || [])], meetings: withRecords, projects, advisors, recalled, commitments, progression };
 }
 
 // What the board is drawing on, recorded so the founder can see it later.
@@ -340,6 +348,8 @@ function buildMemoryContext(recalled, decisions, commitments) {
       id: d.id,
       question: d.question,
       decided_at: d.created_at,
+      // The founder's call: accept, modify, reject, decided, or open.
+      state: callOf(d).state,
       similarity: d.similarity ?? null,
     })),
     open_commitments: (commitments || []).map(c => ({
@@ -353,7 +363,7 @@ function buildMemoryContext(recalled, decisions, commitments) {
 
 // Round 1: every advisor answers on their own, in parallel, and the Chair
 // opens. Ends with the meeting at independent_complete.
-async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments, previousMeeting, startedAt }: any) {
+async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments, previousMeeting, openMeetings = [], startedAt }: any) {
   const company_id = meeting.company_id;
   const question = meeting.question;
   // Model calls end in time for this function to save their answers.
@@ -426,7 +436,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
     )),
     buildChairOpening({
       supabaseUrl, serviceKey, db, chair, company, companyId: company_id, userId: user.id, anonymous: !!user.is_anonymous,
-      meetingId: meeting.id, newQuestion: question, previousMeeting, debaterNames: selectedAdvisors.map(a => a.name), deadlineAt,
+      meetingId: meeting.id, newQuestion: question, previousMeeting, openMeetings, debaterNames: selectedAdvisors.map(a => a.name), deadlineAt,
     }).then((opening) => {
       if (opening) saveProgress({ chair_opening: opening });
       return opening;
@@ -503,7 +513,7 @@ async function retryRoundOne(db, supabaseUrl, serviceKey, meetingId) {
   await db.from('board_meetings').update({ context_package: contextPackage }).eq('id', m.id);
   later(runRoundOne({
     db, supabaseUrl, serviceKey, meeting: claimed, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments,
-    previousMeeting: meetings?.[0] || null, startedAt: Date.now(),
+    previousMeeting: meetings?.[0] || null, openMeetings: meetings || [], startedAt: Date.now(),
   }).then(() => handOver(m.id)), 'Round 1 retry');
   return { started: true };
 }
@@ -624,7 +634,7 @@ Deno.serve(async (req) => {
     // The last meeting that actually reached a resolution: an abandoned,
     // failed or superseded one never happened as far as the Chair knows.
     const previousMeeting = meetings?.[0] || null;
-    const roundOne = { db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments, previousMeeting };
+    const roundOne = { db, supabaseUrl, serviceKey, meeting, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments, previousMeeting, openMeetings: meetings || [] };
 
     if (serverRun) {
       // Round 1 runs after this answers, so a closed tab doesn't stop it;

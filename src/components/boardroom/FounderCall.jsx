@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { base44, supabase } from "@/api/base44Client";
 import { toast } from "@/components/ui/use-toast";
-import { ANSWERS, CALLS } from "@/lib/meetingResult";
+import { ANSWERS, CALLS, CALL_REASON, decisionPatch } from "@/lib/meetingResult";
 
 // The founder's side of the results page (M1): their call on the verdict,
 // and their answers to the decisions only they can make. Both save the
@@ -36,10 +36,15 @@ function Choice({ options, value, onChange, label }) {
 
 const saveFailed = () => toast({ title: "Couldn't save that", description: "Check your connection and try again." });
 
+// The call has three states (owner, 16 October 2026): none yet (still open),
+// or accept, modify or reject, each with an optional reason. The meeting
+// holds it; a Decision Centre record for the meeting follows it.
 export function YourCall({ meetingId, initialCall, initialNotes }) {
-  const [call, setCall] = useState(["accept", "modify", "reject"].includes(initialCall) ? initialCall : null);
-  const [notes, setNotes] = useState(initialCall === "modify" ? initialNotes || "" : "");
-  const savedNotes = useRef(initialCall === "modify" ? initialNotes || "" : "");
+  const known = ["accept", "modify", "reject"].includes(initialCall) ? initialCall : null;
+  const [call, setCall] = useState(known);
+  const [notes, setNotes] = useState(known ? initialNotes || "" : "");
+  const savedNotes = useRef(known ? initialNotes || "" : "");
+  const current = useRef({ call: known, notes: known ? initialNotes || "" : "" });
   // Saves go out one at a time, in the order chosen.
   const queue = useRef(Promise.resolve());
 
@@ -49,28 +54,50 @@ export function YourCall({ meetingId, initialCall, initialNotes }) {
     const row = await base44.entities.BoardMeeting.get(meetingId).catch(() => null);
     if (!row) return;
     const stored = ["accept", "modify", "reject"].includes(row.founder_decision) ? row.founder_decision : null;
-    const storedNotes = stored === "modify" ? row.founder_decision_notes || "" : "";
+    const storedNotes = stored ? row.founder_decision_notes || "" : "";
     setCall(stored);
     setNotes(storedNotes);
     savedNotes.current = storedNotes;
+    current.current = { call: stored, notes: storedNotes };
   };
 
+  // Any Decision Centre record for this meeting follows the call. A failure
+  // there is said on its own: the call itself saved.
+  const syncRecords = async () => {
+    const { data: records, error } = await supabase.from("decisions").select("id, status, decision_taken").eq("meeting_id", meetingId);
+    let failed = !!error;
+    for (const r of records || []) {
+      const patch = decisionPatch(r, current.current.call, current.current.notes);
+      if (!patch) continue;
+      const { error: e } = await supabase.from("decisions").update(patch).eq("id", r.id);
+      if (e) failed = true;
+    }
+    if (failed) toast({ title: "Your call is saved", description: "The Decision Centre didn't update just now. It will next time you change your call." });
+  };
+
+  // The meeting first, then any Decision Centre record for it.
   const save = (patch) => {
-    queue.current = queue.current.then(() => base44.entities.BoardMeeting.update(meetingId, patch)).catch(reload);
+    queue.current = queue.current
+      .then(() => base44.entities.BoardMeeting.update(meetingId, patch))
+      .then(syncRecords, reload)
+      .catch(() => toast({ title: "Your call is saved", description: "The Decision Centre didn't update just now. It will next time you change your call." }));
   };
 
   const choose = (next) => {
     setCall(next);
-    // A note belongs to "Modify": choosing anything else clears it, so the
-    // next meeting isn't told "accept" with an old modification attached.
-    const patch = { founder_decision: next || "undecided" };
-    if (next !== "modify") { patch.founder_decision_notes = null; setNotes(""); savedNotes.current = ""; }
+    // A reason belongs to the call it was given for: a new call starts
+    // without one, so the next meeting isn't told "accept" with an old
+    // reason for rejecting attached.
+    const patch = { founder_decision: next || "undecided", founder_decision_notes: null };
+    setNotes(""); savedNotes.current = "";
+    current.current = { call: next, notes: "" };
     save(patch);
   };
 
   const saveNotes = () => {
     if (notes === savedNotes.current) return;
     savedNotes.current = notes;
+    current.current = { ...current.current, notes: notes.slice(0, 2000) };
     save({ founder_decision_notes: notes.slice(0, 2000) });
   };
 
@@ -79,7 +106,7 @@ export function YourCall({ meetingId, initialCall, initialNotes }) {
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <span className="room-mono shrink-0">Your call</span>
       <Choice options={CALLS} value={call} onChange={choose} label="Your call on the verdict" />
-      {call === "modify" && (
+      {call && (
         <input
           type="text"
           value={notes}
@@ -87,8 +114,8 @@ export function YourCall({ meetingId, initialCall, initialNotes }) {
           onBlur={saveNotes}
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
           maxLength={2000}
-          placeholder="What would you change?"
-          aria-label="What you would change"
+          placeholder={CALL_REASON[call]}
+          aria-label={call === "modify" ? "What you would change" : call === "accept" ? "Why you accept" : "Why you reject"}
           className="min-w-0 flex-1 border-b border-foreground bg-transparent py-1 text-sm outline-none placeholder:italic placeholder:text-muted-foreground"
         />
       )}

@@ -36,7 +36,13 @@ export default function BoardMemoryNote({ memoryContext, companyId }) {
               <li key={d.id} className="text-sm flex gap-2">
                 <span className="text-muted-foreground">—</span>
                 <span>
-                  your {formatDate(d.decided_at)} decision on “{d.question}”
+                  {/* Only the founder's call is a decision (owner, 16 October
+                      2026); older notes don't say, so they stay neutral. */}
+                  {["accept", "modify", "reject", "decided"].includes(d.state)
+                    ? <>your {formatDate(d.decided_at)} decision on “{d.question}”</>
+                    : d.state === "open"
+                      ? <>the board's {formatDate(d.decided_at)} recommendation on “{d.question}” <span className="text-muted-foreground">(you haven't decided)</span></>
+                      : <>the board's {formatDate(d.decided_at)} resolution on “{d.question}”</>}
                 </span>
               </li>
             ))}
