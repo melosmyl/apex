@@ -57,6 +57,16 @@ function AdvisorCard({ resp, challenge }) {
 }
 
 function TranscriptEntry({ msg }) {
+  if (msg.unavailable) {
+    return (
+      <div className="flex gap-3">
+        <div className="shrink-0 pt-0.5"><AdvisorAvatar name={msg.advisor_name} size="sm" /></div>
+        <p className="flex-1 min-w-0 text-sm italic text-muted-foreground pt-0.5">
+          {msg.advisor_name} gave no view this round{msg.unavailable_reason ? `: ${msg.unavailable_reason}` : ''}. The board continued without them.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="flex gap-3">
       <div className="shrink-0 pt-0.5"><AdvisorAvatar name={msg.advisor_name} size="sm" /></div>

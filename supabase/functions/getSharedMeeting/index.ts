@@ -62,6 +62,8 @@ function curateTranscriptEntry(m: any) {
     changed_opinion: !!m.changed_opinion,
     new_position: m.new_position || null,
     confidence_score: m.confidence_score,
+    // A missing turn says why, in plain words (never the technical detail).
+    ...(m.unavailable ? { unavailable: true, unavailable_reason: m.unavailable_reason || null } : {}),
   };
 }
 

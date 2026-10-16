@@ -52,3 +52,18 @@ Deno.test('a dropped connection is tried again', async () => {
   const data = await callAdvisorWithRetry('http://x', 'k', payload, opts(s));
   assertEquals([data.response.message, s.rows[0].error_code.includes("didn't connect")], ['back', true]);
 });
+
+Deno.test('a missing turn says why in plain words, the same on the page as on the server', async () => {
+  const { plainUnavailableReason, PLAIN_UNAVAILABLE_REASONS } = await import('./advisorCall.ts');
+  const page = await import('../../../src/lib/meetingResult.js');
+  assertEquals(plainUnavailableReason("the call didn't connect: tcp connect error: Connection refused (os error 111)"), 'the connection to the advisor failed');
+  assertEquals(plainUnavailableReason('Anthropic error: HTTP 529 — Overloaded'), 'the AI service was overloaded');
+  assertEquals(plainUnavailableReason('Your credit balance is too low'), "the AI provider's account was out of credit");
+  assertEquals(plainUnavailableReason('The model declined to answer'), 'the model declined to answer');
+  // Read back, a plain reason stays as it is; the page shows only plain ones.
+  for (const r of PLAIN_UNAVAILABLE_REASONS) {
+    assertEquals(plainUnavailableReason(r), r);
+    assertEquals(page.plainUnavailableReason(r), r);
+  }
+  assertEquals(page.plainUnavailableReason('Anthropic error: HTTP 529 — Overloaded'), null);
+});

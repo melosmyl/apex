@@ -404,7 +404,7 @@ Deno.serve(async (req) => {
     recordPushbackChanges(resolution, discussionTranscript);
     const priorityActions = resolution.priority_actions;
     const discussionField = discussionTranscript.length > 0
-      ? discussionTranscript.map(m => ({ advisor: m.advisor_name, role: m.role, message: m.message, stance: m.message_type }))
+      ? discussionTranscript.filter(m => !m.unavailable).map(m => ({ advisor: m.advisor_name, role: m.role, message: m.message, stance: m.message_type }))
       : [
           ...independentResponses.map(r => ({ advisor: r.advisor_name, role: r.role, message: `${r.position} ${r.recommendation}`, stance: 'supports' })),
           ...challengeResponses.map(r => ({ advisor: r.advisor_name, role: 'Challenge', message: r.revised_position, stance: 'challenges' })),

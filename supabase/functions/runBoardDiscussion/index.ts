@@ -257,7 +257,7 @@ async function tableNote({ supabaseUrl, serviceKey, meeting, user, chair, note, 
   try {
     // Each advisor's latest position.
     const latest = new Map();
-    for (const m of transcript) if (m.advisor_id && !['founder_message', 'chair_tabling'].includes(m.message_type)) latest.set(m.advisor_name, m.position || m.new_position || String(m.message).split('\nWhy: ')[0]);
+    for (const m of transcript) if (m.advisor_id && !m.unavailable && !['founder_message', 'chair_tabling'].includes(m.message_type)) latest.set(m.advisor_name, m.position || m.new_position || String(m.message).split('\nWhy: ')[0]);
     const positions = [...latest].map(([name, p]) => `- ${name}: ${String(p).slice(0, 300)}`).join('\n');
     const data = await callAdvisor(supabaseUrl, serviceKey, {
       ...chairCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
@@ -429,7 +429,8 @@ async function loadDiscussion(db, meeting, ownerId): Promise<any> {
     new_risks: (r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)), confidence_score: clampScore(r.confidence_score),
     provider_used: r.provider_used, model_used: r.model_used,
     unavailable: r.unavailable || false,
-    ...(r.unavailable && r.unavailable_reason ? { unavailable_reason: String(r.unavailable_reason).slice(0, 200) } : {}),
+    // Plain words only: records from before kept the technical detail here.
+    ...(r.unavailable ? { unavailable_reason: plainUnavailableReason(r.unavailable_reason) } : {}),
     ...(Number.isFinite(Number(r.cost_usd)) && r.cost_usd != null ? { cost_usd: Number(r.cost_usd) } : {}),
     ...(r.redone_after ? { redone_after: String(r.redone_after).slice(0, 100) } : {}),
   }));
@@ -506,7 +507,7 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
       // A round counts once someone answered; a missing advisor's entry
       // (saying why) isn't an answer.
       const answered = roundMessages.filter((m) => !m.unavailable);
-      const next = answered.length ? [...transcript, ...founderEntries, ...roundMessages] : transcript;
+      const next = answered.length ? [...transcript, ...founderEntries, ...roundMessages] : [...transcript, ...roundMessages];
       // What the founder did while this round ran (asked for the decision,
       // asked for another round, said something new) decides what's next.
       // The save holds only if none of that changed since it was read;
@@ -626,7 +627,14 @@ Deno.serve(async (req) => {
         isLastRound, convergencePairs, profile: d.profile, facts: d.profile, independentResponses: d.independentResponses, roundDeadline,
       });
 
-      if (!roundMessages.some((m) => !m.unavailable)) break;
+      if (!roundMessages.some((m) => !m.unavailable)) {
+        // Nobody answered: the record still says why, and the discussion ends.
+        if (roundMessages.length) {
+          transcript = [...transcript, ...roundMessages];
+          await db.from('board_meetings').update({ discussion_transcript: transcript }).eq('id', meeting.id);
+        }
+        break;
+      }
       transcript = [...transcript, ...roundMessages];
 
       await db.from('board_meetings').update({

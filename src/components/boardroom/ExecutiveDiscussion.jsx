@@ -230,7 +230,7 @@ export default function ExecutiveDiscussion({ transcript = [], evaluation, advis
   const stats = useMemo(() => {
     const challenges = transcript.filter((m) => ["challenge", "rebuttal"].includes(m.message_type)).length;
     const changed = transcript.filter((m) => m.changed_opinion).length;
-    return { rounds: rounds.length, messages: transcript.length, challenges, changed };
+    return { rounds: rounds.length, messages: transcript.filter((m) => !m.unavailable).length, challenges, changed };
   }, [transcript, rounds]);
 
   const chairName = findChair(advisors)?.name || null;

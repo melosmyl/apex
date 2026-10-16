@@ -8,6 +8,16 @@
 
 export const TASK_TYPE_LABELS = { research: "Research", draft: "Draft", calculate: "Calculate", plan: "Plan" };
 
+// Why an advisor gave no turn, as the server words it
+// (_shared/advisorCall.ts PLAIN_UNAVAILABLE_REASONS). Anything else is an
+// older record's technical detail, which the founder doesn't see.
+const PLAIN_UNAVAILABLE_REASONS = [
+  "the AI provider's account was out of credit", "the AI provider refused our key", "the model declined to answer",
+  "the AI service was overloaded", "it ran out of time", "the connection to the advisor failed",
+  "the answer came back incomplete", "the advisor couldn't be reached",
+];
+export const plainUnavailableReason = (reason) => (PLAIN_UNAVAILABLE_REASONS.includes(reason) ? reason : null);
+
 export const CALLS = [
   { value: "accept", label: "Accept" },
   { value: "modify", label: "Modify" },

@@ -12,7 +12,7 @@ import HumanPerspectiveStep from "@/components/boardroom/HumanPerspectiveStep";
 import LiveMeeting from "@/components/boardroom/live/LiveMeeting";
 import OpenDoor from "@/components/boardroom/live/OpenDoor";
 import PaceChoice, { BeforeNote, turnShapeAsked, usePaceOffered } from "@/components/boardroom/PaceChoice";
-import { decisionFromCall } from "@/lib/meetingResult";
+import { decisionFromCall, plainUnavailableReason } from "@/lib/meetingResult";
 import { usePin } from "@/components/pins/PinContext";
 import { startMeeting, continueMeeting, retryMeeting, meetingPhase, isRunningOnServer, runFounderFollowup, embedDecisionInBackground, assignChairs, beforeMeetingNote, MAX_DEBATERS, MIN_DEBATERS, suggestedQuestionsFor } from "@/lib/boardroom";
 import { findChair, chairOrBuiltIn } from "@/lib/chair";
@@ -46,7 +46,7 @@ function toRoundOneMessages(responses = []) {
     new_risks: r.risks || [],
     confidence_score: r.confidence_score || 0,
     unavailable: r.unavailable || false,
-    unavailable_reason: r.unavailable_reason || null,
+    unavailable_reason: plainUnavailableReason(r.unavailable_reason),
     redone_after: r.redone_after || null,
   }));
 }
