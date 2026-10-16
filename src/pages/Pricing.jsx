@@ -29,6 +29,8 @@ const TIERS = [
   },
   {
     name: "Team",
+    // Hidden until Teams exists (owner, 16 October 2026).
+    hidden: true,
     dot: "bg-violet-500",
     price: "£79",
     period: "per month",
@@ -63,8 +65,8 @@ export default function Pricing() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {TIERS.map((t) => (
+        <div className="grid md:grid-cols-3 gap-5">
+          {TIERS.filter((t) => !t.hidden).map((t) => (
             <div key={t.name} className={`relative flex flex-col bg-card border rounded-2xl p-6 rise-in ${t.highlight ? "shadow-[6px_6px_0_hsl(var(--brand))]" : "border-border/70"}`}>
               {t.highlight && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">

@@ -3,13 +3,12 @@ import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Users, Trash2, Mail, RefreshCw } from "lucide-react";
+import { UserPlus, Users, Trash2, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import AddAdvisorDialog from "@/components/team/AddAdvisorDialog";
 import { ADVISOR_PROVIDER_CONFIG, characterFields } from "@/lib/advisorLibrary";
-import InvitePersonDialog from "@/components/team/InvitePersonDialog";
 import AdvisorProfileDialog from "@/components/team/AdvisorProfileDialog";
 import { findChair } from "@/lib/chair";
 import { MAX_AI_ADVISORS } from "@/lib/boardroom";
@@ -22,7 +21,6 @@ export default function ExecutiveTeam() {
   const [advisors, setAdvisors] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [selected, setSelected] = useState(null);
 
   const load = async () => {
@@ -57,12 +55,6 @@ export default function ExecutiveTeam() {
     await load();
   };
 
-  const invitePerson = async ({ name, role, email }) => {
-    await base44.users.inviteUser(email, "user");
-    await base44.entities.Advisor.create({ company_id: companyId, type: "human", name, role, email, biography: "Invited team member." });
-    await load();
-  };
-
   const remove = async (advisor) => {
     await base44.entities.Advisor.delete(advisor.id);
     setSelected(null);
@@ -75,10 +67,11 @@ export default function ExecutiveTeam() {
   return (
     <div>
       <PageHeader eyebrow="Your board" title="Your advisors"
-      description="Choose who sits on your board: up to six AI advisors, the Chair included, plus anyone you invite.">
+      description="Choose who sits on your board: up to six AI advisors, the Chair included.">
+        {/* "Invite person" is gone until Teams exists: it called an invite
+            the backend doesn't have (owner, 16 October 2026). */}
         <div className="flex gap-2">
           <Button onClick={() => setAddOpen(true)} variant="primary" className="px-5"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button>
-          <Button onClick={() => setInviteOpen(true)} variant="secondaryOutline" className="px-5"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button>
         </div>
       </PageHeader>
 
@@ -90,8 +83,8 @@ export default function ExecutiveTeam() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{[0, 1, 2].map((i) => <div key={i} className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />)}</div> :
       advisors.length === 0 ?
       <EmptyState icon={Users} title="Your boardroom is empty"
-      description="Invite AI advisors from the library, or bring in people you work with."
-      action={<div className="flex gap-2 justify-center"><Button onClick={() => setAddOpen(true)} variant="primary" className="px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button><Button onClick={() => setInviteOpen(true)} variant="secondaryOutline" className="px-6"><Mail className="w-4 h-4 mr-1.5" /> Invite person</Button></div>} /> :
+      description="Invite AI advisors from the library."
+      action={<div className="flex gap-2 justify-center"><Button onClick={() => setAddOpen(true)} variant="primary" className="px-6"><UserPlus className="w-4 h-4 mr-1.5" /> Invite advisor</Button></div>} /> :
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {advisors.map((a) => (
@@ -114,7 +107,6 @@ export default function ExecutiveTeam() {
       }
 
       <AddAdvisorDialog open={addOpen} onOpenChange={setAddOpen} existingKeys={existingKeys} onAdd={addAdvisor} atCap={atCap} maxAdvisors={MAX_AI_ADVISORS} seatsFilled={aiAdvisorCount} />
-      <InvitePersonDialog open={inviteOpen} onOpenChange={setInviteOpen} onInvite={invitePerson} />
       <AdvisorProfileDialog advisor={selected} open={!!selected} onOpenChange={(o) => !o && setSelected(null)}
       onAction={selected?.id === chair?.id ? undefined : remove} actionLabel="Remove from team" actionVariant="destructive"
       actionNote={selected?.id === chair?.id ? CHAIR_STAYS : null} />
