@@ -32,15 +32,18 @@ function ShapedTurn({ m }) {
       )}
       <p className="font-medium leading-snug">{m.position}</p>
       {m.because && <p className="leading-relaxed">Why: {m.because}</p>}
-      {m.changed_opinion && m.moved_by && (
-        <p className="text-sm">Moved by {m.moved_by === "Founder" ? "you" : firstName(m.moved_by)}{m.change_because ? `: ${m.change_because}` : ""}</p>
-      )}
       {m.against_me && <p className="text-sm"><b className="font-medium">Against my view:</b> {m.against_me}</p>}
-      {m.would_change_my_mind && <p className="text-sm"><b className="font-medium">Would change my mind:</b> {m.would_change_my_mind}</p>}
-      {m.message && (
+      {/* Everything else folds away (owner, 16 October 2026). */}
+      {(m.message || m.moved_by || m.would_change_my_mind) && (
         <details className="text-sm">
           <summary className="cursor-pointer text-muted-foreground">The full turn</summary>
-          <p className="mt-1.5 whitespace-pre-line leading-relaxed">{m.message}</p>
+          <div className="mt-1.5 space-y-1.5">
+            {m.changed_opinion && m.moved_by && (
+              <p>Moved by {m.moved_by === "Founder" ? "you" : firstName(m.moved_by)}{m.change_because ? `: ${m.change_because}` : ""}</p>
+            )}
+            {m.would_change_my_mind && <p><b className="font-medium">Would change my mind:</b> {m.would_change_my_mind}</p>}
+            {m.message && <p className="whitespace-pre-line leading-relaxed">{m.message}</p>}
+          </div>
         </details>
       )}
     </div>
@@ -125,7 +128,7 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
               <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                 <b className="font-display text-[1.05rem] font-medium">{m.advisor_name}</b>
                 <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">
-                  {m.kind === "opening" ? "Opening" : m.message_type === "final_statement" ? `Round ${m.round} · closing` : `Round ${m.round}`}
+                  {m.kind === "opening" ? "Opening" : m.kind === "chair" ? `Round ${m.round} · puts it to the board` : m.message_type === "final_statement" ? `Round ${m.round} · closing` : `Round ${m.round}`}
                 </span>
                 {Number.isFinite(m.cost_usd) && (
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground">{formatCost(m.cost_usd)}</span>
@@ -138,6 +141,9 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
                 {m.redone_after && (
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground" title={`The first answer was almost the same as ${m.redone_after}'s, so it was asked again`}>Asked again</span>
                 )}
+                {m.challenge_redo && (
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.12em] text-muted-foreground" title="Nobody challenged anyone in this round, so the challenger was asked again">Asked to challenge</span>
+                )}
                 {m.challenger && (
                   <span className="rounded-full border-[1.5px] border-foreground px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em]">Challenger</span>
                 )}
@@ -145,7 +151,7 @@ export default function MeetingMinutes({ items, revealed, thinking = [], chairWr
                   <span key={f.label} className={`rounded-full border-[1.5px] px-2 py-px font-mono text-[0.58rem] uppercase tracking-[0.12em] ${FLAG_TONE[f.tone]}`}>{f.label}</span>
                 ))}
               </div>
-              <Say tone={m.kind === "opening" ? "chair" : "plain"}>
+              <Say tone={m.kind === "opening" || m.kind === "chair" ? "chair" : "plain"}>
                 {m.kind === "turn" && shapedTurn(m) ? <ShapedTurn m={m} /> : <p className="whitespace-pre-line leading-relaxed">{m.message}</p>}
               </Say>
               {onPin && m.kind === "turn" && (

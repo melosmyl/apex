@@ -14,18 +14,23 @@ const ECHO_SIMILARITY = 0.8;
 
 const STANCES = ['disagree', 'build', 'question', 'agree'];
 
-// The answer form for one meeting: "who I'm answering" and "who moved me"
-// can only name someone actually in it (the founder too), or nobody.
-export function discussionSchema(names: string[]) {
-  const people = [...new Set([...names.map((n) => String(n || '').trim()).filter((n) => n && n !== 'Founder'), 'Founder', ''])];
+// The answer form for one advisor in one meeting: "who I'm answering" can
+// only name another advisor in it; the founder only for the advisor a note
+// was addressed to (owner, 16 October 2026); never the speaker. "Who moved
+// me" can be anyone else in the room, the founder included. `mustDisagree`
+// is the challenger asked again: the only stance left is disagreeing.
+export function discussionSchema(names: string[], { speaker = '', mayAnswerFounder = true, allowNobody = true, mustDisagree = false }: { speaker?: string; mayAnswerFounder?: boolean; allowNobody?: boolean; mustDisagree?: boolean } = {}) {
+  const others = [...new Set(names.map((n) => String(n || '').trim()).filter((n) => n && n !== 'Founder' && n !== speaker))];
+  const answering = [...others, ...(mayAnswerFounder && !mustDisagree ? ['Founder'] : []), ...(allowNobody && !mustDisagree ? [''] : [])];
+  const people = [...others, 'Founder', ''];
   return {
     type: 'object',
     properties: {
       position: { type: 'string', description: 'Your answer to the founder\'s question now, in one sentence.' },
       because: { type: 'string', description: 'One sentence: your main reason, naming something specific to this company or question (a number, a person, a place, or a fact the founder gave).' },
-      answering_who: { type: 'string', enum: people, description: 'The one person whose point you are answering: another advisor, or "Founder". Never yourself. Empty only if nobody has spoken yet.' },
+      answering_who: { type: 'string', enum: answering, description: answering.includes('Founder') ? 'The one person whose point you are answering: another advisor, or "Founder" since they asked you directly.' : 'The advisor whose point you are answering.' },
       answering_point: { type: 'string', description: 'Their point, in their words, in at most 15 words.' },
-      stance: { type: 'string', enum: STANCES, description: 'What you do with their point: disagree, build on it, question it, or agree.' },
+      stance: { type: 'string', enum: mustDisagree ? ['disagree'] : STANCES, description: 'What you do with their point: disagree, build on it, question it, or agree.' },
       adds: { type: 'string', description: 'The one thing you add that nobody in this meeting has said yet, in one sentence. Empty only if you agree and have nothing to add.' },
       message: { type: 'string', description: `Your turn as you would say it in the room: ${TURN_WORDS} words at most, plain sentences, no numbered lists (a list is allowed only in the final round).` },
       changed_opinion: { type: 'boolean', description: 'Whether your position has changed from your Round 1 position.' },
@@ -87,6 +92,24 @@ export function shapedEntry(resp: any, { speaker, isLastRound, founderSpoke = fa
   };
 }
 
+// Who a turn names, as one of the meeting's advisors (a first name is
+// enough), the founder where that's allowed, or nobody. The answer form
+// enforces this when the provider checks it; this holds when it doesn't.
+export function personNamed(value: unknown, names: string[], { founderAllowed = false, speaker = '' } = {}) {
+  const v = String(value ?? '').trim().toLowerCase();
+  if (!v) return '';
+  if (v === 'founder' || v === 'the founder') return founderAllowed ? 'Founder' : '';
+  const match = names.find((n) => n.toLowerCase() === v) || names.find((n) => n.split(/\s+/)[0].toLowerCase() === v);
+  return match && match !== speaker ? match : '';
+}
+
+// A challenge (owner, 16 October 2026): a turn that disagrees with a named
+// advisor's position, with a reason. Every discussion round needs one.
+export function isChallenge(entry: any, advisorNames: string[]) {
+  return entry?.stance === 'disagree' && !!entry.reply_to_advisor && entry.reply_to_advisor !== 'Founder'
+    && advisorNames.includes(entry.reply_to_advisor) && !!String(entry.because || '').trim();
+}
+
 // ---- The checks: flags only, no model calls.
 const STOP = new Set(('the a an and or but of to in on for with at by from is are was were be been it its this that these those your you we our they their them i my me ' +
   'as if then than so not no do does did can could should would will may might must have has had more most less very just also about into over under up out what which who when where why how all any each ' +
@@ -144,7 +167,7 @@ export function turnFlags(entry: any, { sameRound = [], earlier = [], record, is
     || /founder\s+(has\s+)?(decided|insists|wants|prefers)|founder'?s decision/i.test(entry.change_because))) flags.push('change_without_reason');
   const same = sameRound.find((o) => o !== entry && o.advisor_name !== entry.advisor_name && o.message && similarity(o.message, entry.message) >= ECHO_SIMILARITY);
   if (same) flags.push(`same_point:${same.advisor_name}`);
-  const repeat = earlier.find((o) => o.message && o.message_type !== 'founder_message' && similarity(o.message, entry.message) >= ECHO_SIMILARITY);
+  const repeat = earlier.find((o) => o.message && !['founder_message', 'chair_tabling'].includes(o.message_type) && similarity(o.message, entry.message) >= ECHO_SIMILARITY);
   if (repeat) flags.push(`repeats:${repeat.advisor_name}`);
   if (wordCount(entry.message) > LONG_TURN_WORDS) flags.push('long');
   if (!isLastRound && listItems(entry.message) >= 3) flags.push('checklist');

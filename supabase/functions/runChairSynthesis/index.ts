@@ -104,6 +104,10 @@ function formatTranscriptForChair(transcript) {
         text += `THE FOUNDER (company record: said in the meeting${msg.to_name ? `, to ${msg.to_name}` : ''}): ${msg.message}\n`;
         return;
       }
+      if (msg.message_type === 'chair_tabling') {
+        text += `YOU (the Chair), putting the founder's point to the board: ${msg.message}\n`;
+        return;
+      }
       text += `${msg.advisor_name} (${msg.role})`;
       if (msg.reply_to_advisor) text += ` -> responding to ${msg.reply_to_advisor}`;
       if (msg.changed_opinion) text += msg.after_founder_pushback ? ` [CHANGED POSITION AFTER THE FOUNDER SPOKE]` : ` [OPINION CHANGED]`;

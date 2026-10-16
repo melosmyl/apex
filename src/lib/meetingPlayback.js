@@ -61,6 +61,11 @@ export function playbackItems(chairOpening, chairName, transcript = []) {
       if (m.note_id) items.push({ kind: "founder", ...m });
       continue;
     }
+    // The Chair putting the founder's note to the board (turn shape on).
+    if (m.message_type === "chair_tabling") {
+      items.push({ kind: "chair", ...m });
+      continue;
+    }
     items.push({ kind: "turn", ...m });
   }
   return items;

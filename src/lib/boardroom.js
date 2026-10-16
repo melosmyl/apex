@@ -178,6 +178,13 @@ export function noteStatus(note, m) {
   const heard = (m?.discussion_transcript || []).find((x) => x.note_id === note.id);
   if (heard) return { label: `Heard in Round ${heard.round}`, done: true };
   if (m?.decide_now || m?.status === "synthesizing") return { label: "Goes to the Chair", done: false };
+  // With the turn shape on, one note goes into each round: a later one waits
+  // (while rounds are still to come).
+  if (m?.turn_shape && (m.status !== "discussion_complete" || (m.pace === "sit_in" && m.waiting_for_founder && (m.extra_rounds || 0) < MAX_EXTRA_ROUNDS))) {
+    const used = new Set((m.discussion_transcript || []).map((x) => x.note_id).filter(Boolean));
+    const waiting = (m.founder_notes || []).filter((n) => !used.has(n.id));
+    if (waiting.findIndex((n) => n.id === note.id) > 0) return { label: "Waits for the round after your earlier note", done: false };
+  }
   // Sit in, at the last stop: carrying on gives it one more round while
   // extra rounds are left.
   if (m?.status === "discussion_complete")

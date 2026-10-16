@@ -82,6 +82,12 @@ const POLICIES: Record<string, CallPolicy> = {
     maxTokens: { anthropic: 2_000, openai: 1_000 },
     thinking: 'off', effort: 'low', nativeFormat: true, fallbackReserveMs: 10_000, attemptTimeoutMs: 25_000,
   },
+  // The Chair putting a founder's note to the board in one sentence (turn
+  // shape): quick, so the round's advisors keep their time.
+  chair_tabling: {
+    maxTokens: { anthropic: 1_000, openai: 500 },
+    thinking: 'off', effort: 'low', nativeFormat: true, fallbackReserveMs: 8_000, attemptTimeoutMs: 15_000,
+  },
   onboarding_plan: {
     maxTokens: { anthropic: 8_000, openai: 8_000 },
     thinking: 'adaptive', effort: 'high', nativeFormat: true, fallbackReserveMs: 40_000,
@@ -92,7 +98,8 @@ const POLICIES: Record<string, CallPolicy> = {
 // (documents and the small assistant calls).
 export function policyFor(requestType: string | null | undefined): CallPolicy | null {
   if (!requestType) return null;
-  if (/^discussion_round_\d+$/.test(requestType)) return DEBATER;
+  // A discussion turn, or the challenger asked again in one (turn shape).
+  if (/^discussion_round_\d+(_challenge)?$/.test(requestType)) return DEBATER;
   return POLICIES[requestType] ?? null;
 }
 

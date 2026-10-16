@@ -53,7 +53,7 @@ const nextStop = (id: string, after: any) => waitFor(id, (m) => m.waiting_for_fo
 // ---- 1. Sit in: a stop after every round.
 console.log('== Sit in stops after every round');
 const ASK = `priya-what-would-you-cut-${tag}`, LAST = `one-last-thing-${tag}`;
-await script({ marks: [ASK, LAST, '[asked of you directly]', 'Answer the founder first', 'Round 2 of', 'Round 3 of', 'Round 4 of', 'Why: ', '-> Arguments: '] });
+await script({ marks: [ASK, LAST, '[asked of you directly]', 'Answer the founder first', 'Round 2 of', 'Round 3 of', 'Round 4 of', 'Why: ', '-> Arguments: ', 'Answer them first', 'answers it, not you', 'never the founder', 'The Chair put it to the board', 'Put it to the board in ONE sentence'] });
 const A = await start('Should we sell at craft fairs?', 'sit_in');
 const s1 = await waitFor(A, (m) => m.waiting_for_founder);
 await sleep(3000);
@@ -78,9 +78,14 @@ const r3 = (s3?.discussion_transcript || []).filter((x: any) => x.round === 3);
 check(n1.status === 200 && s3?.discussion_rounds_completed === 3 && r3[0]?.message_type === 'founder_message' && r3[0]?.note_id === n1.json?.note?.id,
   'the note starts Round 3 straight away, and opens its minutes', [n1.status, r3.map((x: any) => x.advisor_name)]);
 const log3 = (await fakeLog()).filter((l: any) => l.marked.includes('Round 3 of'));
-check(log3.length === 3 && log3.every((l: any) => l.marked.includes(ASK) && l.marked.includes('Answer the founder first'))
-  && JSON.stringify(log3.filter((l: any) => l.marked.includes('[asked of you directly]')).map((l: any) => l.who)) === JSON.stringify([names.priya]),
-  'every advisor is told to answer the founder first; the question is marked as Priya\'s', log3.map((l: any) => [l.who, l.marked]));
+const priya3 = log3.filter((l: any) => l.who === names.priya), others3 = log3.filter((l: any) => l.who !== names.priya);
+check(log3.length === 3 && log3.every((l: any) => l.marked.includes(ASK))
+  && priya3.length === 1 && priya3[0].marked.includes('[asked of you directly]') && priya3[0].marked.includes('Answer them first')
+  && others3.every((l: any) => l.marked.includes('answers it, not you') && l.marked.includes('never the founder') && !l.marked.includes('Answer them first')),
+  'only Priya answers a note to Priya; the others hear it, and argue with each other', log3.map((l: any) => [l.who, l.marked]));
+check(r3.filter((x: any) => x.advisor_id && x.advisor_name !== names.priya).every((x: any) => x.reply_to_advisor && x.reply_to_advisor !== 'Founder' && !x.founder_answer)
+  && !!r3.find((x: any) => x.advisor_name === names.priya)?.founder_answer,
+  'nobody else answers the founder', r3.map((x: any) => [x.advisor_name, x.reply_to_advisor, x.founder_answer]));
 check(s3?.status === 'discussion_complete' && s3?.waiting_for_founder, 'after the last round it stops before the Chair', [s3?.status, s3?.waiting_for_founder]);
 
 console.log('\n== a note after the last round gets one more round');
@@ -89,6 +94,12 @@ const s4 = await nextStop(A, s3);
 const log4 = (await fakeLog()).filter((l: any) => l.marked.includes('Round 4 of'));
 check(n2.json?.answered_in === 'one more round' && n2.json?.extra_rounds === 1 && s4?.discussion_rounds_completed === 4 && log4.length === 3 && log4.every((l: any) => l.marked.includes(LAST)),
   'the board answers it in Round 4, then stops again', [n2.json, s4?.discussion_rounds_completed, log4.length]);
+const r4a = (s4?.discussion_transcript || []).filter((x: any) => x.round === 4);
+const tabling = (await fakeLog()).filter((l: any) => l.who === names.chair && l.marked.includes('Put it to the board in ONE sentence'));
+check(r4a[0]?.message_type === 'founder_message' && r4a[1]?.message_type === 'chair_tabling' && r4a[1]?.advisor_name === names.chair && tabling.length === 1
+  && log4.every((l: any) => l.marked.includes('The Chair put it to the board') && l.marked.includes('never the founder'))
+  && r4a.filter((x: any) => x.advisor_id && x.message_type !== 'chair_tabling').every((x: any) => x.reply_to_advisor !== 'Founder' && !x.founder_answer),
+  'a note to the board: the Chair puts it on the table in one sentence, and the advisors argue about it with each other', [r4a.map((x: any) => [x.advisor_name, x.message_type, x.reply_to_advisor]), tabling.length]);
 await act(A, 'carry_on');
 const mA = await waitFor(A, finished);
 check(mA?.status === 'complete' && JSON.stringify(rounds(mA)) === '[1,2,3,4]', 'Carry on to the decision: the Chair resolves', [mA?.status, rounds(mA)]);
@@ -169,10 +180,10 @@ check(later2.length === 6 && later2.every((x: any) => x.position && x.because &&
 // The fake answers are word for word the same, and the answer form's first
 // name is the first advisor's own (the reason check is in the unit tests:
 // this company's record holds earlier fake meetings' words).
-check(later2.filter((x: any) => !x.reply_to_advisor).length === 2 && later2.filter((x: any) => !x.reply_to_advisor).every((x: any) => x.flags.includes('answers_no_one'))
+check(later2.every((x: any) => x.reply_to_advisor && x.reply_to_advisor !== x.advisor_name && !x.flags.includes('answers_no_one'))
   && later2.every((x: any) => x.flags.some((f: string) => f.startsWith('same_point:')))
   && later2.filter((x: any) => x.round === 3).every((x: any) => x.flags.some((f: string) => f.startsWith('repeats:'))),
-  'a turn that answers no one, makes the same point as another, or repeats an earlier round, is flagged', later2.map((x: any) => x.flags));
+  'every turn answers another advisor; the same point twice in a round, or a repeat of an earlier round, is flagged', later2.map((x: any) => x.flags));
 const tlog = await fakeLog();
 const r2 = tlog.filter((l: any) => l.marked.includes('YOUR TURN HAS A SHAPE'));
 check(r2.length === 6 && r2.every((l: any) => l.marked.includes('120 words at most'))
@@ -194,11 +205,37 @@ check(mO?.status === 'complete' && mO?.turn_shape === false && oTurns.every((x: 
 check(olog.every((l: any) => !l.marked.includes('YOUR TURN HAS A SHAPE') && !l.marked.includes('Why: ') && !l.marked.includes('TURNS THAT FAILED A CHECK'))
   && olog.some((l: any) => l.marked.includes('set agrees_with to')),
   "the advisors and the Chair are asked exactly as before", olog.map((l: any) => [l.who, l.marked]));
-const ask = await call('startBoardMeeting', { company_id: co.id, question: 'x?', advisor_ids: debaters, meeting_id: crypto.randomUUID(), server_driven: true, turn_shape: true });
-const anonCo = (await row(ask.json?.meeting?.id || ask.json?.meeting_id || ''))?.turn_shape;
-check(anonCo === true || ask.status === 200, 'a signed-in founder can ask for it', [ask.status, anonCo]);
+const askId = crypto.randomUUID();
+const ask = await call('startBoardMeeting', { company_id: co.id, question: 'x?', advisor_ids: debaters, meeting_id: askId, server_driven: true, turn_shape: true });
+check(ask.status === 200 && (await row(askId))?.turn_shape === true, 'a signed-in founder can ask for it', ask.status);
+// Let it finish, so it doesn't take the next test's scripted answers.
+await waitFor(askId, finished);
 const { data: forged2 } = await F.from('board_meetings').insert({ company_id: co.id, created_by_id: uid, question: 'x', status: 'preparing', turn_shape: true }).select('turn_shape').single();
 check(forged2?.turn_shape === false, 'a meeting the browser makes never has it', forged2);
+
+// ---- 7. Two notes at one stop; a round with no challenge.
+console.log('\n== two notes at one stop go into two rounds; a round without a challenge asks the challenger again');
+await script({ fields: { stance: ['agree', 'agree', 'agree'] }, marks: ['ASKED AGAIN', 'The Chair put it to the board'] });
+const G = await start('Should we sell to a department store?', 'sit_in');
+const g1 = await waitFor(G, (m) => m.waiting_for_founder);
+const X = { id: crypto.randomUUID(), text: `board-note-${tag}`, to_advisor_id: null, to_name: null, at: new Date().toISOString() };
+const Y = { id: crypto.randomUUID(), text: `grace-note-${tag}`, to_advisor_id: byName(names.grace).id, to_name: names.grace, at: new Date().toISOString() };
+await admin.from('board_meetings').update({ founder_notes: [X, Y] }).eq('id', G);
+await act(G, 'carry_on', { at: { status: g1.status, rounds: g1.discussion_rounds_completed } });
+const g2 = await nextStop(G, g1);
+const r2g = (g2?.discussion_transcript || []).filter((x: any) => x.round === 2);
+check(r2g.filter((x: any) => x.message_type === 'founder_message').map((x: any) => x.note_id).join() === X.id && !(g2?.discussion_transcript || []).some((x: any) => x.note_id === Y.id),
+  'only the first note goes into Round 2; the second waits', r2g.map((x: any) => [x.advisor_name, x.message_type]));
+const redo = r2g.filter((x: any) => x.challenge_redo);
+const askedAgain = (await fakeLog()).filter((l: any) => l.marked.includes('ASKED AGAIN'));
+check(redo.length === 1 && redo[0].stance === 'disagree' && redo[0].reply_to_advisor && redo[0].reply_to_advisor !== 'Founder' && askedAgain.length === 1,
+  'nobody challenged, so the challenger was asked once more, and disagreed with a named advisor', [redo.map((x: any) => [x.advisor_name, x.stance, x.reply_to_advisor]), askedAgain.length, r2g.map((x: any) => [x.advisor_name, x.stance, x.challenge_redo, x.message_type])]);
+await act(G, 'carry_on', { at: { status: g2.status, rounds: g2.discussion_rounds_completed } });
+const g3 = await nextStop(G, g2);
+check((g3?.discussion_transcript || []).filter((x: any) => x.round === 3 && x.message_type === 'founder_message').map((x: any) => x.note_id).join() === Y.id,
+  'the second note goes into Round 3', (g3?.discussion_transcript || []).filter((x: any) => x.round === 3).map((x: any) => [x.advisor_name, x.message_type]));
+await act(G, 'decide');
+await waitFor(G, finished);
 
 // The fake data made for this test is removed.
 await admin.from('documents').delete().eq('company_id', co.id);

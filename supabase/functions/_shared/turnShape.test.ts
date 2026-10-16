@@ -1,5 +1,5 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { chairTags, discussionSchema, recordWords, shapedEntry, similarity, turnFlags } from './turnShape.ts';
+import { chairTags, discussionSchema, isChallenge, personNamed, recordWords, shapedEntry, similarity, turnFlags } from './turnShape.ts';
 
 const names = ['Sofia Marchetti', 'Victor Hale'];
 const record = recordWords('petit m sells hand-painted dinner sets. £3,500 saved. Stall at Spitalfields market.', 'Should we take a stall?');
@@ -73,4 +73,33 @@ Deno.test('the Chair is told what failed', () => {
   assertEquals(chairTags(['long', 'checklist', 'bare_agreement']), []);
   assertEquals(chairTags(null), []);
   assertEquals(chairTags('generic_reason'), []);
+});
+
+Deno.test('each advisor answers another advisor; only the one a note was addressed to may answer the founder', () => {
+  const three = ['Sofia Marchetti', 'Victor Hale', 'Priya Nair'];
+  const other: any = discussionSchema(three, { speaker: 'Sofia Marchetti', mayAnswerFounder: false, allowNobody: false });
+  assertEquals(other.properties.answering_who.enum, ['Victor Hale', 'Priya Nair']);
+  assertEquals(other.properties.moved_by.enum, ['Victor Hale', 'Priya Nair', 'Founder', '']);
+  const asked: any = discussionSchema(three, { speaker: 'Priya Nair', mayAnswerFounder: true, allowNobody: false });
+  assertEquals(asked.properties.answering_who.enum, ['Sofia Marchetti', 'Victor Hale', 'Founder']);
+  const again: any = discussionSchema(three, { speaker: 'Victor Hale', mustDisagree: true });
+  assertEquals([again.properties.answering_who.enum, again.properties.stance.enum], [['Sofia Marchetti', 'Priya Nair'], ['disagree']]);
+});
+
+Deno.test('a challenge disagrees with a named advisor, with a reason', () => {
+  const names = ['Sofia Marchetti', 'Victor Hale'];
+  assert(isChallenge(entry(), names));
+  assert(!isChallenge(entry({ stance: 'build' }), names));
+  assert(!isChallenge(entry({ answering_who: 'Founder' }), names));
+  assert(!isChallenge(entry({ because: '' }), names));
+});
+
+Deno.test("a name the model writes is matched to someone in the meeting; the founder only where allowed", () => {
+  const names = ['Sofia Marchetti', 'Victor Hale'];
+  assertEquals(personNamed('Sofia', names), 'Sofia Marchetti');
+  assertEquals(personNamed('victor hale', names), 'Victor Hale');
+  assertEquals(personNamed('Founder', names), '');
+  assertEquals(personNamed('the founder', names, { founderAllowed: true }), 'Founder');
+  assertEquals(personNamed('Sofia', names, { speaker: 'Sofia Marchetti' }), '');
+  assertEquals(personNamed('Amara', names), '');
 });

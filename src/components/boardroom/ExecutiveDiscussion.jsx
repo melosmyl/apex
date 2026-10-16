@@ -22,6 +22,7 @@ const MESSAGE_TYPE_META = {
   opinion_changed: { label: "Changed", className: "bg-primary text-primary-foreground" },
   final_statement: { label: "Final", className: "bg-secondary text-muted-foreground" },
   founder_message: { label: "Founder", className: "bg-primary text-primary-foreground" },
+  chair_tabling: { label: "Chair", className: "bg-secondary text-muted-foreground" },
 };
 
 function FilterPill({ active, onClick, children }) {

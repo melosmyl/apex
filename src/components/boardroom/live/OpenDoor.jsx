@@ -93,8 +93,9 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
   };
 
   // Where a note goes from here, in plain words.
-  const whereItGoes = !(lastRoundDone || lastRoundRunning) ? "The board answers it first in the next round."
-    : !roundsLeft ? "It goes to the Chair for the decision."
+  const whereItGoes = (lastRoundDone || lastRoundRunning) && !roundsLeft ? "It goes to the Chair for the decision."
+    : row?.turn_shape && unheard.length ? "One note goes into each round: this one waits for the round after your earlier note."
+    : !(lastRoundDone || lastRoundRunning) ? "The board answers it first in the next round."
     : lastRoundDone ? `The board answers it in one more round (about ${formatCost(EXTRA_ROUND_USD)}).`
     : `This is the board's last planned round. When it stops, carry on and they answer it in one more round (about ${formatCost(EXTRA_ROUND_USD)}).`;
   const notes = row?.founder_notes || [];

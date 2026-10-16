@@ -71,7 +71,7 @@ export default function LiveMeeting({
   };
 
   const chairState =
-    speaking?.kind === "opening" ? "speaking" :
+    speaking?.kind === "opening" || speaking?.kind === "chair" ? "speaking" :
     (phase === "preparing" && !chairOpening) || phase === "resolution" ? "writing" :
     "chairing";
 
@@ -94,6 +94,8 @@ export default function LiveMeeting({
   let bubble;
   if (speaking?.kind === "opening") {
     bubble = { label: `Opening · ${chair.name}`, text: excerpt(speaking.message) };
+  } else if (speaking?.kind === "chair") {
+    bubble = { label: `${chair.name} · Round ${speaking.round} · puts it to the board`, text: excerpt(speaking.message) };
   } else if (speaking?.kind === "founder") {
     bubble = { label: `You · Round ${speaking.round}${speaking.to_name ? ` · to ${firstName(speaking.to_name)}` : ""}`, text: excerpt(speaking.message) };
   } else if (speaking) {
