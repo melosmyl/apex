@@ -10,6 +10,7 @@ import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { callOf, openCallsForOpening, openCallsSentence, pastMeetingsSection, pastResolutionsSection, withCalls } from '../_shared/founderCalls.ts';
 import { NOTE_LIMIT, STEP_STALE_MS, beforeMeetingSection, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
+import { withFactsRule } from '../_shared/factsRule.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -248,7 +249,7 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
         // Her book, hobby or place may come up here; never in the resolution.
         personal_details: true,
         // The Chair opens knowing what the founder has told us, like the board.
-        company_context: companyProfile(company) || null, meeting_context: null,
+        company_context: withFactsRule(companyProfile(company), { asks: false }), meeting_context: null,
         user_question: prompt, previous_responses: [], output_schema: CHAIR_OPENING_SCHEMA,
         temperature: 0.4, request_type: 'chair_opening', deadline_at: deadlineAt,
       }),
@@ -423,7 +424,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
         // Their own lens, and their own commitments on top of what everyone
         // gets; the full list stays in the package later rounds and the Chair use.
         system_instructions: `${advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`}\n${lensFor(advisor)}`,
-        company_context: roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage,
+        company_context: withFactsRule(roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage),
         user_question: question, previous_responses: [], output_schema: meeting.turn_shape ? INDEPENDENT_SCHEMA_SHAPED : INDEPENDENT_SCHEMA,
         temperature: advisor.temperature, request_type: 'independent', deadline_at: deadlineAt,
         personal_details: true, // nothing said yet in this meeting
@@ -461,7 +462,7 @@ async function runRoundOne({ db, supabaseUrl, serviceKey, meeting, company, user
     ask: (advisor, note) => callAdvisor(supabaseUrl, serviceKey, {
       advisor_id: advisor.id, company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       system_instructions: `${advisor.system_instructions || advisor.biography || `You are ${advisor.name}, a ${advisor.role}.`}\n${lensFor(advisor)}`,
-      company_context: roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage,
+      company_context: withFactsRule(roundOneContext ? `${roundOneContext}${commitmentsFor(advisor, commitments)}` : contextPackage),
       meeting_context: note, user_question: question, previous_responses: [], output_schema: meeting.turn_shape ? INDEPENDENT_SCHEMA_SHAPED : INDEPENDENT_SCHEMA,
       temperature: advisor.temperature, request_type: 'independent_redo', deadline_at: deadlineAt, personal_details: true,
     }, { db, provider: advisor.default_provider, model: advisor.default_model }).then(data => formatIndependent({ advisor, data })).catch(() => null),

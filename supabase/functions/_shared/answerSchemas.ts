@@ -34,7 +34,7 @@ export const INDEPENDENT_SCHEMA = {
     position: { type: 'string', description: 'Your overall position on the question' },
     recommendation: { type: 'string', description: 'Your specific recommendation' },
     key_arguments: { type: 'array', items: { type: 'string' } },
-    assumptions: { type: 'array', items: { type: 'string' }, description: 'Empty if none' },
+    assumptions: { type: 'array', items: { type: 'string' }, description: "Conditions your advice depends on, as conditions to check. Never a fact about the business that isn't in the record or the founder's words: ask that in missing_information instead. Empty if none" },
     risks: { type: 'array', items: { type: 'string' }, description: 'Empty if none' },
     missing_information: {
       type: 'array',
@@ -65,7 +65,7 @@ export const INDEPENDENT_SCHEMA_SHAPED = {
   ...INDEPENDENT_SCHEMA,
   properties: {
     position: R1_POSITION,
-    because: { type: 'string', description: 'One sentence: the main reason for your position, naming something specific to this company or question (a number, a person, a place, or a fact the founder gave)' },
+    because: { type: 'string', description: "One sentence: the main reason for your position, naming something specific to this company or question, taken from the record or the founder's words (a number, a person, a place, or a fact the founder gave), never one you've supposed" },
     would_change_my_mind: { type: 'string', description: 'One fact that could be checked and would change your mind' },
     ...R1_REST,
   },

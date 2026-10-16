@@ -8,6 +8,7 @@ import { mergeRepair, normalizeResults, plainMissingInfo, recordPushbackChanges,
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 import { chairTags } from '../_shared/turnShape.ts';
+import { withFactsRule } from '../_shared/factsRule.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
@@ -83,7 +84,7 @@ Everything else (reasoning, agreement, assumptions, the minority view) is the fu
 const RESOLUTION_RULES = `=== HOW TO WRITE THIS RESOLUTION ===
 AGREEMENT IS NOT EVIDENCE. Present converged advisors once, as the CONVERGENCE instruction says, but when the whole board converges treat it as a reason for LOWER confidence, not higher: advisors who all reached the same view may share the same blind spot, and nobody tested it. Say so plainly in your reasoning and in confidence_reason, and set overall_confidence_score lower than you would for an answer that survived real disagreement. Never cite the board's agreement as a strength of the recommendation.
 WHAT THIS RESTS ON, AND WHAT WOULD CHANGE THE BOARD'S MIND:
-- assumptions is what this decision rests on: the conditions that must hold for it to be right.
+- assumptions is what this decision rests on: the conditions that must hold for it to be right. A fact about the business that isn't in the record or the founder's words is never written as settled: it goes in missing_information as a question, and here, if at all, as a condition to check ("if most of your buyers are local...").
 - what_would_change_minds is different: concrete facts that could be checked and would reverse the decision. Take them only from the advisors' own "would change their mind" lines in the transcript; leave it empty if those lines give nothing concrete or there are none. Never restate an assumption as one.
 MISSING INFORMATION: write each item in plain words, as a question to the founder. Never write internal field names or keys (anything like profile_field or existing_assets).`;
 
@@ -340,7 +341,7 @@ Deno.serve(async (req) => {
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
       ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       // The same memory every round worked from (P1); older meetings, the profile.
-      system_instructions: CHAIR_INSTRUCTIONS, company_context: withoutFieldKeys(meeting.context_package || profile),
+      system_instructions: CHAIR_INSTRUCTIONS, company_context: withFactsRule(withoutFieldKeys(meeting.context_package || profile)),
       meeting_context: `${RESOLUTION_RULES}\n\n${discussionTranscript.some((m) => Array.isArray(m?.flags)) ? `${TURN_CHECKS}\n\n` : ''}${meetingContext}`,
       user_question: meeting.question, previous_responses: [],
       output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',
@@ -388,7 +389,7 @@ Deno.serve(async (req) => {
       try {
         const repair = await callAdvisor(supabaseUrl, serviceKey, {
           ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-          system_instructions: REPAIR_INSTRUCTIONS, company_context: meeting.context_package || profile,
+          system_instructions: REPAIR_INSTRUCTIONS, company_context: withFactsRule(meeting.context_package || profile),
           meeting_context: `${meetingContext}\n\n=== YOUR RESULTS ===\nActions:\n${resolution.priority_actions.map((a, i) => `${i + 1}. ${a.title} (${a.assigned_to})`).join('\n')}\nIssues and fixes:\n${resolution.top_issues.map((x, i) => `${i + 1}. ${x.problem}: fix: ${x.fix}`).join('\n')}\n\nReword only these, which are too vague to act on:\n${vague.map((v) => `- ${v}`).join('\n')}`,
           user_question: meeting.question, previous_responses: [],
           output_schema: RESULTS_REPAIR_SCHEMA, temperature: 0.3, request_type: 'chair_repair',

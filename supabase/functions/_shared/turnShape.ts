@@ -27,7 +27,7 @@ export function discussionSchema(names: string[], { speaker = '', mayAnswerFound
     type: 'object',
     properties: {
       position: { type: 'string', description: 'Your answer to the founder\'s question now, in one sentence.' },
-      because: { type: 'string', description: 'One sentence: your main reason, naming something specific to this company or question (a number, a person, a place, or a fact the founder gave).' },
+      because: { type: 'string', description: 'One sentence: your main reason, naming something specific to this company or question, taken from the record or the founder\'s words (a number, a person, a place, or a fact the founder gave), never one you\'ve supposed.' },
       answering_who: { type: 'string', enum: answering, description: answering.includes('Founder') ? 'The one person whose point you are answering: another advisor, or "Founder" since they asked you directly.' : 'The advisor whose point you are answering.' },
       answering_point: { type: 'string', description: 'Their point, in their words, in at most 15 words.' },
       stance: { type: 'string', enum: mustDisagree ? ['disagree'] : STANCES, description: 'What you do with their point: disagree, build on it, question it, or agree.' },
@@ -56,7 +56,7 @@ export function discussionSchema(names: string[], { speaker = '', mayAnswerFound
 // The rules of the turn, in the prompt.
 export function turnRules({ isLastRound, founderSpoke }: { isLastRound: boolean; founderSpoke: boolean }) {
   let t = `YOUR TURN HAS A SHAPE. Fill in every part:\n`;
-  t += `- position: your answer now, in one sentence. because: one sentence naming something specific to this company or question. Advice that would fit any business is not a reason.\n`;
+  t += `- position: your answer now, in one sentence. because: one sentence naming something specific to this company or question, from the record or the founder's words. Advice that would fit any business is not a reason.\n`;
   t += `- answering_who and answering_point: the one person whose point you are answering, and their point in a few words. Answer the sharpest disagreement, or the founder if they spoke. Never yourself.\n`;
   t += `- stance: disagree, build, question or agree. If you agree, say why in your own reason, not theirs; if you agree and add nothing, leave "adds" empty and keep the turn short.\n`;
   t += `- adds: the one thing nobody has said yet. Do not repeat a point already made in this meeting.\n`;

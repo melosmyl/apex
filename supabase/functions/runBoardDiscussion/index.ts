@@ -39,6 +39,7 @@ const CHALLENGE_AGAIN = `ASKED AGAIN: nobody in this round (above) disagreed wit
 import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, challengerFor, handOver, isServiceCall, later, meetingOwner, roundsFor, unusedNotes } from '../_shared/meetingDriver.ts';
+import { withFactsRule } from '../_shared/factsRule.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
 // startBoardMeeting) — nothing stops two advisors reaching for the same
@@ -299,7 +300,7 @@ async function runOneRound({ db = null, supabaseUrl, serviceKey, meeting, user, 
     }) : DISCUSSION_SCHEMA;
     return callAdvisor(supabaseUrl, serviceKey, {
       advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-      system_instructions: null, company_context: profile, meeting_context: meetingContext,
+      system_instructions: null, company_context: withFactsRule(profile), meeting_context: meetingContext,
       user_question: meeting.question, previous_responses: [], output_schema: schema,
       temperature: advisor.temperature, request_type: requestType, deadline_at: roundDeadline,
       // Their book, hobby or place stay on offer until they've used one.
