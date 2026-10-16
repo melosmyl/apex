@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Plus, RefreshCw, Shield } from "lucide-react";
 import CompanyCard from "@/components/companies/CompanyCard";
@@ -37,6 +38,7 @@ export default function Companies({ skipRedirect = false }) {
   const [companies, setCompanies] = useState(null);
   const [stats, setStats] = useState({});
   const [user, setUser] = useState(null);
+  const { logout } = useAuth();
   const [onboarding, setOnboarding] = useState(false);
   const [error, setError] = useState(false);
   const [meetings, setMeetings] = useState([]);
@@ -121,6 +123,8 @@ export default function Companies({ skipRedirect = false }) {
           <div className="flex flex-wrap gap-2 items-center">
             {user?.role === "admin" && <Link to="/admin"><Button variant="ghost"><Shield className="w-4 h-4 mr-1.5" /> Admin</Button></Link>}
             <Link to="/pricing"><Button variant="ghost">Pricing</Button></Link>
+            {user && !user.isAnonymous && <Link to="/account"><Button variant="ghost">Account</Button></Link>}
+            {user && !user.isAnonymous && <Button variant="ghost" onClick={() => logout(true)}>Sign out</Button>}
           </div>
         </div>
 

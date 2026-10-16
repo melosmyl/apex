@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { safeReturnTo, withReturnTo } from "@/lib/authReturnTo";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +45,7 @@ export default function Register() {
     try {
       const result = await base44.auth.register({ email, password, captchaToken });
       if (result?.session) {
-        window.location.href = "/";
+        window.location.href = safeReturnTo();
         return;
       }
       setShowOtp(true);
@@ -63,7 +64,7 @@ export default function Register() {
       if (result?.access_token) {
         base44.auth.setToken(result.access_token);
       }
-      window.location.href = "/";
+      window.location.href = safeReturnTo();
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {
@@ -93,7 +94,7 @@ export default function Register() {
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", "/");
+    base44.auth.loginWithProvider("google", safeReturnTo());
   };
 
   if (showOtp) {
@@ -159,7 +160,7 @@ export default function Register() {
       footer={
         <>
           Already have an account?{" "}
-          <Link to="/login" className="text-primary font-medium hover:underline">
+          <Link to={withReturnTo("/login")} className="text-primary font-medium hover:underline">
             Log in
           </Link>
         </>

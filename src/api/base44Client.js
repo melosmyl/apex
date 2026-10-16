@@ -120,6 +120,9 @@ async function fetchProfile(authUser) {
     id: authUser.id,
     email: authUser.email,
     role: profile?.role || 'user',
+    // The name other people in a company see (Workstream S); null until set.
+    displayName: profile?.display_name || null,
+    isAnonymous: !!authUser.is_anonymous,
   };
 }
 
@@ -204,13 +207,32 @@ const auth = {
     if (error) throw error;
   },
 
+  // Your own display name, through the one function that may change it.
+  async setDisplayName(name) {
+    const { data, error } = await supabase.rpc('set_my_display_name', { p_name: name });
+    if (error) throw error;
+    return data?.display_name ?? null;
+  },
+
+  // Signs out this browser only (not your other devices). If Supabase can't
+  // be reached, the session is still removed here, so "signed out" is true.
   async logout(redirectUrl) {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) {
+      for (const k of Object.keys(localStorage)) if (/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k);
+    }
     if (redirectUrl) window.location.href = '/login';
   },
 
+  // Sign in, then come back here: only a same-origin path is passed on
+  // (and Login checks it again with safeReturnTo).
   redirectToLogin(returnUrl) {
-    window.location.href = '/login';
+    let path = '/';
+    try {
+      const url = new URL(returnUrl || '/', window.location.origin);
+      if (url.origin === window.location.origin) path = url.pathname + url.search;
+    } catch { /* keep "/" */ }
+    window.location.href = path === '/' ? '/login' : `/login?returnTo=${encodeURIComponent(path)}`;
   },
 };
 
