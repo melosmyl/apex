@@ -137,6 +137,78 @@
 .landing .ticker .track span::after { content: "\00B7"; margin-left: 2.5rem; color: var(--room-accent); }
 @keyframes landing-slide { to { transform: translateX(-50%); } }
 
+/* Why not just ask a chatbot? (the owner's mock, in the white tokens) */
+.landing .versus { padding-top: clamp(4rem, 8vw, 7rem); }
+.landing .versus h2 { max-width: 18ch; }
+.landing .versus h2 em { font-style: italic; color: var(--room-accent); }
+.landing .versus .sub { max-width: 36rem; margin-top: 0.8rem; }
+.landing .versus .asked { margin: 2.5rem 0 2rem; display: grid; justify-items: start; gap: 1.1rem; }
+.landing .versus .asked blockquote {
+  margin: 0;
+  max-width: 40rem;
+  padding: 0.9rem 1.2rem;
+  border-radius: 16px;
+  box-shadow: var(--room-shadow);
+  font-family: var(--room-serif);
+  font-weight: 300;
+  font-size: clamp(1.1rem, 1.8vw, 1.3rem);
+  line-height: 1.35;
+}
+.landing .versus .asked blockquote::before,
+.landing .versus .asked blockquote::after { content: ""; position: absolute; border-style: solid; border-color: transparent; border-bottom: 0; }
+.landing .versus .asked blockquote::before { left: 28px; bottom: -11px; border-width: 11px 9px 0; border-top-color: var(--room-ink); }
+.landing .versus .asked blockquote::after { left: 31px; bottom: -6px; border-width: 7px 6px 0; border-top-color: var(--room-mat); }
+.landing .versus .asked figcaption { color: var(--room-muted); font-size: 0.7rem; letter-spacing: 0.12em; }
+
+.landing .versus .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; align-items: start; }
+.landing .versus .col { min-width: 0; background: var(--room-mat); border: var(--room-border); border-radius: 8px; box-shadow: var(--room-shadow); overflow: hidden; }
+.landing .versus .head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.3rem 1rem; padding: 0.9rem 1.2rem; border-bottom: var(--room-border); }
+.landing .versus .head b { font-family: var(--room-serif); font-weight: 500; font-size: 1.15rem; }
+.landing .versus .head .room-mono { font-size: 0.64rem; color: var(--room-ink); }
+.landing .versus .bot .head { background: var(--room-panel); }
+.landing .versus .room .head { background: var(--room-blue); }
+
+/* The chatbot: one essay that fades out */
+.landing .versus .essay { padding: 1.2rem 1.3rem 0.4rem; color: var(--room-muted); font-size: 0.98rem; }
+.landing .versus .essay p,
+.landing .versus .essay h3 { margin: 0 0 0.9rem; }
+.landing .versus .essay h3 { font-family: var(--room-sans); font-size: 1rem; font-weight: 600; color: var(--room-ink); }
+.landing .versus .essay .cut { font-size: 1.3rem; line-height: 1; letter-spacing: 0.1em; color: var(--room-ink); }
+.landing .versus .rec { display: grid; gap: 0.15rem; margin-bottom: 1rem; padding-bottom: 0.9rem; border-bottom: 1px solid var(--room-line); }
+.landing .versus .rec b { font-size: 1.6rem; font-weight: 600; line-height: 1.1; color: var(--room-ink); }
+.landing .versus .rec span:last-child { font-size: 0.9rem; }
+.landing .versus .essay-foot { display: flex; justify-content: space-between; gap: 1rem; padding: 0.9rem 1.3rem 1.2rem; border-top: 1px solid var(--room-line); color: var(--room-muted); font-size: 0.92rem; }
+
+/* The Room: four positions, the Chair, one task */
+.landing .versus .block { padding: 1rem 1.3rem 1.1rem; border-bottom: 1px solid var(--room-line); }
+.landing .versus .block:last-child { border-bottom: 0; }
+.landing .versus .positions { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.9rem; }
+.landing .versus .position,
+.landing .versus .task-row { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 0.8rem; align-items: start; }
+.landing .versus .face { display: block; width: 40px; height: 50px; object-fit: cover; object-position: top; background: var(--room-panel); border: var(--room-border); border-radius: 3px; }
+.landing .versus .who { display: block; font-size: 0.9rem; line-height: 1.3; }
+.landing .versus .who b { font-weight: 600; }
+.landing .versus .who span { color: var(--room-muted); }
+.landing .versus .position q { display: block; margin-top: 0.15rem; font-family: var(--room-serif); font-weight: 300; font-size: 1.08rem; line-height: 1.3; quotes: "\201C" "\201D"; }
+.landing .versus .position q.pending { font-family: var(--room-mono); font-size: 0.74rem; color: var(--room-accent); }
+.landing .versus .position q.pending::before,
+.landing .versus .position q.pending::after { content: none; }
+.landing .versus .verdict { background: var(--room-panel); }
+.landing .versus .verdict p { margin: 0.35rem 0 0.9rem; font-family: var(--room-serif); font-weight: 300; font-size: 1.22rem; line-height: 1.32; }
+.landing .versus .confidence { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.8rem; font-size: 0.9rem; color: var(--room-muted); }
+.landing .versus .confidence b { color: var(--room-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.landing .versus .meter { display: block; width: 7rem; height: 0.7rem; background: var(--room-mat); border: var(--room-border); border-radius: 999px; overflow: hidden; }
+.landing .versus .meter span { display: block; height: 100%; background: var(--room-accent); }
+.landing .versus .verdict .why { margin: 0.6rem 0 0; font-family: var(--room-sans); font-size: 0.88rem; line-height: 1.4; color: var(--room-muted); }
+.landing .versus .task-row { margin-top: 0.6rem; }
+.landing .versus .task-row p { margin: 0; font-weight: 500; line-height: 1.35; }
+.landing .versus .task-row .meta { color: var(--room-muted); font-size: 0.88rem; }
+.landing .versus .do { margin: 0.8rem 0 0 calc(40px + 0.8rem); font-size: 0.62rem; padding: 0.3rem 0.65rem; }
+
+/* The three lines under it */
+.landing .versus .three { list-style: none; margin: 2.5rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; }
+.landing .versus .three li { border-top: var(--room-border); padding-top: 0.8rem; font-family: var(--room-serif); font-weight: 500; font-size: clamp(1.1rem, 1.6vw, 1.3rem); line-height: 1.25; letter-spacing: -0.01em; }
+
 /* Who's in the room */
 .landing .speak { padding-top: clamp(4rem, 8vw, 7rem); }
 .landing .section-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem; align-items: end; margin-bottom: 3rem; }
@@ -225,6 +297,10 @@
   .landing .card .mug { grid-column: 1 / -1; }
   .landing .card .mug { text-align: left; }
   .landing .steps { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+  .landing .versus .cols,
+  .landing .versus .three { grid-template-columns: minmax(0, 1fr); }
+  .landing .versus .three { gap: 1rem; }
+  .landing .versus .essay .wide-only { display: none; } /* columns stacked: the reply stops at its first cut */
   .landing .gallery { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .landing .gallery .shot { transform: none !important; }
   .landing .top nav { gap: 1.25rem; }
