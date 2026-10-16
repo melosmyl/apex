@@ -93,7 +93,7 @@ try {
 
   // Someone who only made a call is remembered too; names go once nothing of theirs is left
   const caller = await person('caller', 'Cal Caller');
-  const { data: callMtg } = await admin.from('board_meetings').insert({ company_id: co.id, created_by_id: owner.id, question: `Theirs ${tag}`, founder_decision: 'accepted', decided_by: caller.id }).select('id, decided_by').single();
+  const { data: callMtg } = await admin.from('board_meetings').insert({ company_id: co.id, created_by_id: owner.id, question: `Theirs ${tag}`, founder_decision: 'accept', decided_by: caller.id }).select('id, decided_by').single();
   check(callMtg?.decided_by === caller.id, 'the server can say who made the call');
   await admin.auth.admin.deleteUser(caller.id);
   check(await sql(`select display_name from public.former_members where user_id = '${caller.id}'`) === 'Cal Caller', "someone who only made a call is remembered by name");
@@ -124,7 +124,7 @@ try {
   // Who made the call on a meeting
   const { data: mtg } = await owner.client.from('board_meetings').insert({ company_id: co2.id, created_by_id: owner.id, question: `Call ${tag}` }).select().single();
   check(mtg && mtg.decided_by === null, 'a new meeting has no decider');
-  let r = await owner.client.from('board_meetings').update({ founder_decision: 'accepted' }).eq('id', mtg.id).select('decided_by').single();
+  let r = await owner.client.from('board_meetings').update({ founder_decision: 'accept' }).eq('id', mtg.id).select('decided_by').single();
   check(r.data?.decided_by === owner.id, 'making the call records who made it', r);
   r = await owner.client.from('board_meetings').update({ founder_decision_notes: 'thinking more' }).eq('id', mtg.id).select('decided_by').single();
   check(r.data?.decided_by === owner.id, "editing the notes doesn't change who decided", r);
@@ -136,7 +136,7 @@ try {
     "the server's other updates leave the decider as it was", null);
   r = await owner.client.from('board_meetings').update({ founder_decision: 'undecided' }).eq('id', mtg.id).select('decided_by').single();
   check(r.data?.decided_by === null, 'taking the call back ("undecided", as the screen saves it) clears it', r);
-  await owner.client.from('board_meetings').update({ founder_decision: 'accepted' }).eq('id', mtg.id);
+  await owner.client.from('board_meetings').update({ founder_decision: 'accept' }).eq('id', mtg.id);
   r = await owner.client.from('board_meetings').update({ founder_decision: null }).eq('id', mtg.id).select('decided_by').single();
   check(r.data?.decided_by === null, '…and so does clearing it', r);
 
@@ -152,8 +152,8 @@ try {
 
   // Every remaining link to an account is a personal one
   const links = await sql(`select string_agg(conrelid::regclass::text, ',' order by conrelid::regclass::text) from pg_constraint where contype = 'f' and confrelid = 'auth.users'::regclass and connamespace = 'public'::regnamespace`);
-  check(links === 'assistant_chases,assistant_events,companies,document_download_logs,free_meeting_attempts,meeting_messages,profiles,subscriptions',
-    'accounts are linked only to profiles, companies (until S2) and personal records', links);
+  check(links === 'assistant_chases,assistant_events,company_members,document_download_logs,free_meeting_attempts,meeting_messages,profiles,subscriptions',
+    'accounts are linked only to profiles, memberships and personal records (no company content)', links);
 } finally {
   for (const id of created) await admin.auth.admin.deleteUser(id).catch(() => {});
   await sql(`delete from public.former_members where user_id in (${created.map((id) => `'${id}'`).join(',') || "'00000000-0000-0000-0000-000000000000'"})`);

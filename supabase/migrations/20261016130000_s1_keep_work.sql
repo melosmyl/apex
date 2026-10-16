@@ -68,14 +68,15 @@ create index tasks_assignee_user on public.tasks (assignee_user_id) where assign
 
 -- From the browser, worked out here whatever was sent: the person making the
 -- call (or approving), kept as it was when the call itself doesn't change,
--- cleared when it's taken back ("undecided" counts as no call). The server
--- (service role) may say who did it, for work it does on someone's behalf.
+-- cleared when there's no call (a call is accept, modify or reject; anything
+-- else, such as "undecided", means still open). The server (service role)
+-- may say who did it, for work it does on someone's behalf.
 create function public.record_decided_by()
 returns trigger
 language plpgsql set search_path = ''
 as $$
 begin
-  if coalesce(new.founder_decision, 'undecided') = 'undecided' then
+  if new.founder_decision is null or new.founder_decision not in ('accept', 'modify', 'reject') then
     new.decided_by := null;
   elsif current_user not in ('anon', 'authenticated') then
     null;  -- the server's value stands

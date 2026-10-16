@@ -12,10 +12,13 @@ Workstreams P and T have merged into main.
 | Migration | Step | What |
 |---|---|---|
 | `20261016120000_s0_display_names` | S0 | A display name on profiles; set only through `set_my_display_name()`; filled from a name given at sign-up (Google) |
+| `20261016140000_s2_members_and_invitations` | S2 | `company_members` (owner, manager, member; one owner, always one) and `company_invitations` (7 days, one open per person, only a hash of the link's secret); role checks; every company's founder made its owner, and every new company's creator; deleting an account deletes the companies the person owns, refused while others are in one; anonymous visitors never join others' companies |
 | `20261016130000_s1_keep_work` | S1 | Company content no longer deleted with the account of the person who made it (companies still go with their founder until S2); `former_members` keeps the name of someone who leaves work behind; `decided_by`, `approved_by_user_id` recorded by the database; `tasks.assignee_user_id`; who made a row can't be changed |
 
-At merge time, check that these still come after main's newest migration, and after the
-workspace's (`20261016110000`–`20261016110800`); renumber if not.
+**Renumber at merge time.** Main keeps gaining migrations: on 16 October it already had
+`20261017100000_note_withdraw`, numbered after these. Before merging, renumber Teams' migrations
+(in order) to come after main's newest and after the workspace's (`20261016110000`–`20261016110800`,
+which also need renumbering after main's by then). Check with `supabase db push --dry-run`.
 
 ## Before or at deploy
 
@@ -29,20 +32,28 @@ workspace's (`20261016110000`–`20261016110800`); renumber if not.
 
 ## Follow-ups owed by later steps
 
-- **S2:** `remember_departing_member` decides "a company that isn't theirs" by `companies.created_by_id`;
-  rewrite it for membership (owner role), and replace the companies' account cascade with an
-  explicit "delete companies this person solely owns" step.
+- **S2 (done):** the departing-member check and account deletion now go by ownership.
+- **For the admin who deletes accounts by hand:** deleting an account is refused while the person owns a
+  company other people belong to. Hand it over or delete the company first.
+- **S3:** `prepareAccountabilityChases` writes `assistant_chases.created_by_id = company.created_by_id` (the
+  founder); after a founder hands over and deletes their account, that insert fails (the column still links
+  to accounts). Chase the task's person instead. Several functions still authorise by
+  `companies.created_by_id`; S3 moves them to membership.
 - **S3:** `taskRun` should pass `approved_by_user_id: user.id` when it saves an accepted result (the
   database lets the server say who approved).
 - **S6:** check `tasks.assignee_user_id` is a member of the task's company before it's used.
 - **Names of people who left** are cleared when a company is deleted (which happens nightly, through
   the anonymous clean-up), so a name can outlast its last trace by up to a day. If that needs to be
   tighter, run the same clean-up from a nightly job.
+- **Invitations** are deleted 30 days after they're accepted, cancelled or expired (nightly job
+  `purge-old-invitations`, plain SQL), and at once when the invited person's account is deleted.
 - **Privacy notice:** say that when someone leaves, their name stays on work they did for a company
   (decided by, approved by, made by), until that company's data is deleted.
-- **Optional, with the owner's yes:** a read-only count in production of rows whose creator differs
-  from their company's creator (from Base44 imports or admin edits); such rows now outlive the
-  creator's account.
+- **Checked in production (read-only, owner's yes, 16 October 2026):** no row in any of the 13 content
+  tables has a creator different from its company's founder, and none is without a company (advisors 91,
+  board meetings 39, tasks 84, progress nodes 48 and completions 15, documents 11, progress trees 7,
+  task runs 5; projects, decisions, pins, notes and voice sessions empty). S1 changes nothing about who
+  existing data belongs to.
 - **Unrelated, found in review:** `src/components/documents/DocumentManager.jsx:109` writes
   `"founder"` into a uuid column, so adding a document there fails (main session).
 
