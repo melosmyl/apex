@@ -15,7 +15,7 @@ import { usePin } from "@/components/pins/PinContext";
 import { base44 } from "@/api/base44Client";
 import { toast } from "@/components/ui/use-toast";
 import { SITE_URL } from "@/lib/branding";
-import { actionsHeading, resultSections } from "@/lib/meetingResult";
+import { actionsHeading, plainMissingInfo, resultSections } from "@/lib/meetingResult";
 import TaskDesk from "@/components/tasks/TaskDesk";
 import { useTaskRuns } from "@/lib/taskRuns";
 import { formatCost } from "@/lib/money";
@@ -248,15 +248,16 @@ export default function MeetingResult({ result, advisors, companyId, onRecordDec
               </PinnableText>
               <div className="grid gap-5 sm:grid-cols-2">
                 <List title="What the board agreed" items={resolution.areas_of_agreement} />
-                <List title="What would change its mind" items={resolution.assumptions} />
+                <List title="What this rests on" items={resolution.assumptions} />
               </div>
+              <List title="What would change the board's mind" items={resolution.what_would_change_minds} />
               {(typeof resolution.minority_opinion === "string" ? resolution.minority_opinion : "") && (
                 <div>
                   <h4 className="room-mono mb-2">The minority view</h4>
                   <p className="text-sm">{resolution.minority_opinion}</p>
                 </div>
               )}
-              <List title="Missing information" items={resolution.missing_information} />
+              <List title="Missing information" items={(resolution.missing_information || []).map((it) => plainMissingInfo(typeof it === "string" ? it : it?.detail)).filter(Boolean)} />
               {resolution.recommended_experiment && (
                 <div>
                   <h4 className="room-mono mb-2">An experiment worth running</h4>

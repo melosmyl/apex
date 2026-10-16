@@ -46,3 +46,22 @@ export function actionsHeading(count) {
   if (count === 1) return "Do this in the next 24 hours";
   return `Do these ${count} things in the next 24 hours`;
 }
+
+// Missing information in the founder's words (owner, 16 October 2026): the
+// company record's internal field names never show, including in meetings
+// saved before the server cleaned them. Where a gap has a place the founder
+// can see and edit, it says where (the same rule as the server's
+// plainMissingInfo in supabase/functions/_shared/resultsStandard.ts).
+const PROFILE_FIELD_KEYS = ["industry", "business_model", "solo_founder", "team_size", "target_customer", "primary_market", "available_capital", "available_time", "existing_assets", "immediate_goal", "confidence_gaps", "deadlines", "country"];
+const FIELD_HOME = { industry: "in your company settings under Industry" };
+export function plainMissingInfo(text) {
+  let t = String(text ?? "");
+  let home = "";
+  const keyed = (key) => { if (!home && FIELD_HOME[key]) home = FIELD_HOME[key]; return ""; };
+  t = t.replace(/\s*[([]\s*profile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?\s*[)\]]/gi, (_m, k) => keyed(k.toLowerCase()));
+  t = t.replace(/\s*\bprofile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?/gi, (_m, k) => keyed(k.toLowerCase()));
+  t = t.replace(/\s*[([]["']?([a-z]+(?:_[a-z]+)+)["']?[)\]]/g, (m, k) => (PROFILE_FIELD_KEYS.includes(k) ? keyed(k) : m));
+  t = t.replace(/\s+([.,;:?!])/g, "$1").replace(/\s{2,}/g, " ").trim();
+  if (!t) return "";
+  return home ? `${t.replace(/[.?!]$/, "")} (${home})${/[?]$/.test(t) ? "?" : "."}` : t;
+}

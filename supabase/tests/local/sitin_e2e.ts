@@ -191,10 +191,12 @@ check(r2.length === 6 && r2.every((l: any) => l.marked.includes('120 words at mo
   'every advisor is given the shape, the 120-word cap, and the final round\'s extra parts', r2.map((l: any) => l.marked));
 const chairLog = tlog.filter((l: any) => l.who === names.chair && l.marked.includes('TURNS THAT FAILED A CHECK'));
 check(chairLog.length >= 1 && chairLog.some((l: any) => l.marked.includes('[SAME POINT AS ')), 'the Chair sees the failed turns tagged', chairLog.map((l: any) => l.marked));
+check((mT?.board_resolution?.what_would_change_minds || []).length >= 1 && (mT?.board_resolution?.assumptions || []).length >= 1,
+  "with the turn shape, the advisors' 'would change my mind' lines give the board's list; what it rests on is kept apart", [mT?.board_resolution?.what_would_change_minds, mT?.board_resolution?.assumptions]);
 
 // ---- 6. Without the switch, today's turns, exactly.
 console.log('\n== without the turn shape switch, a meeting is as it was this morning');
-await script({ marks: ['YOUR TURN HAS A SHAPE', 'Why: ', 'set agrees_with to', 'TURNS THAT FAILED A CHECK'] });
+await script({ marks: ['YOUR TURN HAS A SHAPE', 'Why: ', 'set agrees_with to', 'TURNS THAT FAILED A CHECK', 'THE WHOLE BOARD AGREED', 'AGREEMENT IS NOT EVIDENCE'] });
 const O = await start('Should we open on Sundays?', 'quick', false);
 const mO = await waitFor(O, finished);
 const olog = await fakeLog();
@@ -204,7 +206,11 @@ check(mO?.status === 'complete' && mO?.turn_shape === false && oTurns.every((x: 
   'no reasons, shape or checks are saved', oTurns.map((x: any) => Object.keys(x)));
 check(olog.every((l: any) => !l.marked.includes('YOUR TURN HAS A SHAPE') && !l.marked.includes('Why: ') && !l.marked.includes('TURNS THAT FAILED A CHECK'))
   && olog.some((l: any) => l.marked.includes('set agrees_with to')),
-  "the advisors and the Chair are asked exactly as before", olog.map((l: any) => [l.who, l.marked]));
+  "the advisors are asked exactly as before", olog.map((l: any) => [l.who, l.marked]));
+// The Chair's resolution fixes apply to every meeting (owner, 16 October 2026).
+const chairO = olog.filter((l: any) => l.who === names.chair && l.marked.includes('AGREEMENT IS NOT EVIDENCE'));
+check(chairO.length >= 1 && chairO.some((l: any) => l.marked.includes('THE WHOLE BOARD AGREED')) && (mO?.board_resolution?.what_would_change_minds || []).length === 0,
+  "the whole board agreed: the Chair is told that's a reason for lower confidence; with no advisor saying what would change their mind, that list stays empty", [chairO.map((l: any) => l.marked), mO?.board_resolution?.what_would_change_minds, mO?.convergence]);
 const askId = crypto.randomUUID();
 const ask = await call('startBoardMeeting', { company_id: co.id, question: 'x?', advisor_ids: debaters, meeting_id: askId, server_driven: true, turn_shape: true });
 check(ask.status === 200 && (await row(askId))?.turn_shape === true, 'a signed-in founder can ask for it', ask.status);

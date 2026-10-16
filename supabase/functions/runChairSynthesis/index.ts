@@ -3,7 +3,7 @@ import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, resolutionCallFields } from '../_shared/chair.ts';
-import { mergeRepair, normalizeResults, recordPushbackChanges, vagueParts } from '../_shared/resultsStandard.ts';
+import { mergeRepair, normalizeResults, plainMissingInfo, recordPushbackChanges, vagueParts } from '../_shared/resultsStandard.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 import { chairTags } from '../_shared/turnShape.ts';
@@ -75,6 +75,16 @@ THE RESULTS — the founder reads these first, in this order, so each must stand
 5. disagreements: where the room genuinely disagreed and it wasn't settled, at most 3, one line each naming who disagreed about what. Real disagreements only; empty if the room agreed. Don't invent one.
 Then confidence_reason: one line on why the confidence is what it is.
 Everything else (reasoning, agreement, assumptions, the minority view) is the full record the founder can open; keep it accurate and don't repeat the results there word for word.`;
+
+// More of the Chair's rules (owner, 16 October 2026). They travel with the
+// meeting, not in her instructions: those are cut at 6,000 characters
+// (advisorPrompt.ts), and CHAIR_INSTRUCTIONS is close to that already.
+const RESOLUTION_RULES = `=== HOW TO WRITE THIS RESOLUTION ===
+AGREEMENT IS NOT EVIDENCE. Present converged advisors once, as the CONVERGENCE instruction says, but when the whole board converges treat it as a reason for LOWER confidence, not higher: advisors who all reached the same view may share the same blind spot, and nobody tested it. Say so plainly in your reasoning and in confidence_reason, and set overall_confidence_score lower than you would for an answer that survived real disagreement. Never cite the board's agreement as a strength of the recommendation.
+WHAT THIS RESTS ON, AND WHAT WOULD CHANGE THE BOARD'S MIND:
+- assumptions is what this decision rests on: the conditions that must hold for it to be right.
+- what_would_change_minds is different: concrete facts that could be checked and would reverse the decision. Take them only from the advisors' own "would change their mind" lines in the transcript; leave it empty if those lines give nothing concrete or there are none. Never restate an assumption as one.
+MISSING INFORMATION: write each item in plain words, as a question to the founder. Never write internal field names or keys (anything like profile_field or existing_assets).`;
 
 // Only for a meeting with the turn shape on, whose turns carry the checks.
 const TURN_CHECKS = `TURNS THAT FAILED A CHECK — some turns carry a tag in square brackets:
@@ -306,6 +316,18 @@ Deno.serve(async (req) => {
     }
 
     const convergence = meeting.convergence || [];
+    // The whole board ended up in one place (owner, 16 October 2026): every
+    // debater in a converged group, or, with the turn shape on, nobody
+    // disagreeing with anyone in the last round.
+    const debaterNames = [...new Set(discussionTranscript.filter((m) => m.round > 1 && m.advisor_id && m.message_type !== 'chair_tabling').map((m) => m.advisor_name))];
+    const converged = new Set(convergence.flatMap((c) => c.advisors || []));
+    const lastRound = Math.max(0, ...discussionTranscript.map((m) => Number(m.round) || 0));
+    const lastTurns = discussionTranscript.filter((m) => m.round === lastRound && m.advisor_id && m.message_type !== 'chair_tabling');
+    const wholeBoardAgreed = debaterNames.length > 1 && (debaterNames.every((n) => converged.has(n))
+      || (lastTurns.length > 1 && lastTurns.every((m) => m.stance && m.stance !== 'disagree')));
+    if (wholeBoardAgreed) {
+      meetingContext += `\n\n=== THE WHOLE BOARD AGREED ===\nEvery advisor ended up in the same place. As AGREEMENT IS NOT EVIDENCE above says, that is a reason for lower confidence, not a strength: say so in your reasoning and confidence_reason.\n`;
+    }
     if (convergence.length) {
       meetingContext += `\n\n=== CONVERGED ADVISORS ===\nThese advisors' recommendations genuinely converged during this discussion — present each group's shared recommendation once, attributed to all named, per the CONVERGENCE instruction:\n`;
       convergence.forEach(c => { meetingContext += `- ${(c.advisors || []).map(n => String(n).slice(0, 100)).join(' and ')} converged on essentially the same recommendation.\n`; });
@@ -314,7 +336,8 @@ Deno.serve(async (req) => {
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
       ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       // The same memory every round worked from (P1); older meetings, the profile.
-      system_instructions: discussionTranscript.some((m) => Array.isArray(m?.flags)) ? `${CHAIR_INSTRUCTIONS}\n\n${TURN_CHECKS}` : CHAIR_INSTRUCTIONS, company_context: meeting.context_package || profile, meeting_context: meetingContext,
+      system_instructions: CHAIR_INSTRUCTIONS, company_context: meeting.context_package || profile,
+      meeting_context: `${RESOLUTION_RULES}\n\n${discussionTranscript.some((m) => Array.isArray(m?.flags)) ? `${TURN_CHECKS}\n\n` : ''}${meetingContext}`,
       user_question: meeting.question, previous_responses: [],
       output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',
       // Ends in time for this function to save the resolution and its tasks.
@@ -345,6 +368,12 @@ Deno.serve(async (req) => {
     // never name different owners for the same commitment.
     const nonHumanAdvisors = (advisors || []).filter(a => a.type !== 'human');
     normalizeResults(resolution, nonHumanAdvisors);
+    // Missing information in plain words; what would change the board's mind
+    // only from what the advisors actually said would.
+    resolution.missing_information = (Array.isArray(resolution.missing_information) ? resolution.missing_information : []).map(plainMissingInfo).filter(Boolean);
+    const saidWhat = [...independentResponses, ...discussionTranscript].some((m) => String(m?.would_change_my_mind || '').trim());
+    resolution.what_would_change_minds = saidWhat && Array.isArray(resolution.what_would_change_minds)
+      ? resolution.what_would_change_minds.map((x) => String(x).trim()).filter(Boolean).slice(0, 5) : [];
 
     // Nothing vague survives: an action or fix that names a category of work
     // ("validate demand") goes back to the Chair once, if there's time left

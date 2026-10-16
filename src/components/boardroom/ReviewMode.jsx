@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import AdvisorAvatar from "@/components/AdvisorAvatar";
 import { ArrowRight, RotateCcw, ClipboardCheck, FileText, ThumbsUp, ThumbsDown, AlertTriangle, HelpCircle, Lightbulb } from "lucide-react";
 import { runReview, saveReviewMeeting } from "@/lib/meetingModes";
+import { plainMissingInfo } from "@/lib/meetingResult";
 import { base44 } from "@/api/base44Client";
 
 export default function ReviewMode({ company, companyId, advisors }) {
@@ -86,7 +87,7 @@ export default function ReviewMode({ company, companyId, advisors }) {
                 <ReviewSection icon={ThumbsUp} title="Strengths" items={result.strengths} tone="positive" />
                 <ReviewSection icon={ThumbsDown} title="Weaknesses" items={result.weaknesses} tone="negative" />
                 <ReviewSection icon={AlertTriangle} title="Risks" items={result.risks} tone="warning" />
-                <ReviewSection icon={HelpCircle} title="Missing information" items={result.missing_information} tone="neutral" />
+                <ReviewSection icon={HelpCircle} title="Missing information" items={(result.missing_information || []).map(plainMissingInfo).filter(Boolean)} tone="neutral" />
               </div>
 
               <div className="mt-4 bg-secondary/40 rounded-xl p-4">

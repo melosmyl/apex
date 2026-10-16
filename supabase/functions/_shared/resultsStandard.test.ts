@@ -1,5 +1,5 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { isVague, mergeRepair, normalizeResults, vagueParts } from './resultsStandard.ts';
+import { isVague, mergeRepair, normalizeResults, plainMissingInfo, vagueParts } from './resultsStandard.ts';
 
 const board = [
   { id: 'c', name: 'Margaret Ashford', role: 'The Chair', library_key: 'chair', type: 'ai', company_id: 'co' },
@@ -164,4 +164,14 @@ Deno.test("many switches go in one line, so the Chair's own disagreements keep t
   assertEquals(r.disagreements.length, 3);
   assert(r.disagreements[0].startsWith('Julian Rhodes, Priya Nair, Rafael Duarte and Sofia Marchetti changed position after you spoke.'));
   assertEquals(r.disagreements.slice(1), ['Grace and Marcus differ on stock levels.', 'Tomas thinks the timing is wrong.']);
+});
+
+Deno.test('missing information never shows internal field names; where a gap has a home, it says where', () => {
+  assertEquals(plainMissingInfo('What do you already have to sell from? (profile_field: existing_assets)'), 'What do you already have to sell from?');
+  assertEquals(plainMissingInfo('Which industry are you in [profile_field: "industry"]?'), 'Which industry are you in (in your company settings under Industry)?');
+  assertEquals(plainMissingInfo('How much capital is there (available_capital).'), 'How much capital is there.');
+  assertEquals(plainMissingInfo('Who buys the dinner sets now?'), 'Who buys the dinner sets now?');
+  assertEquals(plainMissingInfo('(profile_field: deadlines)'), '');
+  // Ordinary words in brackets stay.
+  assertEquals(plainMissingInfo('Stall fees (per day) at Spitalfields'), 'Stall fees (per day) at Spitalfields');
 });

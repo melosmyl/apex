@@ -4,6 +4,7 @@
 // room disagreed. The Chair writes these as their own fields; this module
 // tidies what comes back and catches advice too vague to act on.
 import { matchAdvisorByName, matchAdvisorByRole } from './advisorResolution.ts';
+import { PROFILE_FIELD_KEYS } from './answerSchemas.ts';
 
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -166,4 +167,21 @@ export function recordPushbackChanges(r: any, transcript: any[]) {
   ];
   r.disagreements = [...added, ...chairs, ...rest].slice(0, LIMITS.disagreements);
   return r;
+}
+
+// Missing information in the founder's words (owner, 16 October 2026): the
+// company record's internal field names never show. Where a gap has a place
+// the founder can see and edit, it says where; the others have none yet, so
+// nothing is said.
+const FIELD_HOME: Record<string, string> = { industry: 'in your company settings under Industry' };
+export function plainMissingInfo(text: unknown): string {
+  let t = String(text ?? '');
+  let home = '';
+  const keyed = (key: string) => { if (!home && FIELD_HOME[key]) home = FIELD_HOME[key]; return ''; };
+  t = t.replace(/\s*[([]\s*profile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?\s*[)\]]/gi, (_m, k) => keyed(k.toLowerCase()));
+  t = t.replace(/\s*\bprofile[_ ]field\s*[:=]\s*["']?([a-z_]+)["']?/gi, (_m, k) => keyed(k.toLowerCase()));
+  t = t.replace(/\s*[([]["']?([a-z]+(?:_[a-z]+)+)["']?[)\]]/g, (m, k) => (PROFILE_FIELD_KEYS.includes(k) ? keyed(k) : m));
+  t = t.replace(/\s+([.,;:?!])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  if (!t) return '';
+  return home ? `${t.replace(/[.?!]$/, '')} (${home})${/[?]$/.test(t) ? '?' : '.'}` : t;
 }
