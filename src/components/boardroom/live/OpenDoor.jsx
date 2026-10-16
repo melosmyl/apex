@@ -41,6 +41,7 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
   const [text, setText] = useState("");
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState(null);
+  const [withdrawing, setWithdrawing] = useState(null);
   const [error, setError] = useState(null);
   const barRef = useRef(null);
   const keyboard = useKeyboardInset();
@@ -135,10 +136,11 @@ export default function OpenDoor({ meetingId, row, debaters = [], isAnonymous = 
                   <span className={`min-w-0 flex-1 truncate ${n.withdrawn_at ? "text-muted-foreground line-through" : ""}`}>"{n.text}"{n.to_name ? ` (to ${firstName(n.to_name)})` : ""}</span>
                   <span className="room-mono text-muted-foreground">{s.label}</span>
                   {/* Not heard yet: it can be taken back, and never reaches the board. */}
-                  {!s.done && !chairBusy && (
+                  {/* While Round 1 is written or at a stop: nothing is holding it then. */}
+                  {!s.done && !chairBusy && (status === "preparing" || yourTurn) && (
                     <button type="button" className="border-b border-foreground text-xs disabled:opacity-50" disabled={!!busy}
-                      onClick={() => run("withdraw", { note_id: n.id })}>
-                      {busy === "withdraw" ? "Withdrawing…" : "Withdraw"}
+                      onClick={async () => { setWithdrawing(n.id); await run("withdraw", { note_id: n.id }); setWithdrawing(null); }}>
+                      {withdrawing === n.id ? "Withdrawing…" : "Withdraw"}
                     </button>
                   )}
                 </li>

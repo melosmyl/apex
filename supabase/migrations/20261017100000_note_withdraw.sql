@@ -6,7 +6,8 @@
 --    checked (status and the running step's claim), so a round that starts
 --    at that moment can't take it.
 -- 2. A note given before the meeting (before_meeting) and a withdrawn note
---    no longer count towards the six notes a meeting can take.
+--    no longer count towards the six notes a meeting can take; a meeting
+--    keeps at most 20 in all, withdrawn ones included.
 
 create or replace function public.append_founder_note(p_meeting_id uuid, p_note jsonb, p_max integer)
 returns boolean language sql security definer set search_path = public, pg_temp as $$
@@ -16,6 +17,7 @@ returns boolean language sql security definer set search_path = public, pg_temp 
      where id = p_meeting_id
        and (select count(*) from jsonb_array_elements(founder_notes) n
              where not (n ? 'withdrawn_at') and not coalesce((n ->> 'before_meeting')::boolean, false)) < p_max
+       and jsonb_array_length(founder_notes) < 20
        and status in ('preparing', 'independent_complete', 'discussing', 'discussion_complete')
     returning 1)
   select exists (select 1 from done);

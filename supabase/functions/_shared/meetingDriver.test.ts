@@ -58,7 +58,7 @@ Deno.test("the sweep's thresholds match the cron job's filter in the migration",
 });
 
 // ---- P1: the founder in the room
-import { beforeMeetingSection, challengerFor, nextTarget, notesInRunningRound, roundsFor, unusedNotes } from './meetingDriver.ts';
+import { beforeMeetingSection, challengerFor, nextTarget, roundsFor, unusedNotes } from './meetingDriver.ts';
 
 
 
@@ -146,10 +146,6 @@ Deno.test("a withdrawn note and the note before the meeting never go into a roun
     { id: 'n3', text: 'later', at: ago(10_000) },
   ];
   assertEquals(unusedNotes({ founder_notes: notes, discussion_transcript: [] }).map((n: any) => n.id), ['n1', 'n3']);
-  // The round written now took what was sent before it started: one with the turn shape on.
-  const running = { status: 'discussing', step_claimed_at: ago(60_000), founder_notes: notes, discussion_transcript: [], turn_shape: true };
-  assertEquals(notesInRunningRound(running).map((n: any) => n.id), ['n1']);
-  assertEquals(notesInRunningRound({ ...running, status: 'independent_complete', step_claimed_at: null }), []);
   const brief = beforeMeetingSection(notes);
   assert(brief.includes('FROM THE FOUNDER, BEFORE THE MEETING') && brief.includes('Budget is 500') && !brief.includes('first'));
   assertEquals(beforeMeetingSection([{ ...notes[0], withdrawn_at: ago(1) }]), '');

@@ -245,12 +245,12 @@ await waitFor(G, finished);
 
 // ---- 8. Before the board starts; a note withdrawn before it's heard.
 console.log('\n== a note before the meeting is in every brief; a withdrawn note never reaches the board');
-const BEFORE = `budget-is-500-${tag}`, DUP = `same-note-${tag}`;
-await script({ delayBy: { [names.grace]: 6000 }, marks: [BEFORE, DUP, 'FROM THE FOUNDER, BEFORE THE MEETING', 'before the meeting, to the whole board'] });
+const BEFORE = `budget-is-500-${tag}`, DUP = `kept-note-${tag}`, DUP2 = `withdrawn-note-${tag}`;
+await script({ delayBy: { [names.grace]: 6000 }, marks: [BEFORE, DUP, DUP2, 'FROM THE FOUNDER, BEFORE THE MEETING', 'before the meeting, to the whole board'] });
 const W = await start('Should we run a paid supper club?', 'sit_in', true, BEFORE);
 await sleep(1500);
 const w0 = await row(W);
-const d1 = await act(W, 'note', { text: DUP }), d2 = await act(W, 'note', { text: DUP });
+const d1 = await act(W, 'note', { text: DUP }), d2 = await act(W, 'note', { text: DUP2 });
 const pull = await act(W, 'withdraw', { note_id: d2.json?.note?.id });
 const w1 = await waitFor(W, (m) => m.waiting_for_founder);
 const r1log = (await fakeLog()).filter((l: any) => l.marked.includes('FROM THE FOUNDER, BEFORE THE MEETING'));
@@ -265,10 +265,16 @@ check(fe2.length === 1 && fe2[0].note_id === d1.json?.note?.id && !(w2?.discussi
   'Round 2 hears the first note only: not the withdrawn one, not the note before the meeting', fe2.map((x: any) => [x.note_id, x.message]));
 const late = await act(W, 'withdraw', { note_id: d1.json?.note?.id });
 check(late.status === 409, 'a note the board has heard can\'t be withdrawn', [late.status, late.json]);
+// While the board is moving on (not at a stop), nothing can be withdrawn.
+await act(W, 'carry_on', { at: { status: w2.status, rounds: w2.discussion_rounds_completed } });
+const d3 = await act(W, 'note', { text: `moving-${tag}` });
+const moving = await act(W, 'withdraw', { note_id: d3.json?.note?.id });
+check(moving.status === 409, 'not while the board is moving on: it may already have it', [moving.status, moving.json]);
 await act(W, 'decide');
 const mW = await waitFor(W, finished);
 const chairW = (await fakeLog()).filter((l: any) => l.who === names.chair && l.marked.includes('before the meeting, to the whole board'));
-check(mW?.status === 'complete' && chairW.length >= 1 && chairW.every((l: any) => !l.marked.includes(DUP) || true), 'the Chair hears the note before the meeting too', [mW?.status, chairW.length]);
+check(mW?.status === 'complete' && chairW.length >= 1 && chairW.every((l: any) => !l.marked.includes(DUP2)) && !(await fakeLog()).some((l: any) => l.marked.includes(DUP2)),
+  'the Chair hears the note before the meeting too; nobody ever hears the withdrawn one', [mW?.status, chairW.length]);
 
 // The fake data made for this test is removed.
 await admin.from('documents').delete().eq('company_id', co.id);

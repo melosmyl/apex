@@ -16,7 +16,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireOwnedRow, accessErrorResponse, checkUserLimit } from '../_shared/access.ts';
-import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, callAsServer, isServiceCall, later, needsSweep, nextStep, nextTarget, notesInRunningRound, unusedNotes } from '../_shared/meetingDriver.ts';
+import { GAVE_UP, IDLE_GRACE_MS, MAX_EXTRA_ROUNDS, MAX_NOTES, MAX_STEP_ATTEMPTS, MAX_SWEEPS, NOTE_LIMIT, STEP_FUNCTION, STEP_STALE_MS, callAsServer, isServiceCall, later, needsSweep, nextStep, nextTarget, unusedNotes } from '../_shared/meetingDriver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -178,7 +178,8 @@ Deno.serve(async (req) => {
       const { data: added, error } = await db.rpc('append_founder_note', { p_meeting_id: meeting.id, p_note: note, p_max: MAX_NOTES });
       if (error) throw error;
       if (!added) {
-        const full = (meeting.founder_notes || []).filter((n: any) => !n.withdrawn_at && !n.before_meeting).length >= MAX_NOTES;
+        const full = (meeting.founder_notes || []).filter((n: any) => !n.withdrawn_at && !n.before_meeting).length >= MAX_NOTES
+          || (meeting.founder_notes || []).length >= 20;
         return json({ error: full ? `You can add up to ${MAX_NOTES} notes in one meeting.` : 'The Chair is already writing up. Ask the board after the resolution.' }, 409);
       }
       // Otherwise, and in a Quick meeting, a note after the last round goes
@@ -201,7 +202,11 @@ Deno.serve(async (req) => {
       if (note.withdrawn_at) return json({ withdrawn: true });
       if ((meeting.discussion_transcript || []).some((e: any) => e.note_id === id)) return json({ error: 'The board has already heard it.' }, 409);
       if (!open) return json({ error: meeting.status === 'synthesizing' ? 'The Chair already has it.' : 'This meeting has finished.' }, 409);
-      if (notesInRunningRound(meeting).some((n: any) => n.id === id)) return json({ error: 'The board is hearing it in the round being written now.' }, 409);
+      // Only while nothing can be holding it: Round 1 (blind, it takes no
+      // notes) or a stop. Once the board is moving on, a round may already
+      // have it, or it may have brought one; it can be withdrawn at the next
+      // stop if it's still unheard.
+      if (meeting.status !== 'preparing' && !meeting.waiting_for_founder) return json({ error: "The board is moving on. You can withdraw it at the next stop if they haven't heard it." }, 409);
       const { data: done, error } = await db.rpc('withdraw_founder_note', { p_meeting_id: meeting.id, p_note_id: id, p_status: meeting.status, p_claimed_at: meeting.step_claimed_at });
       if (error) throw error;
       if (!done) return json({ error: 'The meeting moved on just then. Please try again.' }, 409);

@@ -298,7 +298,9 @@ export default function BoardDebate({ company, companyId, advisors, initialQuest
         // Visitors on the free meeting always get Quick.
         pace: !freeAttemptId ? pace : "quick",
         turnShape: !freeAttemptId && turnShapeAsked(),
-        beforeNote: !freeAttemptId && paceOffered ? beforeNote : "",
+        // Gated where it's written (the field shows only where Sit in is
+        // offered); the server never takes it from a free visitor.
+        beforeNote: !freeAttemptId ? beforeNote : "",
       });
       // The Assistant routed this question in from a captured note — the
       // note only learns its meeting_id now that a real meeting exists.

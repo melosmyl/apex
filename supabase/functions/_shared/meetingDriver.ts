@@ -129,16 +129,6 @@ export function unusedNotes(m: any) {
   return (m?.founder_notes || []).filter((n: any) => !used.has(n.id) && !n.withdrawn_at && !n.before_meeting);
 }
 
-// The note(s) the round now being written took when it started: the unheard
-// notes sent before its claim (one, with the turn shape on). Those can't be
-// withdrawn any more.
-export function notesInRunningRound(m: any) {
-  if (m?.status !== 'discussing' || !m.step_claimed_at) return [];
-  const claimed = new Date(m.step_claimed_at).getTime();
-  const taken = unusedNotes(m).filter((n: any) => new Date(n.at).getTime() < claimed);
-  return m.turn_shape ? taken.slice(0, 1) : taken;
-}
-
 // What the founder told the board before it started (the Boardroom's
 // "Before the board starts"), for every advisor's brief.
 export function beforeMeetingSection(notes: any[] = []) {

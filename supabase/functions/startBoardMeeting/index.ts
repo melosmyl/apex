@@ -553,6 +553,8 @@ Deno.serve(async (req) => {
     // accepted; a clash with an existing row simply fails the insert.
     if (requestedId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(requestedId)))
       return Response.json({ error: 'Invalid meeting id' }, { status: 400, headers: corsHeaders });
+    if (typeof before_note === 'string' && before_note.trim().length > NOTE_LIMIT)
+      return Response.json({ error: `Keep what the board should know first under ${NOTE_LIMIT} characters.` }, { status: 400, headers: corsHeaders });
     if (!company_id || !question?.trim() || !advisor_ids?.length)
       return Response.json({ error: 'company_id, question and advisor_ids are required' }, { status: 400, headers: corsHeaders });
 
@@ -596,7 +598,6 @@ Deno.serve(async (req) => {
     // given before the meeting. A signed-in founder's, on a meeting the
     // server runs.
     const beforeText = typeof before_note === 'string' ? before_note.trim() : '';
-    if (beforeText.length > NOTE_LIMIT) return Response.json({ error: `Keep it under ${NOTE_LIMIT} characters.` }, { status: 400, headers: corsHeaders });
     const beforeNotes = beforeText && !user.is_anonymous && server_driven === true
       ? [{ id: crypto.randomUUID(), text: beforeText, before_meeting: true, to_advisor_id: null, to_name: null, at: new Date().toISOString() }] : [];
     const before = beforeMeetingSection(beforeNotes);
