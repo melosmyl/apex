@@ -182,8 +182,10 @@ function ensureConvergenceNamed(resolution, convergence, independentResponses) {
 // The statements of fact in what the founder said during the meeting, in
 // their own words: what they have, have done, or know about their business.
 // Cheap tier; questions, opinions and pushback are left out.
+// Room for the cheap model and, if it stalls, the backup model after it.
+const FACTS_MS = 120_000;
 const FACTS_SCHEMA = { type: 'object', properties: { facts: { type: 'array', items: { type: 'string' } } }, required: ['facts'] };
-async function foundersFacts(supabaseUrl, serviceKey, notes, { company_id, meeting_id, user_id }) {
+async function foundersFacts(supabaseUrl, serviceKey, notes, { db, company_id, meeting_id, user_id }) {
   const data = await callAdvisor(supabaseUrl, serviceKey, {
     advisor_override: {
       name: 'Record keeper', role: 'Assistant',
@@ -191,8 +193,10 @@ async function foundersFacts(supabaseUrl, serviceKey, notes, { company_id, meeti
     },
     company_id, meeting_id, user_id, previous_responses: [], output_schema: FACTS_SCHEMA,
     model_tier: 'cheap', temperature: 0, max_output_length: 800, request_type: 'founder_facts',
+    // Its own two minutes, so a stuck call can't hold the background work open.
+    deadline_at: Date.now() + FACTS_MS,
     user_question: `During a board meeting the founder said:\n${notes.map(n => `- "${String(n.text).slice(0, 2000)}"`).join('\n')}\n\nList only the statements of fact about their business: numbers, what they have done, what exists, what they know. Keep each in the founder's own words, trimming only filler. Leave out questions, requests, opinions, preferences and pushback. If there are none, return an empty list.`,
-  });
+  }, { db, provider: 'cheap tier', model: 'record keeper' });
   return (Array.isArray(data?.response?.facts) ? data.response.facts : [])
     .map((f) => String(f).trim()).filter(Boolean).slice(0, 10).map((f) => f.slice(0, 500));
 }
@@ -489,7 +493,7 @@ Deno.serve(async (req) => {
     // slow call can never cost the meeting its tasks.
     if (!user.is_anonymous && founderNotes.length) later((async () => {
       try {
-        const facts = await foundersFacts(supabaseUrl, serviceKey, founderNotes, { company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id });
+        const facts = await foundersFacts(supabaseUrl, serviceKey, founderNotes, { db, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id });
         if (facts.length) {
           const { error: docErr } = await db.from('documents').insert({
             company_id: meeting.company_id, created_by_id: user.id, meeting_id: meeting.id, kind: 'knowledge',

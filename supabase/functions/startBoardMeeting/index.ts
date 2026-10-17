@@ -6,7 +6,7 @@ import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.
 import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, INDEPENDENT_SCHEMA_SHAPED, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
-import { findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
+import { BUILT_IN_CHAIR, findChair, withoutChair, chairCallFields } from '../_shared/chair.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { callOf, openCallsForOpening, openCallsSentence, pastMeetingsSection, pastResolutionsSection, withCalls } from '../_shared/founderCalls.ts';
 import { NOTE_LIMIT, STEP_STALE_MS, beforeMeetingSection, handOver, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
@@ -241,21 +241,19 @@ async function buildChairOpening({ supabaseUrl, serviceKey, db, chair, company, 
   }
 
   try {
-    const res = await fetch(`${supabaseUrl}/functions/v1/routeAdvisorRequest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
-      body: JSON.stringify({
-        ...chairCallFields(chair), company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
-        // Her book, hobby or place may come up here; never in the resolution.
-        personal_details: true,
-        // The Chair opens knowing what the founder has told us, like the board.
-        company_context: withFactsRule(companyProfile(company), { asks: false }), meeting_context: null,
-        user_question: prompt, previous_responses: [], output_schema: CHAIR_OPENING_SCHEMA,
-        temperature: 0.4, request_type: 'chair_opening', deadline_at: deadlineAt,
-      }),
-    });
-    const data = await res.json();
-    const stated = res.ok ? (data.response?.opening_statement || null) : null;
+    // Through the same call as the advisors (owner, 16 October 2026): an
+    // error page instead of an answer is tried again and logged, not read
+    // as if it were her answer.
+    const data = await callAdvisor(supabaseUrl, serviceKey, {
+      ...chairCallFields(chair), company_id: companyId, meeting_id: meetingId, user_id: userId, anonymous,
+      // Her book, hobby or place may come up here; never in the resolution.
+      personal_details: true,
+      // The Chair opens knowing what the founder has told us, like the board.
+      company_context: withFactsRule(companyProfile(company), { asks: false }), meeting_context: null,
+      user_question: prompt, previous_responses: [], output_schema: CHAIR_OPENING_SCHEMA,
+      temperature: 0.4, request_type: 'chair_opening', deadline_at: deadlineAt,
+    }, { db, provider: (chair ?? BUILT_IN_CHAIR).default_provider, model: (chair ?? BUILT_IN_CHAIR).default_model });
+    const stated = data?.response?.opening_statement || null;
 
     // If the model claims it named the completed items but didn't actually
     // include their titles verbatim, don't ship a statement that only
