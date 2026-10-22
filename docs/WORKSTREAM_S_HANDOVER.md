@@ -11,9 +11,9 @@ Workstreams P and T have merged into main.
 
 | Migration | Step | What |
 |---|---|---|
-| `20261016120000_s0_display_names` | S0 | A display name on profiles; set only through `set_my_display_name()`; filled from a name given at sign-up (Google) |
-| `20261016140000_s2_members_and_invitations` | S2 | `company_members` (owner, manager, member; one owner, always one) and `company_invitations` (7 days, one open per person, only a hash of the link's secret); role checks; every company's founder made its owner, and every new company's creator; deleting an account deletes the companies the person owns, refused while others are in one; anonymous visitors never join others' companies |
-| `20261016130000_s1_keep_work` | S1 | Company content no longer deleted with the account of the person who made it (companies still go with their founder until S2); `former_members` keeps the name of someone who leaves work behind; `decided_by`, `approved_by_user_id` recorded by the database; `tasks.assignee_user_id`; who made a row can't be changed |
+| `20261022110000_s0_display_names` | S0 | A display name on profiles; set only through `set_my_display_name()`; filled from a name given at sign-up (Google) |
+| `20261022130000_s2_members_and_invitations` | S2 | `company_members` (owner, manager, member; one owner, always one) and `company_invitations` (7 days, one open per person, only a hash of the link's secret); role checks; every company's founder made its owner, and every new company's creator; deleting an account deletes the companies the person owns, refused while others are in one; anonymous visitors never join others' companies |
+| `20261022120000_s1_keep_work` | S1 | Company content no longer deleted with the account of the person who made it (companies still go with their founder until S2); `former_members` keeps the name of someone who leaves work behind; `decided_by`, `approved_by_user_id` recorded by the database; `tasks.assignee_user_id`; who made a row can't be changed |
 
 **Renumber at merge time.** Main keeps gaining migrations: on 16 October it already had
 `20261017100000_note_withdraw`, numbered after these. Before merging, renumber Teams' migrations
