@@ -5,6 +5,7 @@ import { portraitFor } from "@/lib/portraits";
 import { OFF_DUTY } from "@/lib/offDuty";
 import { STARTING_BOARD_KEYS } from "@/lib/companyJourney";
 import { ADVISORS_ARE_AI, PRODUCT_NAME } from "@/lib/branding";
+import WhyNotChatbot from "@/components/landing/WhyNotChatbot";
 import "@/styles/landing.css";
 
 // The page logged-out visitors see at "/", built from jatr-landing-mock.html
@@ -137,6 +138,8 @@ export default function Landing() {
         </div>
 
         <div className="wrap">
+          <WhyNotChatbot />
+
           <section className="speak" id="advisors">
             <div className="section-head">
               <div>
