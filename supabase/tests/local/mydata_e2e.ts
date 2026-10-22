@@ -63,6 +63,19 @@ check(dc.status === 200 && dcBody.files === 1 && (await files(a.co2.id)) === 0 &
   'deleting her second company deletes its rows and its stored file', dcBody);
 check((await files(a.co.id)) === 1, 'her other company keeps its file');
 
+// 2b. Teams: with Bob in Alice's company, he can't delete it, and her
+// account can't be deleted until she hands it over: nothing goes meanwhile.
+await admin.from('company_members').insert({ company_id: a.co.id, user_id: b.id, role: 'member' });
+const asMember = await call(b.token, { action: 'delete_company', company_id: a.co.id });
+check(asMember.status === 403 && (await files(a.co.id)) === 1, "a member can't delete the owner's company", asMember.status);
+const refused = await call(a.token, { action: 'delete_account', confirm: 'delete my account' });
+const refusedBody = await refused.json();
+check(refused.status === 409 && /hand it over/i.test(refusedBody.error) && (await files(a.co.id)) === 1 && !!(await admin.auth.admin.getUserById(a.id)).data.user,
+  'owning a company someone else is in: refused, in plain words, with nothing deleted', refusedBody);
+const ex2 = JSON.parse(await (await JSZip.loadAsync(new Uint8Array(await (await call(b.token, { action: 'export' })).arrayBuffer()))).file('data.json')!.async('string'));
+check(ex2.company_members?.some((m: any) => m.company_id === a.co.id && m.role === 'member'), "Bob's copy includes his membership");
+await admin.from('company_members').delete().eq('company_id', a.co.id).eq('user_id', b.id);
+
 // 3. Deleting the account: the phrase first.
 const wrong = await call(a.token, { action: 'delete_account', confirm: 'delete' });
 check(wrong.status === 400 && (await admin.auth.admin.getUserById(a.id)).data.user !== null, 'without the typed phrase nothing is deleted', wrong.status);

@@ -8,8 +8,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import JSZip from 'npm:jszip@3.10.1';
-import { AccessError, accessErrorResponse, checkUserLimit, requireNotAnonymous, requireOwnedCompany } from '../_shared/access.ts';
-import { BACKUP_DAYS, FILES_BUCKET, OWN_TABLES, allRows, companyFiles, confirmed, forCopy, removeCompanyFiles } from '../_shared/myData.ts';
+import { AccessError, accessErrorResponse, checkUserLimit, requireNotAnonymous } from '../_shared/access.ts';
+import { BACKUP_DAYS, FILES_BUCKET, OWN_TABLES, allRows, companyFiles, confirmed, forCopy, othersIn, removeCompanyFiles, theirCompanies } from '../_shared/myData.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,10 +41,11 @@ async function exportAll(db: any, user: any) {
 }
 
 async function deleteCompany(db: any, user: any, companyId: string) {
-  await requireOwnedCompany(db, companyId, user.id);
+  if (!companyId) throw new AccessError(400, 'company_id is required');
+  if (!(await theirCompanies(db, user.id)).includes(companyId)) throw new AccessError(403, 'Only the owner can delete a company.');
   // Files first: if that fails, nothing is gone and the founder can retry.
   const files = await removeCompanyFiles(db, companyId);
-  const { error } = await db.from('companies').delete().eq('id', companyId).eq('created_by_id', user.id);
+  const { error } = await db.from('companies').delete().eq('id', companyId);
   if (error) throw new Error(`deleting the company: ${error.message}`);
   return { deleted: true, files };
 }
@@ -61,10 +62,13 @@ async function forgetPerson(db: any, userId: string) {
 }
 
 async function deleteAccount(db: any, user: any) {
-  const { data: companies, error: listErr } = await db.from('companies').select('id').eq('created_by_id', user.id);
-  if (listErr) throw new Error(`listing companies: ${listErr.message}`);
+  // Their companies, as the database sees them (Teams S2). If anyone else is
+  // in one, nothing is deleted: they hand it over or delete it first.
+  const companies = await theirCompanies(db, user.id);
+  if (await othersIn(db, companies, user.id))
+    throw new AccessError(409, 'You own a company other people are in. Hand it over to one of them, or delete that company first; then you can delete your account.');
   let files = 0;
-  for (const c of companies || []) files += await removeCompanyFiles(db, c.id);
+  for (const id of companies) files += await removeCompanyFiles(db, id);
   await forgetPerson(db, user.id);
   // A free meeting's record holds a hashed network address: deleted with the
   // account, before the sign-in would cut its link to them.
@@ -77,7 +81,7 @@ async function deleteAccount(db: any, user: any) {
   // account is gone by now, so a failure here is logged, not reported as a
   // failed deletion (a retry couldn't sign in any more).
   try { await forgetPerson(db, user.id); } catch (e) { console.error('myData: second clean-up after deleting the account failed:', (e as Error).message); }
-  return { deleted: true, companies: (companies || []).length, files, backup_days: BACKUP_DAYS };
+  return { deleted: true, companies: companies.length, files, backup_days: BACKUP_DAYS };
 }
 
 Deno.serve(async (req) => {
