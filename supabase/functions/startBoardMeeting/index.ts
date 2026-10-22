@@ -2,7 +2,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callAdvisorWithRetry, plainUnavailableReason } from '../_shared/advisorCall.ts';
 import { embedText } from '../_shared/embeddings.ts';
 import { distinctRoundOne } from '../_shared/roundOne.ts';
-import { loadOpenCommitments, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
+import { commitmentKey, loadOpenCommitments, oneEach, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
+import { dayOf, todayLine } from '../_shared/recordDates.ts';
 import { requireOwnedCompany, requireMaxLength, checkUserLimit, accessErrorResponse, TEXT_LIMITS } from '../_shared/access.ts';
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { PROFILE_GAPS, PROFILE_FIELD_KEYS, INDEPENDENT_SCHEMA, INDEPENDENT_SCHEMA_SHAPED, CHAIR_OPENING_SCHEMA } from '../_shared/answerSchemas.ts';
@@ -50,73 +51,114 @@ function lensFor(advisor) {
   return `\nYOUR LENS: you are this board's ${role}. Answer from your own speciality first: what does this question look like from where you sit that the others won't see? The rest of the board covers their own areas, so don't open with the checklist every advisor would give (validate demand, check compliance, secure suppliers) unless it is truly your speciality. If you agree with an obvious point, say so in a line and spend the rest of your answer on your own angle.\n`;
 }
 
+const OWN_COMMITMENTS_LISTED = 10;
 function commitmentsFor(advisor, commitments) {
-  const mine = (commitments || []).filter(c => c.advisor_id === advisor.id
-    || (!c.advisor_id && String(c.assigned_to || '').trim().toLowerCase() === String(advisor.name || '').trim().toLowerCase()));
-  const others = (commitments || []).length - mine.length;
+  // Whose a commitment is comes from every copy of it (a later meeting may
+  // have given it to someone else); then each is listed once (owner, 22
+  // October 2026).
+  const isMine = c => c.advisor_id === advisor.id
+    || (!c.advisor_id && String(c.assigned_to || '').trim().toLowerCase() === String(advisor.name || '').trim().toLowerCase());
+  const allMine = oneEach((commitments || []).filter(isMine));
+  const mine = allMine.slice(0, OWN_COMMITMENTS_LISTED);
+  const mineKeys = new Set(allMine.map(c => commitmentKey(c)));
+  const others = oneEach(commitments || []).filter(c => !mineKeys.has(commitmentKey(c))).length;
   let text = '';
   if (mine.length) {
     text += `\nCommitments from earlier meetings that are yours to deliver, still open:\n`;
     mine.forEach(c => {
       const overdue = c.days_open >= OVERDUE_AFTER_DAYS ? ' [OVERDUE]' : '';
-      text += `- "${c.title}", agreed ${c.days_open} day${c.days_open === 1 ? '' : 's'} ago after the meeting on "${c.meeting_question}"${overdue}\n`;
+      const when = dayOf(c.agreed_at);
+      text += `- "${c.title}", agreed ${when ? `on ${when}, ` : ''}${c.days_open} day${c.days_open === 1 ? '' : 's'} ago after the meeting on "${c.meeting_question}"${overdue}\n`;
     });
+    if (allMine.length > mine.length) text += `(And ${allMine.length - mine.length} more of yours, older ones not listed.)\n`;
     text += `Mention one only where it bears on this question.\n`;
   }
   if (others > 0) text += `\n(The founder has ${others} other open commitment${others === 1 ? '' : 's'} from earlier meetings; the Chair keeps track of them. Leave them to their owners unless one decides your answer.)\n`;
   return text;
 }
 
+// The company record every stage of the meeting works from (owner, 22
+// October 2026): what the founder said comes first (their profile, what
+// they told the board, their calls on past resolutions), every statement
+// dated, and is never cut; the rest (the gaps, documents within their own
+// share, the plan's suggestions, progress, projects, then each commitment
+// once) fills what's left of maxSize, and loses its end if it doesn't fit.
+const COMMITMENTS_LISTED = 20;
+const DOCUMENTS_SHARE = 2500;
 function buildContext(company, documents, decisions, meetings, projects, commitments, progression, maxSize) {
+  let ctx = todayLine();
   // Everything the founder has filled in, as facts they stated (not just
   // the gaps below), the same block every later stage of the meeting gets.
-  let ctx = companyProfile(company) || `Company: ${company.name || 'N/A'}\n`;
-  // The onboarding plan's priorities are its suggestions, not the founder's
-  // words (its generated welcome line, the "tagline", is left out).
-  if (company.priorities?.length) ctx += `\nSuggested priorities from the onboarding plan (not the founder's own words): ${company.priorities.join(', ')}\n`;
+  ctx += companyProfile(company) || `Company: ${company.name || 'N/A'}\n`;
   if (company.metrics?.length) ctx += `Key Metrics: ${company.metrics.map(m => `${m.label}: ${m.value} (${m.trend})`).join(', ')}\n`;
+  // Facts the founder stated in earlier meetings (P1), each with the day
+  // and the meeting they said it in.
+  const toldBoard = (documents || []).filter(d => d.category === 'What you told the board');
+  if (toldBoard.length) {
+    ctx += `\nWhat the founder told the board in earlier meetings (their words, dated; they may have edited them since):\n`;
+    toldBoard.slice(0, 5).forEach(d => {
+      const when = dayOf(d.created_at);
+      const about = String(d.title || '').replace(/^What you told the board:\s*/, '').slice(0, 120);
+      ctx += `On ${when || 'an earlier day'}${about ? `, in the meeting on "${about}"` : ''}:\n${(d.content || '').slice(0, 600)}\n`;
+    });
+  }
+  // Past resolutions and meetings, dated, each with the founder's call: a
+  // recommendation they haven't acted on is never a decision.
+  ctx += pastResolutionsSection(decisions);
+  ctx += pastMeetingsSection(meetings);
+  // Everything above is the founder's and stays whole; what follows fills
+  // the space that's left.
+  const founders = ctx;
+  ctx = '';
   const gaps = PROFILE_GAPS.filter(g => !String(company[g.key] ?? '').trim());
   if (gaps.length) {
     ctx += `\nNot yet on file about this company (onboarding is short by design — the board fills these in over time):\n`;
     gaps.forEach(g => { ctx += `- ${g.label} [profile_field: "${g.key}"]\n`; });
     ctx += `If knowing one of these would materially change your answer, ask the founder directly in your response and report it in missing_information with the exact profile_field key. Don't force one in if it isn't actually relevant to this question — most won't be.\n`;
   }
+  // Their documents, dated, and whose they are: the board's work (a task's
+  // result) is not the founder's words. Within their own share, so a full
+  // shelf can't push out what the founder said.
+  const otherDocs = (documents || []).filter(d => d.category !== 'What you told the board');
+  if (otherDocs.length) {
+    let docs = '';
+    for (const d of otherDocs.slice(0, 10)) {
+      const when = dayOf(d.created_at);
+      const whose = d.created_by_advisor_id || d.task_id ? "the board's work" : 'added by the founder';
+      const line = `- [${when ? `${when}, ` : ''}${whose}] ${d.title} (${d.category}): ${(d.content || '').slice(0, 400)}\n`;
+      if (docs.length + line.length > DOCUMENTS_SHARE) break;
+      docs += line;
+    }
+    if (docs) ctx += `\nDocuments (dated, newest first; "the board's work" was made by an advisor, "added by the founder" is theirs):\n${docs}`;
+  }
+  // The onboarding plan's priorities are its suggestions, not the founder's
+  // words (its generated welcome line, the "tagline", is left out).
+  if (company.priorities?.length) ctx += `\nSuggested priorities from the onboarding plan (not the founder's own words): ${company.priorities.join(', ')}\n`;
   if (progression?.completed?.length || progression?.next?.length) {
     ctx += `\nProgress on the founder's path (their Progression Tree):\n`;
     if (progression.completed.length) ctx += `Already unlocked: ${progression.completed.join(', ')}\n`;
     if (progression.next.length) ctx += `Next up: ${progression.next.join(', ')}\n`;
     ctx += `Reference it explicitly if directly relevant to this question — e.g. this question depends on something not yet unlocked, or the answer should build on something they just achieved. Don't force it in if it isn't relevant — most questions won't touch it.\n`;
   }
-  // Past resolutions and meetings, each with the founder's call: a
-  // recommendation they haven't acted on is never a decision.
-  ctx += pastResolutionsSection(decisions);
-  ctx += pastMeetingsSection(meetings);
   if (projects?.length) {
     ctx += `\nActive Projects:\n`;
     projects.slice(0, 5).forEach(p => { ctx += `- ${p.name} (${p.status}): ${p.description || ''}\n`; });
   }
-  if (commitments?.length) {
-    ctx += `\nOutstanding commitments the founder made after previous board meetings:\n`;
-    commitments.forEach(c => {
+  // Last, and each once: a long list is what gets cut.
+  const open = oneEach(commitments).slice(0, COMMITMENTS_LISTED);
+  if (open.length) {
+    ctx += `\nOutstanding commitments the founder made after previous board meetings (each listed once):\n`;
+    open.forEach(c => {
       const overdue = c.days_open >= OVERDUE_AFTER_DAYS ? ' [OVERDUE]' : '';
-      ctx += `- "${c.title}" — agreed ${c.days_open} day${c.days_open === 1 ? '' : 's'} ago after the meeting on "${c.meeting_question}", still not done${overdue}\n`;
+      const when = dayOf(c.agreed_at);
+      const again = c.times_agreed > 1 ? `; agreed ${c.times_agreed} times in all` : '';
+      ctx += `- "${c.title}" — agreed ${when ? `on ${when}, ` : ''}${c.days_open} day${c.days_open === 1 ? '' : 's'} ago, after the meeting on "${c.meeting_question}"${again}, still not done${overdue}\n`;
     });
     ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not.\n`;
   }
-  // Facts the founder stated in earlier meetings (P1) have their own block,
-  // so they never crowd the founder's other Knowledge out of the ten below.
-  const toldBoard = (documents || []).filter(d => d.category === 'What you told the board');
-  if (toldBoard.length) {
-    ctx += `\nFacts the founder told the board in earlier meetings (their words; the founder may have edited them since):\n`;
-    toldBoard.slice(0, 5).forEach(d => { ctx += `${(d.content || '').slice(0, 600)}\n`; });
-  }
-  const otherDocs = (documents || []).filter(d => d.category !== 'What you told the board');
-  if (otherDocs.length) {
-    ctx += `\nRelevant Documents:\n`;
-    otherDocs.slice(0, 10).forEach(d => { ctx += `- ${d.title} (${d.category}): ${(d.content || '').slice(0, 400)}\n`; });
-  }
-  if (ctx.length > maxSize) ctx = ctx.slice(0, maxSize) + '... [truncated]';
-  return ctx;
+  const room = Math.max(0, maxSize - founders.length);
+  if (ctx.length > room) ctx = ctx.slice(0, room) + '... [the rest of the record didn\'t fit]';
+  return founders + ctx;
 }
 
 // Board memory: find past decisions related to the question being asked, rather
@@ -323,7 +365,8 @@ async function gather(db, userId, companyId, question): Promise<any> {
     db.from('projects').select('*').eq('company_id', companyId).eq('created_by_id', userId).order('created_at', { ascending: false }).limit(10),
     db.from('advisors').select('*').eq('company_id', companyId).eq('created_by_id', userId).limit(100),
     recallRelatedDecisions(db, companyId, userId, question),
-    loadOpenCommitments(db, companyId, userId),
+    // Read more than are listed: repeats are listed once (oneEach).
+    loadOpenCommitments(db, companyId, userId, 60),
     loadProgressionSummary(db, companyId),
   ]);
   const { data: toldBoard } = await db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
@@ -347,7 +390,7 @@ function buildMemoryContext(recalled, decisions, commitments) {
       state: callOf(d).state,
       similarity: d.similarity ?? null,
     })),
-    open_commitments: (commitments || []).map(c => ({
+    open_commitments: oneEach(commitments || []).slice(0, COMMITMENTS_LISTED).map(c => ({
       title: c.title,
       days_open: c.days_open,
       overdue: c.days_open >= OVERDUE_AFTER_DAYS,

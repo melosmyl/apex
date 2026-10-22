@@ -7,6 +7,7 @@ import { findChair, withoutChair } from '../_shared/chair.ts';
 import { usedPersonalDetail, ownWords } from '../_shared/personalDetails.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { withFactsRule } from '../_shared/factsRule.ts';
+import { withToday } from '../_shared/recordDates.ts';
 
 // At most five debaters answer (startBoardMeeting seats the same); the
 // Chair doesn't debate, here or in any round.
@@ -176,7 +177,7 @@ Deno.serve(async (req) => {
       callAdvisor(supabaseUrl, serviceKey, {
         advisor_id: advisor.id, company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
         // The same memory the meeting worked from (P1); older meetings, the profile.
-        system_instructions: null, company_context: withFactsRule(meeting.context_package || profile), meeting_context: followupContext,
+        system_instructions: null, company_context: withFactsRule(withToday(meeting.context_package) || profile), meeting_context: followupContext,
         user_question: meeting.question, previous_responses: [], output_schema: FOLLOWUP_SCHEMA,
         temperature: advisor.temperature, request_type: 'founder_followup', deadline_at: deadlineAt,
         // Their book, hobby or place stay on offer until they've used one.

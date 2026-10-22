@@ -40,6 +40,7 @@ import { embedText, cosineSimilarity } from '../_shared/embeddings.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, challengerFor, handOver, isServiceCall, later, meetingOwner, roundsFor, unusedNotes } from '../_shared/meetingDriver.ts';
 import { withFactsRule } from '../_shared/factsRule.ts';
+import { withToday } from '../_shared/recordDates.ts';
 
 // Round 1 runs every advisor independently and in parallel (see
 // startBoardMeeting) — nothing stops two advisors reaching for the same
@@ -498,7 +499,7 @@ async function serverRound(db, supabaseUrl, serviceKey, meeting, user) {
         db, supabaseUrl, serviceKey, meeting, user, meetingAdvisors: d.meetingAdvisors, transcript, round, maxRounds,
         isLastRound, convergencePairs, independentResponses: d.independentResponses,
         // Every round works from the same memory as Round 1, not just the profile.
-        profile: meeting.context_package || d.profile, facts: d.profile,
+        profile: withToday(meeting.context_package) || d.profile, facts: d.profile,
         founderNotes: notes, challenger: challengerFor(d.meetingAdvisors, round),
         // Each round is its own step, with the whole step's time.
         roundDeadline: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,

@@ -3,6 +3,7 @@
 // results). Without it, later stages listed as "unknown" things the founder
 // had already stated, such as what their product is made of.
 // deno-lint-ignore-file no-explicit-any
+import { dayOf } from './recordDates.ts';
 
 const STAGES: Record<string, string> = {
   idea_validation: 'validating the idea', pre_launch: 'getting ready to launch', early_revenue: 'early revenue',
@@ -47,5 +48,8 @@ export function companyProfile(company: any): string {
   const facts = profileFacts(company);
   const name = text(company?.name, 200);
   if (!facts.length) return name ? `Company: ${name}\n` : '';
-  return `WHAT THE FOUNDER HAS TOLD US about ${name || 'their company'} (facts they stated: use them, and don't list them as missing or ask for them again. If one is too vague to act on, or the founder now says otherwise, ask about that specifically):\n${facts.map((f) => `- ${f}`).join('\n')}\n`;
+  // Dated (owner, 22 October 2026). Any save moves the date, so it says
+  // when the profile was last saved, not when each answer was given.
+  const updated = dayOf(company?.updated_at);
+  return `WHAT THE FOUNDER HAS TOLD US about ${name || 'their company'} (facts they stated: use them, and don't list them as missing or ask for them again. If one is too vague to act on, or the founder now says otherwise, ask about that specifically):\n${updated ? `(Their company profile, last saved on ${updated}; some answers in it may be older.)\n` : ''}${facts.map((f) => `- ${f}`).join('\n')}\n`;
 }

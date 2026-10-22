@@ -3,6 +3,7 @@
 // has answered, then asks meetingRun to start the next. A sweep restarts a
 // step that stalled. The founder's screen only watches the meeting row.
 // deno-lint-ignore-file no-explicit-any
+import { dayOf } from './recordDates.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
@@ -134,7 +135,7 @@ export function unusedNotes(m: any) {
 export function beforeMeetingSection(notes: any[] = []) {
   const before = (notes || []).filter((n: any) => n?.before_meeting && !n.withdrawn_at && String(n.text || '').trim());
   if (!before.length) return '';
-  return `\nFROM THE FOUNDER, BEFORE THE MEETING (facts and constraints they want every advisor to have from the start):\n${before.map((n: any) => `- "${String(n.text).slice(0, 2000)}"`).join('\n')}\nA fact they state about their own business is a fact: use it. A preference is their view: weigh it, and say so if you disagree.\n`;
+  return `\nFROM THE FOUNDER, BEFORE THE MEETING (dated; facts and constraints they want every advisor to have from the start):\n${before.map((n: any) => `- ${dayOf(n.at) ? `[${dayOf(n.at)}] ` : ''}"${String(n.text).slice(0, 2000)}"`).join('\n')}\nA fact they state about their own business is a fact: use it. A preference is their view: weigh it, and say so if you disagree.\n`;
 }
 
 // How many rounds this meeting runs to: the usual, or the target the

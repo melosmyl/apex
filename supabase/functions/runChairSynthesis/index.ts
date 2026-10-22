@@ -9,6 +9,7 @@ import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 import { chairTags } from '../_shared/turnShape.ts';
 import { withFactsRule } from '../_shared/factsRule.ts';
+import { withToday } from '../_shared/recordDates.ts';
 
 // A synthesis that claimed the meeting and then died is retryable after this.
 const STALE_CLAIM_MS = 10 * 60_000;
@@ -345,7 +346,7 @@ Deno.serve(async (req) => {
     const chairResult = await callAdvisor(supabaseUrl, serviceKey, {
       ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
       // The same memory every round worked from (P1); older meetings, the profile.
-      system_instructions: CHAIR_INSTRUCTIONS, company_context: withFactsRule(withoutFieldKeys(meeting.context_package || profile)),
+      system_instructions: CHAIR_INSTRUCTIONS, company_context: withFactsRule(withoutFieldKeys(withToday(meeting.context_package) || profile)),
       meeting_context: `${RESOLUTION_RULES}\n\n${discussionTranscript.some((m) => Array.isArray(m?.flags)) ? `${TURN_CHECKS}\n\n` : ''}${meetingContext}`,
       user_question: meeting.question, previous_responses: [],
       output_schema: RESOLUTION_SCHEMA, temperature: 0.5, request_type: 'chair_synthesis',
@@ -393,7 +394,7 @@ Deno.serve(async (req) => {
       try {
         const repair = await callAdvisor(supabaseUrl, serviceKey, {
           ...resolutionCallFields(chair), company_id: meeting.company_id, meeting_id: meeting.id, user_id: user.id, anonymous: !!user.is_anonymous,
-          system_instructions: REPAIR_INSTRUCTIONS, company_context: withFactsRule(meeting.context_package || profile),
+          system_instructions: REPAIR_INSTRUCTIONS, company_context: withFactsRule(withToday(meeting.context_package) || profile),
           meeting_context: `${meetingContext}\n\n=== YOUR RESULTS ===\nActions:\n${resolution.priority_actions.map((a, i) => `${i + 1}. ${a.title} (${a.assigned_to})`).join('\n')}\nIssues and fixes:\n${resolution.top_issues.map((x, i) => `${i + 1}. ${x.problem}: fix: ${x.fix}`).join('\n')}\n\nReword only these, which are too vague to act on:\n${vague.map((v) => `- ${v}`).join('\n')}`,
           user_question: meeting.question, previous_responses: [],
           output_schema: RESULTS_REPAIR_SCHEMA, temperature: 0.3, request_type: 'chair_repair',

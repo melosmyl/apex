@@ -4,6 +4,7 @@
 // still open. A recommendation the founder hasn't acted on is never a
 // decision: not in board memory, not in the Chair's opening.
 // deno-lint-ignore-file no-explicit-any
+import { dayOf } from './recordDates.ts';
 
 export type CallState = 'accept' | 'modify' | 'reject' | 'decided' | 'open';
 
@@ -71,7 +72,8 @@ export function pastMeetingsSection(meetings: any[] = []) {
   if (!meetings?.length) return '';
   let text = `\nPrevious Board Meetings (what the board recommended, and the founder's call on it):\n`;
   meetings.slice(0, 3).forEach((m) => {
-    text += `- Q: ${cut(m.question, 300)} -> ${callLine(m)} Recommended: ${cut(m.board_resolution?.recommended_direction || m.recommendation || m.executive_summary || 'N/A', 400)}\n`;
+    const when = dayOf(m.created_at);
+    text += `- ${when ? `[${when}] ` : ''}Q: ${cut(m.question, 300)} -> ${callLine(m)} Recommended: ${cut(m.board_resolution?.recommended_direction || m.recommendation || m.executive_summary || 'N/A', 400)}\n`;
   });
   return text;
 }
@@ -83,7 +85,7 @@ export function pastResolutionsSection(decisions: any[] = []) {
   if (!decisions?.length) return '';
   let text = `\nPast resolutions related to this question (most relevant first), with the founder's call on each:\n`;
   decisions.slice(0, 5).forEach((d) => {
-    const when = d.created_at ? new Date(d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'date unknown';
+    const when = dayOf(d.created_at) || 'date unknown';
     text += `- [${when}] ${cut(d.question, 300)}: ${callLine(d)} Recommended: ${cut(d.final_recommendation || d.summary || 'N/A', 400)}\n`;
   });
   text += `MEMORY PRINCIPLE — this is mandatory, not optional:\n`;
