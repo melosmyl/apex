@@ -3,6 +3,8 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { base44 } from "@/api/base44Client";
 import { KanbanSquare } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
+import { DepartmentTag } from "@/components/tasks/DepartmentChip";
+import { cardTitle } from "@/lib/departments";
 
 const COLUMNS = [
   { key: "in_progress", label: "In Progress", dot: "bg-emerald-400" },
@@ -54,7 +56,8 @@ export default function ProjectKanban({ tasks, projects, onTasksChange }) {
                       <Draggable key={t.id} draggableId={t.id} index={index}>
                         {(prov, snap) => (
                           <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} className={`bg-card border border-border/70 rounded-xl p-3 rise-in ${snap.isDragging ? "shadow-lg ring-1 ring-ring/30" : ""}`}>
-                            <p className="text-sm font-medium leading-snug">{t.title}</p>
+                            <DepartmentTag department={t.department} className="mb-1.5" />
+                            <p className="text-sm font-medium leading-snug" title={t.title}>{cardTitle(t)}</p>
                             <div className="flex items-center justify-between gap-2 mt-2">
                               <span className="text-xs text-muted-foreground truncate">{projectName(t.project_id)}</span>
                               {t.assigned_to && <span className="text-xs text-muted-foreground shrink-0">{t.assigned_to}</span>}

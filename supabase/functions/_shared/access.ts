@@ -65,6 +65,8 @@ export const USER_LIMITS = {
   note_process: { max: 60, windowMinutes: 60 },
   // Filling in a new pin (cheap tier).
   pin_analysis: { max: 120, windowMinutes: 60 },
+  // Short titles for task cards (cheap tier, up to ten tasks a call).
+  task_short_title: { max: 60, windowMinutes: 60 },
   progression_answer: { max: 10, windowMinutes: 60 },
   // A meeting's discussion and resolution steps; normal use is two per meeting.
   meeting_step: { max: 50, windowMinutes: 24 * 60 },
