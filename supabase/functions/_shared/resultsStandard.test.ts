@@ -185,3 +185,40 @@ Deno.test("the Chair reads the company record without its field keys", () => {
   const ctx = 'Facts.\nNot yet on file about this company (short by design):\n- what they already have [profile_field: "existing_assets"]\nIf knowing one of these would materially change your answer, ask with the exact profile_field key. Most won\'t be.\nProgress.';
   assertEquals(withoutFieldKeys(ctx), 'Facts.\nNot yet on file about this company (short by design):\n- what they already have\nProgress.');
 });
+
+Deno.test("the Chair's tasks carry her short title, and the founder's own work her department", async () => {
+  const { chairTaskRows, normalizeResults, mergeRepair } = await import('./resultsStandard.ts');
+  const advisors = [{ id: 'adv-1', name: 'Rafael Duarte', role: 'Supply Chain Expert' }];
+  const r = normalizeResults({ priority_actions: [
+    { title: 'Ring the market organiser about a stall for the December fair', assigned_to: 'Founder', task_type: 'founder', short_title: 'Ring the December fair organiser.', department: 'sales', brief: '', done_when: 'Booked', why_first: 'x' },
+    { title: 'Draft the quote request for the set with cradle and box', assigned_to: 'Rafael Duarte', task_type: 'draft', short_title: 'Draft the quote request for the full set with cradle and box', department: 'sales', brief: 'b', done_when: 'd', why_first: 'w' },
+    { title: 'Count the strangers you can reach this week', assigned_to: 'Founder', task_type: 'founder', short_title: 'Count reachable strangers', department: 'nonsense', brief: '', done_when: 'd', why_first: 'w' },
+  ] }, advisors);
+  assertEquals(r.priority_actions.map((a: any) => a.short_title), ['Ring the December fair organiser', null, 'Count reachable strangers']);
+  const rows = chairTaskRows(r.priority_actions, { companyId: 'c', userId: 'u', meetingId: 'm' });
+  assertEquals(rows.map((t: any) => [t.short_title, 'department' in t ? t.department : 'from the advisor']), [
+    ['Ring the December fair organiser', 'sales'],
+    [null, 'from the advisor'],
+    ['Count reachable strangers', 'ops'],
+  ]);
+  assertEquals(rows[0].title, 'Ring the market organiser about a stall for the December fair');
+  assertEquals(rows[1].advisor_id, 'adv-1');
+  // A reworded action loses a short title that described the old wording.
+  const repaired = mergeRepair({ priority_actions: [{ title: 'Do research', short_title: 'Do research', brief: '' }], top_issues: [] }, { actions: [{ number: 1, title: 'Search Companies House for the three gift-shop owners', brief: 'b' }] }, { actions: [0], issues: [] });
+  assertEquals(repaired.priority_actions[0].short_title, null);
+});
+
+Deno.test('the Chair is told who gave a view, and only when someone gave none', async () => {
+  const { whoGaveAView } = await import('./resultsStandard.ts');
+  const r1 = [{ advisor_name: 'Victor' }, { advisor_name: 'Sofia' }, { advisor_name: 'Julian', unavailable: true, unavailable_reason: 'the connection to the advisor failed' }];
+  const turns = [
+    { round: 1, advisor_id: 'j', advisor_name: 'Julian', unavailable: true },
+    { round: 2, advisor_id: 'v', advisor_name: 'Victor' }, { round: 2, advisor_id: 's', advisor_name: 'Sofia' }, { round: 2, advisor_id: 'j', advisor_name: 'Julian' },
+    { round: 2, advisor_name: 'Founder', message_type: 'founder_message' },
+  ];
+  const block = whoGaveAView(r1, turns);
+  assert(block.includes('- Round 1: 2 of 3 gave a view; no view from Julian (the connection to the advisor failed).'));
+  assert(block.includes('- Round 2: 3 of 3 gave a view.'));
+  assert(block.includes('Never write "all 3", "every advisor" or "the whole board"'));
+  assertEquals(whoGaveAView([{ advisor_name: 'Victor' }], [{ round: 2, advisor_id: 'v', advisor_name: 'Victor' }]), '');
+});

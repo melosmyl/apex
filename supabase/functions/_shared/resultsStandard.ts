@@ -4,7 +4,8 @@
 // room disagreed. The Chair writes these as their own fields; this module
 // tidies what comes back and catches advice too vague to act on.
 import { matchAdvisorByName, matchAdvisorByRole } from './advisorResolution.ts';
-import { PROFILE_FIELD_KEYS } from './answerSchemas.ts';
+import { DEPARTMENTS, PROFILE_FIELD_KEYS } from './answerSchemas.ts';
+import { cleanShortTitle } from './shortTitle.ts';
 
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -97,6 +98,10 @@ export function normalizeResults(resolution: Any, advisors: Any[]) {
         brief: str(a.brief, 1500),
         done_when: str(a.done_when, 300),
         why_first: str(a.why_first, 600),
+        // Task board (Workstream T): seven words or none (the board then
+        // asks for one); a department only where it's a real one.
+        short_title: cleanShortTitle(a.short_title),
+        department: DEPARTMENTS.includes(a.department) ? a.department : null,
       };
     });
 
@@ -125,7 +130,7 @@ export function mergeRepair(resolution: Any, repair: Any, flagged = vagueIndexes
   resolution.priority_actions = (resolution.priority_actions || []).map((a: Any, i: number) => {
     const fixed: Any = flagged.actions.includes(i) ? actions.get(i) : null;
     if (!fixed || !str(fixed.title)) return a;
-    return { ...a, title: str(fixed.title, 300), brief: str(fixed.brief, 1500) || a.brief, done_when: str(fixed.done_when, 300) || a.done_when };
+    return { ...a, title: str(fixed.title, 300), short_title: null, brief: str(fixed.brief, 1500) || a.brief, done_when: str(fixed.done_when, 300) || a.done_when };
   });
   const issues = byNumber(repair?.fixes);
   resolution.top_issues = (resolution.top_issues || []).map((x: Any, i: number) => {
@@ -195,4 +200,54 @@ export function plainMissingInfo(item: unknown): string {
 export function withoutFieldKeys(context: string | null) {
   if (!context) return context;
   return context.replace(/ \[profile_field: "[a-z_]+"\]/g, '').replace(/If knowing one of these would materially change your answer[^\n]*\n?/, '');
+}
+
+// The tasks a resolution's actions become. The Chair writes each one's short
+// title (none if it's over seven words: the board then asks for one), and
+// picks the department only for the founder's own work; an advisor's task
+// gets that advisor's home department from the database (task board note,
+// owner 15 and 22 October 2026). `title` stays the full wording: the
+// results page pairs actions with tasks by it.
+export function chairTaskRows(actions: Any[], { companyId, userId, meetingId }: { companyId: string; userId: string; meetingId: string }) {
+  return (actions || []).filter((a: Any) => a?.title).map((a: Any) => ({
+    company_id: companyId,
+    created_by_id: userId,
+    title: a.title,
+    assigned_to: a.assigned_to,
+    advisor_id: a.advisor_id,
+    task_type: a.task_type,
+    description: a.brief || null,
+    done_when: a.done_when || null,
+    created_by: 'Boardroom',
+    status: 'todo',
+    source_meeting_id: meetingId,
+    short_title: cleanShortTitle(a.short_title),
+    ...(a.advisor_id ? {} : { department: DEPARTMENTS.includes(a.department) ? a.department : 'ops' }),
+  }));
+}
+
+// Who gave a view in each round (owner's note, 16 October 2026: the Chair
+// counted an unavailable advisor among those who agreed). Empty when
+// everyone spoke every round; otherwise a block for the Chair naming who
+// gave no view, so her counts use only those who did.
+export function whoGaveAView(independent: Any[] = [], transcript: Any[] = []) {
+  const rounds = new Map<number, { spoke: string[]; silent: { name: string; why: string }[] }>();
+  const add = (round: number, name: string, unavailable: boolean, why: string) => {
+    const r = rounds.get(round) || { spoke: [], silent: [] };
+    if (unavailable) { if (!r.silent.some((x) => x.name === name)) r.silent.push({ name, why }); }
+    else if (!r.spoke.includes(name)) r.spoke.push(name);
+    rounds.set(round, r);
+  };
+  for (const r of independent || []) if (r?.advisor_name) add(1, r.advisor_name, !!r.unavailable, str(r.unavailable_reason, 120));
+  for (const m of transcript || []) {
+    if (!m?.advisor_id || !(Number(m.round) > 1) || ['founder_message', 'chair_tabling'].includes(m.message_type)) continue;
+    add(Number(m.round), m.advisor_name, !!m.unavailable, str(m.unavailable_reason, 120));
+  }
+  if (![...rounds.values()].some((r) => r.silent.length)) return '';
+  const lines = [...rounds.entries()].sort(([a], [b]) => a - b).map(([round, r]) => {
+    const total = r.spoke.length + r.silent.length;
+    const silent = r.silent.map((x) => `${x.name}${x.why ? ` (${x.why})` : ''}`).join(', ');
+    return `- Round ${round}: ${r.spoke.length} of ${total} gave a view${silent ? `; no view from ${silent}` : ''}.`;
+  });
+  return `=== WHO GAVE A VIEW ===\n${lines.join('\n')}\nWhen you say how many advisors agreed or disagreed, count only those who gave a view in that round, and name anyone who gave none. Never write "all ${Math.max(...[...rounds.values()].map((r) => r.spoke.length + r.silent.length))}", "every advisor" or "the whole board" about a round in which someone gave no view.`;
 }

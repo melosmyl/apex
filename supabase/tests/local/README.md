@@ -11,6 +11,7 @@ so they cost nothing and never touch production.
    `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`.
    For the alert emails (quality_e2e): `RESEND_API_URL=http://host.docker.internal:54399/emails`,
    a fake `RESEND_API_KEY` and `ALERT_EMAIL_TO=owner@example.test`.
+   And any `IP_HASH_SECRET` (the share page's rate limit hashes the caller's IP with it).
 3. `LOCAL_ANON_KEY=… LOCAL_SERVICE_KEY=… deno run -A supabase/tests/local/stage1_e2e.ts`
    (keys from `supabase status -o env`; the script uses the
    `supabase_db_localstack` container for SQL checks).

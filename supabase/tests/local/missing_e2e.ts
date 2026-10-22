@@ -36,7 +36,7 @@ const { data: advs } = await F.from('advisors').insert([
 const debaters = advs!.filter((a: any) => a.library_key !== 'chair').map((a: any) => a.id);
 
 // Every call Priya makes fails, on both providers (out of credit).
-await script({ failFor: [names.priya], marks: [`${names.priya} gave no view this round`] });
+await script({ failFor: [names.priya], marks: [`${names.priya} gave no view this round`, '=== WHO GAVE A VIEW ===', `no view from ${names.priya}`] });
 const id = crypto.randomUUID();
 await call('startBoardMeeting', { company_id: co.id, question: 'Should we open a pop-up shop?', advisor_ids: debaters, meeting_id: id, server_driven: true, turn_shape: true });
 let m: any;
@@ -53,6 +53,8 @@ const others = (m?.discussion_transcript || []).filter((x: any) => x.round > 1 &
 check(m?.discussion_rounds_completed >= 2 && others.length >= 2, 'the rounds still count: the others answered', [m?.discussion_rounds_completed, others.length]);
 const chairSaw = (await fakeLog()).some((l: any) => l.marked.includes(`${names.priya} gave no view this round`));
 check(chairSaw, 'the Chair is told who gave no view, and not to count it as agreement');
+const counted = (await fakeLog()).some((l: any) => l.marked.includes('=== WHO GAVE A VIEW ===') && l.marked.includes(`no view from ${names.priya}`));
+check(counted, 'and is given the count of who spoke in each round, naming who gave none');
 const { data: logs } = await admin.from('ai_usage_logs').select('status, provider, request_type').eq('meeting_id', id).eq('advisor_id', advs!.find((a: any) => a.name === names.priya).id);
 check((logs || []).length >= 2 && (logs || []).every((l: any) => l.status === 'error'), 'and each failure is in the call log', logs);
 

@@ -52,7 +52,8 @@ import { withToday } from '../_shared/recordDates.ts';
 const CONVERGENCE_THRESHOLD = 0.90;
 
 async function detectConvergence(independentResponses) {
-  const withText = independentResponses.filter(r => (r.recommendation || '').trim());
+  // An advisor who gave no view converges with nobody.
+  const withText = independentResponses.filter(r => !r.unavailable && (r.recommendation || '').trim());
   if (withText.length < 2) return [];
 
   let embeddings;

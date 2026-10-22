@@ -4,7 +4,7 @@ import { requireOwnedRow, checkUserLimit, accessErrorResponse } from '../_shared
 import { CALL_DEADLINE_MS, CALLER_SAVE_MARGIN_MS } from '../_shared/callPolicy.ts';
 import { RESOLUTION_SCHEMA, RESULTS_REPAIR_SCHEMA } from '../_shared/answerSchemas.ts';
 import { findChair, resolutionCallFields } from '../_shared/chair.ts';
-import { mergeRepair, normalizeResults, plainMissingInfo, recordPushbackChanges, vagueParts, withoutFieldKeys } from '../_shared/resultsStandard.ts';
+import { chairTaskRows, mergeRepair, normalizeResults, plainMissingInfo, recordPushbackChanges, vagueParts, whoGaveAView, withoutFieldKeys } from '../_shared/resultsStandard.ts';
 import { companyProfile } from '../_shared/companyProfile.ts';
 import { STEP_STALE_MS, isServiceCall, later, meetingOwner } from '../_shared/meetingDriver.ts';
 import { chairTags } from '../_shared/turnShape.ts';
@@ -87,7 +87,8 @@ AGREEMENT IS NOT EVIDENCE. Present converged advisors once, as the CONVERGENCE i
 WHAT THIS RESTS ON, AND WHAT WOULD CHANGE THE BOARD'S MIND:
 - assumptions is what this decision rests on: the conditions that must hold for it to be right. A fact about the business that isn't in the record or the founder's words is never written as settled: it goes in missing_information as a question, and here, if at all, as a condition to check ("if most of your buyers are local...").
 - what_would_change_minds is different: concrete facts that could be checked and would reverse the decision. Take them only from the advisors' own "would change their mind" lines in the transcript; leave it empty if those lines give nothing concrete or there are none. Never restate an assumption as one.
-MISSING INFORMATION: write each item in plain words, as a question to the founder. Never write internal field names or keys (anything like profile_field or existing_assets).`;
+MISSING INFORMATION: write each item in plain words, as a question to the founder. Never write internal field names or keys (anything like profile_field or existing_assets).
+ACTIONS: give each a short_title (seven words or fewer, starting with the verb). For an action the founder does, set department to the part of the business the work belongs to (calling a market organiser is sales).`;
 
 // Only for a meeting with the turn shape on, whose turns carry the checks.
 const TURN_CHECKS = `TURNS THAT FAILED A CHECK — some turns carry a tag in square brackets:
@@ -305,12 +306,18 @@ Deno.serve(async (req) => {
     if (discussionTranscript.length > 0) {
       meetingContext = `=== FULL BOARD DISCUSSION TRANSCRIPT ===\nQuestion: ${meeting.question}\n\n${formatTranscriptForChair(discussionTranscript)}`;
     } else {
-      meetingContext = `Independent advisor responses:\n${independentResponses.map(r =>
-        `- ${String(r.advisor_name).slice(0, 100)} (${String(r.role).slice(0, 100)}): Position: ${String(r.position).slice(0, 4000)}. Recommendation: ${String(r.recommendation).slice(0, 2000)}. Key arguments: ${(r.key_arguments || []).slice(0, 10).map(x => String(x).slice(0, 500)).join('; ')}. Risks: ${(r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)).join('; ')}. Confidence: ${Number(r.confidence_score) || 0}%`
+      meetingContext = `Independent advisor responses:\n${independentResponses.map(r => r.unavailable
+        ? `- ${String(r.advisor_name).slice(0, 100)} gave no view (${r.unavailable_reason || "couldn't be reached"}). Don't count them as agreeing or disagreeing.`
+        : `- ${String(r.advisor_name).slice(0, 100)} (${String(r.role).slice(0, 100)}): Position: ${String(r.position).slice(0, 4000)}. Recommendation: ${String(r.recommendation).slice(0, 2000)}. Key arguments: ${(r.key_arguments || []).slice(0, 10).map(x => String(x).slice(0, 500)).join('; ')}. Risks: ${(r.risks || []).slice(0, 10).map(x => String(x).slice(0, 500)).join('; ')}. Confidence: ${Number(r.confidence_score) || 0}%`
       ).join('\n\n')}\n\nChallenge round:\n${challengeResponses.map(r =>
         `- ${r.advisor_name} challenged ${r.challenged_advisor}: ${r.point_challenged}. Reason: ${r.reason}. Revised position: ${r.revised_position}. Confidence: ${r.confidence_score}%`
       ).join('\n')}`;
     }
+
+    // Who gave a view, round by round, when anyone didn't: the Chair counts
+    // only those who spoke (owner's note, 16 October 2026).
+    const whoSpoke = whoGaveAView(independentResponses, discussionTranscript);
+    if (whoSpoke) meetingContext = `${whoSpoke}\n\n${meetingContext}`;
 
     // Everything the founder said during the meeting, including anything
     // said after the last round (it reached no advisor, so it comes here).
@@ -462,21 +469,7 @@ Deno.serve(async (req) => {
     let createdTasks = [];
     if (!user.is_anonymous && priorityActions.length > 0) {
       try {
-        const taskRows = priorityActions
-          .filter(a => a.title)
-          .map(a => ({
-            company_id: meeting.company_id,
-            created_by_id: user.id,
-            title: a.title,
-            assigned_to: a.assigned_to,
-            advisor_id: a.advisor_id,
-            task_type: a.task_type,
-            description: a.brief || null,
-            done_when: a.done_when || null,
-            created_by: 'Boardroom',
-            status: 'todo',
-            source_meeting_id: meeting.id,
-          }));
+        const taskRows = chairTaskRows(priorityActions, { companyId: meeting.company_id, userId: user.id, meetingId: meeting.id });
         if (taskRows.length) {
           const { data: inserted, error: taskError } = await db.from('tasks').insert(taskRows).select();
           if (taskError) throw taskError;

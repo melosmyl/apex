@@ -121,6 +121,9 @@ const stringList = (description?: string) => ({ type: 'array', items: { type: 's
 
 // The results standard's actions and issues (Workstream M1): the actions
 // become tasks the owning advisor can do for the founder in Stage 2.
+// Where a task's work belongs on the task board (Workstream T).
+export const DEPARTMENTS = ['product', 'marketing', 'sales', 'finance', 'legal', 'ops'];
+
 const PRIORITY_ACTIONS = {
   type: 'array',
   description: 'Exactly the things to do in the next 24 hours, ranked: at most 3, small, concrete and doable. These become the tasks created from this meeting.',
@@ -133,8 +136,10 @@ const PRIORITY_ACTIONS = {
       brief: { type: 'string', description: 'What the advisor needs to do it: one to three sentences with the specifics from this meeting. Empty for founder actions.' },
       done_when: { type: 'string', description: 'How the founder will know it is done, in a few words.' },
       why_first: { type: 'string', description: 'Why this has to happen in the next 24 hours, before more time or money goes into the question.' },
+      short_title: { type: 'string', description: 'This action in 7 words or fewer, starting with the verb, keeping its one specific thing (a name, a number, a place). No full stop.' },
+      department: { type: 'string', enum: DEPARTMENTS, description: 'Which part of the business this work belongs to. Only used when the founder does it.' },
     },
-    required: ['title', 'assigned_to', 'task_type', 'brief', 'done_when', 'why_first'],
+    required: ['title', 'assigned_to', 'task_type', 'brief', 'done_when', 'why_first', 'short_title', 'department'],
   },
 };
 
