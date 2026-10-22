@@ -73,8 +73,10 @@ async function deleteAccount(db: any, user: any) {
   // The sign-in last: deleting it deletes every row the account owns.
   const { error: userErr } = await db.auth.admin.deleteUser(user.id);
   if (userErr) throw new Error(`deleting the sign-in: ${userErr.message}`);
-  // Again, for anything a meeting still running wrote in the meantime.
-  await forgetPerson(db, user.id);
+  // Again, for anything a meeting still running wrote in the meantime. The
+  // account is gone by now, so a failure here is logged, not reported as a
+  // failed deletion (a retry couldn't sign in any more).
+  try { await forgetPerson(db, user.id); } catch (e) { console.error('myData: second clean-up after deleting the account failed:', (e as Error).message); }
   return { deleted: true, companies: (companies || []).length, files, backup_days: BACKUP_DAYS };
 }
 
@@ -93,7 +95,7 @@ Deno.serve(async (req) => {
       await checkUserLimit(db, user.id, 'data_export');
       const bytes = await exportAll(db, user);
       const day = new Date().toISOString().slice(0, 10);
-      return new Response(bytes, { headers: { ...corsHeaders, 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="just-ask-the-room-${day}.zip"` } });
+      return new Response(new Blob([bytes as Uint8Array<ArrayBuffer>], { type: 'application/zip' }), { headers: { ...corsHeaders, 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="just-ask-the-room-${day}.zip"` } });
     }
     if (action === 'delete_company') return Response.json(await deleteCompany(db, user, company_id), { headers: corsHeaders });
     if (action === 'delete_account') {
