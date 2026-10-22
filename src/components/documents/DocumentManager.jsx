@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import { toast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +31,9 @@ const SORT_OPTIONS = [
 
 export default function DocumentManager({ eyebrow, title, description, emptyText }) {
   const { companyId } = useParams();
+  const { user } = useAuth();
   const [items, setItems] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [advisors, setAdvisors] = useState([]);
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [search, setSearch] = useState("");
@@ -90,29 +94,40 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
   }, [items, selectedFolder, filterType, filterStatus, search]);
 
   const create = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim() || saving) return;
     const folder = getFolderForType(form.document_type);
     const tags = form.tags.split(",").map(t => t.trim()).filter(Boolean);
-    await base44.entities.Document.create({
-      company_id: companyId,
-      title: form.title,
-      description: form.description,
-      document_type: form.document_type,
-      folder_path: folder,
-      tags,
-      content: form.content,
-      content_format: "Markdown",
-      status: "draft",
-      approval_status: "pending",
-      version_number: 1,
-      is_latest_version: true,
-      created_by_user_id: "founder",
-      kind: "document",
-      file_url: form.file_url || undefined,
-      file_name: form.file_name || undefined,
-    });
-    setForm({ title: "", document_type: "Other", content: "", description: "", file_url: "", file_name: "", tags: "" });
-    setCreateOpen(false); load();
+    setSaving(true);
+    try {
+      await base44.entities.Document.create({
+        company_id: companyId,
+        title: form.title,
+        description: form.description,
+        document_type: form.document_type,
+        folder_path: folder,
+        tags,
+        content: form.content,
+        content_format: "Markdown",
+        status: "draft",
+        approval_status: "pending",
+        version_number: 1,
+        is_latest_version: true,
+        // The founder's own id: the column holds a user id, and the word
+        // "founder" made every add fail.
+        created_by_user_id: user?.id || undefined,
+        kind: "document",
+        file_url: form.file_url || undefined,
+        file_name: form.file_name || undefined,
+      });
+      setForm({ title: "", document_type: "Other", content: "", description: "", file_url: "", file_name: "", tags: "" });
+      setCreateOpen(false); load();
+    } catch (e) {
+      // Say so, and keep what they wrote.
+      console.error("Adding the document failed:", e);
+      toast({ title: "The document wasn't added", description: "Something went wrong saving it. What you wrote is still here; try again in a moment.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const remove = async (d) => {
@@ -263,7 +278,7 @@ export default function DocumentManager({ eyebrow, title, description, emptyText
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
-              <Button onClick={create} disabled={!form.title.trim()}>Create Document</Button>
+              <Button onClick={create} disabled={!form.title.trim() || saving}>{saving ? "Adding…" : "Create Document"}</Button>
             </div>
           </div>
         </DialogContent>
