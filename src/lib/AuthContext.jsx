@@ -42,6 +42,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Reads the profile again without the full-screen loading state (e.g.
+  // after you change your name).
+  const refreshUser = async () => {
+    const current = await base44.auth.me().catch(() => null);
+    if (current) setUser(current);
+    return current;
+  };
+
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
@@ -64,6 +72,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       navigateToLogin,
       checkUserAuth,
+      refreshUser,
       checkAppState: checkUserAuth,
     }}>
       {children}

@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -42,7 +42,15 @@ import AdvisorsIndex from '@/pages/advisors/AdvisorsIndex';
 import AdvisorPage from '@/pages/advisors/AdvisorPage';
 import { AdvisorProfileProvider } from '@/components/advisors/AdvisorProfilePanel';
 import AuthConfirm from '@/pages/AuthConfirm';
+import Account from '@/pages/Account';
 // import CompanySettings from '@/pages/company/CompanySettings';
+
+// Signed out on a page that needs an account: sign in, then come back to it.
+const LoginThenBack = () => {
+  const { pathname, search } = useLocation();
+  const back = pathname + search;
+  return <Navigate to={back === '/' ? '/login' : `/login?returnTo=${encodeURIComponent(back)}`} replace />;
+};
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -85,8 +93,9 @@ const AuthenticatedApp = () => {
       <Route element={<ProtectedRoute unauthenticatedElement={<Landing />} />}>
         <Route path="/" element={<Companies />} />
       </Route>
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+      <Route element={<ProtectedRoute unauthenticatedElement={<LoginThenBack />} />}>
         <Route path="/admin" element={<Admin />} />
+        <Route path="/account" element={<Account />} />
         {/* The explicit hub — never auto-redirects, even for a single-
             company account. "/" is the smart entry point used right after
             login (skips straight into your one company); this is what

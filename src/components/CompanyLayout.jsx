@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Outlet, useParams, NavLink, useNavigate, useLocation, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { PinProvider } from "@/components/pins/PinContext";
+import { useAuth } from "@/lib/AuthContext";
 import {
   LayoutDashboard, Users, Landmark, FolderKanban, CheckSquare, BookOpen,
   FileText, Search, Scale, CalendarClock, Settings, ChevronLeft, Menu, Pin } from
@@ -31,6 +32,7 @@ export default function CompanyLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [company, setCompany] = useState(null);
+  const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -72,6 +74,12 @@ export default function CompanyLayout() {
       </nav>
       <div className="mx-4 py-4 border-t border-border text-muted-foreground">
         <div className="text-[0.85rem] font-display italic mb-1">Never build alone.</div>
+        {user && !user.isAnonymous && (
+          <div className="flex items-center gap-3 text-sm mb-2">
+            <Link to="/account" className="hover:text-foreground transition-colors truncate">{user.displayName || "Your account"}</Link>
+            <button type="button" onClick={() => logout(true)} className="hover:text-foreground transition-colors shrink-0">Sign out</button>
+          </div>
+        )}
         <div className="flex items-center gap-3 text-xs">
           <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
           <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>

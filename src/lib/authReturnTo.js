@@ -31,3 +31,10 @@ export function safeReturnTo() {
     return "/";
   }
 }
+
+// A link to another auth page (login <-> register) that keeps the current
+// ?returnTo=, so switching pages doesn't lose where you were going.
+export function withReturnTo(path) {
+  const back = safeReturnTo();
+  return back === "/" ? path : `${path}?returnTo=${encodeURIComponent(back)}`;
+}
