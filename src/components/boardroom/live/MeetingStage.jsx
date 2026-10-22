@@ -69,7 +69,9 @@ export default function MeetingStage({ seats = [], litChairId = null, onOpen }) 
           const c = CHAIRS.find((ch) => ch.id === s.chairId);
           const tag = TAG_ANCHOR[s.chairId];
           if (!c || !tag) return null;
-          const r = radiusFor(s.chairId) * (s.state === "speaking" ? 1.15 : 1);
+          // Still cues only (owner, 22 October 2026): the speaker's portrait
+          // keeps its size; the lit ring and glow say who has the floor.
+          const r = radiusFor(s.chairId);
           const cx = tag.x;
           const cy = tag.y - r - 8;
           const portrait = portraitFor({ libraryKey: s.libraryKey, name: s.name });

@@ -28,7 +28,7 @@ function SeatCard({ seat, hasFloor, someoneHasFloor, onOpen }) {
   // The name band: periwinkle for the speaker, chamomile for the Chair (the
   // whole card), an outline for whoever is up next, plain otherwise.
   const band = speaking && !seat.isChair
-    ? "bg-[hsl(var(--live-fill))] text-white"
+    ? "bg-[hsl(var(--live-fill))] text-[var(--room-ink)]"
     : seat.state === "up_next"
       ? "rounded-[2px] outline outline-2 -outline-offset-2 outline-foreground"
       : "";
@@ -49,7 +49,7 @@ function SeatCard({ seat, hasFloor, someoneHasFloor, onOpen }) {
       </button>
       <figcaption className={`mb-1 mt-1 px-1 pb-0.5 pt-0.5 ${band}`}>
         <b className="block truncate font-display text-[0.86rem] font-medium leading-tight" title={seat.name}>{seat.shortName}</b>
-        <span className={`font-mono text-[0.55rem] uppercase tracking-[0.1em] ${speaking && !seat.isChair ? "text-white" : seat.isChair || seat.state === "up_next" ? "text-foreground" : "text-muted-foreground"}`}>
+        <span className={`font-mono text-[0.55rem] uppercase tracking-[0.1em] ${speaking && !seat.isChair ? "text-[var(--room-ink)]" : seat.isChair || seat.state === "up_next" ? "text-foreground" : "text-muted-foreground"}`}>
           {STATE_LABEL[seat.state]}
           {seat.state === "thinking" && <span className="meeting-dots" aria-hidden="true" />}
         </span>
