@@ -4,7 +4,7 @@ import { PRODUCT_NAME, PRODUCT_DOMAIN, SUPPORT_EMAIL } from "@/lib/branding";
 
 export default function Privacy() {
   return (
-    <LegalLayout title="Privacy Policy" updated="30 September 2026">
+    <LegalLayout title="Privacy Policy" updated="22 October 2026">
       <section>
         <h2>The short version</h2>
         <p>
@@ -49,9 +49,11 @@ export default function Privacy() {
           Anthropic directly, and we'd encourage you to read them if this matters to you.
         </p>
         <p>
-          Because OpenAI and Anthropic are US-based companies, this means your board meeting content is
-          transmitted to and processed in the United States for the moment it takes to generate a response, even
-          though your data is stored in the EU (see below). We also use OpenAI's embeddings model to power
+          Because OpenAI and Anthropic are US-based companies, your board meeting content is sent to them and may
+          be processed outside the EU, in the United States and elsewhere, when an advisor answers, even though
+          your data is stored in the EU (see below). They may keep each request for up to 30 days to monitor for
+          abuse, then delete it, and they don't use it to train their models. Content their safety systems flag
+          can be kept longer (by Anthropic, for up to 2 years). We also use OpenAI's embeddings model to power
           semantic search over your past decisions and notes, so your board can recall what's actually relevant
           to a new question rather than just what's recent.
         </p>
