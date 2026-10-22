@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Plus, X, Trash2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import MetricsEditor from "@/components/company/MetricsEditor";
+import { toast } from "@/components/ui/use-toast";
+import YourData from "@/components/account/YourData";
 
 export default function CompanySettings() {
   const { company, setCompany } = useOutletContext();
@@ -27,10 +29,16 @@ export default function CompanySettings() {
     setCompany(updated); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
+  // Through the server, so the company's stored files go with it (D3, owner
+  // 22 October 2026; deleting the row alone left them in storage).
   const remove = async () => {
     if (!confirm("Delete this company and its workspace? This cannot be undone.")) return;
-    await base44.entities.Company.delete(companyId);
-    navigate("/");
+    try {
+      await base44.functions.invoke("myData", { action: "delete_company", company_id: companyId });
+      navigate("/");
+    } catch (e) {
+      toast({ title: "The company wasn't deleted", description: e.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -72,6 +80,10 @@ export default function CompanySettings() {
         <h3 className="font-display text-lg mb-1">Danger zone</h3>
         <p className="text-sm text-muted-foreground mb-4">Permanently delete this company and its workspace.</p>
         <Button variant="destructive" onClick={remove}><Trash2 className="w-4 h-4 mr-1.5" /> Delete company</Button>
+      </div>
+
+      <div className="mt-6">
+        <YourData />
       </div>
     </div>
   );

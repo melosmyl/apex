@@ -6,6 +6,7 @@ import { Plus, RefreshCw, Shield } from "lucide-react";
 import CompanyCard from "@/components/companies/CompanyCard";
 import GuidedOnboarding from "@/components/onboarding/GuidedOnboarding";
 import EmptyState from "@/components/EmptyState";
+import YourData from "@/components/account/YourData";
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -159,6 +160,9 @@ export default function Companies({ skipRedirect = false }) {
         }
       </div>
 
+      {companies !== null && (
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 pb-12"><div className="max-w-2xl"><YourData /></div></div>
+      )}
       <GuidedOnboarding open={onboarding} onClose={() => setOnboarding(false)} />
     </div>);
 

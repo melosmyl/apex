@@ -1,0 +1,98 @@
+// myData: a founder's own data (owner, 22 October 2026, D3).
+// - export: a copy of everything, one zip: data.json plus the stored files.
+// - delete_company: a company, its rows and its stored files.
+// - delete_account: everything, at once, after the founder types the
+//   phrase. The cost records we keep for our own accounts stay, without the
+//   person: their user id is cleared first.
+// Signed-in founders only, and only ever their own rows.
+// deno-lint-ignore-file no-explicit-any
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+import JSZip from 'npm:jszip@3.10.1';
+import { AccessError, accessErrorResponse, checkUserLimit, requireNotAnonymous, requireOwnedCompany } from '../_shared/access.ts';
+import { BACKUP_DAYS, FILES_BUCKET, OWN_TABLES, allRows, companyFiles, confirmed, forCopy, removeCompanyFiles } from '../_shared/myData.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+async function exportAll(db: any, user: any) {
+  const zip = new JSZip();
+  const data: Record<string, unknown> = {};
+  for (const { table, owner } of OWN_TABLES) data[table] = (await allRows(db, table, owner, user.id)).map(forCopy);
+  const companies = (data.companies as any[]) || [];
+  const files: string[] = [];
+  for (const c of companies) {
+    for (const path of await companyFiles(db, c.id)) {
+      const { data: blob, error } = await db.storage.from(FILES_BUCKET).download(path);
+      if (error || !blob) throw new Error(`reading a stored file: ${error?.message || 'no data'}`);
+      zip.file(`files/${path}`, new Uint8Array(await blob.arrayBuffer()));
+      files.push(`files/${path}`);
+    }
+  }
+  zip.file('data.json', JSON.stringify({
+    about: 'Everything Just Ask The Room holds about your account, as of the date below. Each section is one kind of record; stored files are in the files folder, by company.',
+    exported_at: new Date().toISOString(),
+    account: { id: user.id, email: user.email, created_at: user.created_at },
+    files,
+    ...data,
+  }, null, 2));
+  return await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+}
+
+async function deleteCompany(db: any, user: any, companyId: string) {
+  await requireOwnedCompany(db, companyId, user.id);
+  // Files first: if that fails, nothing is gone and the founder can retry.
+  const files = await removeCompanyFiles(db, companyId);
+  const { error } = await db.from('companies').delete().eq('id', companyId).eq('created_by_id', user.id);
+  if (error) throw new Error(`deleting the company: ${error.message}`);
+  return { deleted: true, files };
+}
+
+async function deleteAccount(db: any, user: any) {
+  const { data: companies, error: listErr } = await db.from('companies').select('id').eq('created_by_id', user.id);
+  if (listErr) throw new Error(`listing companies: ${listErr.message}`);
+  let files = 0;
+  for (const c of companies || []) files += await removeCompanyFiles(db, c.id);
+  // Cost records stay for our accounts, without the person.
+  const { error: logErr } = await db.from('ai_usage_logs').update({ user_id: null }).eq('user_id', user.id);
+  if (logErr) throw new Error(`clearing the cost records' owner: ${logErr.message}`);
+  // Rows with no link the database follows on its own.
+  const { error: rateErr } = await db.from('user_rate_events').delete().eq('user_id', user.id);
+  if (rateErr) throw new Error(`deleting rate records: ${rateErr.message}`);
+  // The sign-in last: deleting it deletes every row the account owns.
+  const { error: userErr } = await db.auth.admin.deleteUser(user.id);
+  if (userErr) throw new Error(`deleting the sign-in: ${userErr.message}`);
+  return { deleted: true, companies: (companies || []).length, files, backup_days: BACKUP_DAYS };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  try {
+    const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const authClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } });
+    const { data: { user }, error: authErr } = await authClient.auth.getUser();
+    if (authErr || !user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+    requireNotAnonymous(user);
+    const { action, company_id, confirm } = await req.json().catch(() => ({}));
+
+    if (action === 'export') {
+      await checkUserLimit(db, user.id, 'data_export');
+      const bytes = await exportAll(db, user);
+      const day = new Date().toISOString().slice(0, 10);
+      return new Response(bytes, { headers: { ...corsHeaders, 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="just-ask-the-room-${day}.zip"` } });
+    }
+    if (action === 'delete_company') return Response.json(await deleteCompany(db, user, company_id), { headers: corsHeaders });
+    if (action === 'delete_account') {
+      if (!confirmed(confirm)) throw new AccessError(400, 'Type "delete my account" to confirm.');
+      return Response.json(await deleteAccount(db, user), { headers: corsHeaders });
+    }
+    return Response.json({ error: 'Unknown action' }, { status: 400, headers: corsHeaders });
+  } catch (e) {
+    const denied = accessErrorResponse(e, corsHeaders);
+    if (denied) return denied;
+    console.error('myData error:', (e as Error).message);
+    return Response.json({ error: 'Something went wrong. Try again in a moment; anything already removed stays removed, and the rest is still there.' }, { status: 500, headers: corsHeaders });
+  }
+});

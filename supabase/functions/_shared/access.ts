@@ -73,6 +73,8 @@ export const USER_LIMITS = {
   // "Do this for me" runs, including redos (owner's limit, Workstream M).
   task_run: { max: 15, windowMinutes: 24 * 60 },
   embed: { max: 200, windowMinutes: 60 },
+  // A copy of all your data (D3): plenty for real use, not a way to load the server.
+  data_export: { max: 10, windowMinutes: 24 * 60 },
   // A free-meeting visitor gets the onboarding plan once, plus one retry.
   // Rows are purged after two days, which outlasts any free session.
   onboarding_plan_anon: { max: 2, windowMinutes: 2 * 24 * 60 },
