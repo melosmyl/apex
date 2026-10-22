@@ -19,14 +19,14 @@ const corsHeaders = {
 async function exportAll(db: any, user: any) {
   const zip = new JSZip();
   const data: Record<string, unknown> = {};
-  for (const { table, owner } of OWN_TABLES) data[table] = (await allRows(db, table, owner, user.id)).map(forCopy);
+  for (const { table, owner, columns } of OWN_TABLES) data[table] = (await allRows(db, table, owner, user.id, columns)).map(forCopy);
   const companies = (data.companies as any[]) || [];
   const files: string[] = [];
   for (const c of companies) {
     for (const path of await companyFiles(db, c.id)) {
       const { data: blob, error } = await db.storage.from(FILES_BUCKET).download(path);
       if (error || !blob) throw new Error(`reading a stored file: ${error?.message || 'no data'}`);
-      zip.file(`files/${path}`, new Uint8Array(await blob.arrayBuffer()));
+      zip.file(`files/${path}`, new Uint8Array(await blob.arrayBuffer()), { compression: 'STORE' });
       files.push(`files/${path}`);
     }
   }
@@ -37,7 +37,7 @@ async function exportAll(db: any, user: any) {
     files,
     ...data,
   }, null, 2));
-  return await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  return await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 }
 
 async function deleteCompany(db: any, user: any, companyId: string) {
@@ -49,20 +49,32 @@ async function deleteCompany(db: any, user: any, companyId: string) {
   return { deleted: true, files };
 }
 
+// Rows the database doesn't follow from the sign-in: the cost records stay
+// for our accounts without the person; rate records go. Safe to repeat.
+async function forgetPerson(db: any, userId: string) {
+  const { error: logErr } = await db.from('ai_usage_logs').update({ user_id: null }).eq('user_id', userId);
+  if (logErr) throw new Error(`clearing the cost records' owner: ${logErr.message}`);
+  const { error: genErr } = await db.from('deliverable_generation_logs').update({ user_id: null }).eq('user_id', userId);
+  if (genErr) throw new Error(`clearing the generation records' owner: ${genErr.message}`);
+  const { error: rateErr } = await db.from('user_rate_events').delete().eq('user_id', userId);
+  if (rateErr) throw new Error(`deleting rate records: ${rateErr.message}`);
+}
+
 async function deleteAccount(db: any, user: any) {
   const { data: companies, error: listErr } = await db.from('companies').select('id').eq('created_by_id', user.id);
   if (listErr) throw new Error(`listing companies: ${listErr.message}`);
   let files = 0;
   for (const c of companies || []) files += await removeCompanyFiles(db, c.id);
-  // Cost records stay for our accounts, without the person.
-  const { error: logErr } = await db.from('ai_usage_logs').update({ user_id: null }).eq('user_id', user.id);
-  if (logErr) throw new Error(`clearing the cost records' owner: ${logErr.message}`);
-  // Rows with no link the database follows on its own.
-  const { error: rateErr } = await db.from('user_rate_events').delete().eq('user_id', user.id);
-  if (rateErr) throw new Error(`deleting rate records: ${rateErr.message}`);
+  await forgetPerson(db, user.id);
+  // A free meeting's record holds a hashed network address: deleted with the
+  // account, before the sign-in would cut its link to them.
+  const { error: freeErr } = await db.from('free_meeting_attempts').delete().eq('user_id', user.id);
+  if (freeErr) throw new Error(`deleting free-meeting records: ${freeErr.message}`);
   // The sign-in last: deleting it deletes every row the account owns.
   const { error: userErr } = await db.auth.admin.deleteUser(user.id);
   if (userErr) throw new Error(`deleting the sign-in: ${userErr.message}`);
+  // Again, for anything a meeting still running wrote in the meantime.
+  await forgetPerson(db, user.id);
   return { deleted: true, companies: (companies || []).length, files, backup_days: BACKUP_DAYS };
 }
 

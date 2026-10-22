@@ -26,6 +26,8 @@ async function founder(name: string) {
   }
   await admin.from('ai_usage_logs').insert({ user_id: u.user!.id, company_id: co.id, provider: 'anthropic', model: 'claude-sonnet-5-5', request_type: 'independent', input_size: 1, output_size: 1, estimated_cost: 0.01, latency_ms: 1, status: 'success' });
   await admin.from('user_rate_events').insert({ user_id: u.user!.id, action: 'board_meeting' });
+  const fm = await admin.from('free_meeting_attempts').insert({ user_id: u.user!.id, ip_hash: `test-${name}-${tag}` });
+  if (fm.error) console.log('free meeting row:', fm.error.message);
   return { id: u.user!.id, token: s.session!.access_token, co, co2 };
 }
 const call = async (token: string, body: unknown) => {
@@ -47,6 +49,8 @@ check(data.companies?.length === 2 && data.companies.every((c: any) => c.created
 check(names.length === 2 && (await zip.file(names[0])!.async('string')) === "alice's file", 'and her stored files, readable', names);
 check(!JSON.stringify(data).includes('bob') && data.account?.id === a.id, "nothing of Bob's");
 check(Object.values(data).every((v: any) => !Array.isArray(v) || v.every((r: any) => typeof r !== 'object' || !('embedding' in r))), 'search indexes are left out');
+check(data.ai_usage_logs?.[0]?.model === 'claude-sonnet-5-5' && !('estimated_cost' in data.ai_usage_logs[0]) && !('attempts' in data.ai_usage_logs[0]) && data.free_meeting_attempts?.length === 1 && !('ip_hash' in data.free_meeting_attempts[0]),
+  'her usage and free-meeting records are in, without our cost figures or the hashed address', [data.ai_usage_logs?.[0], data.free_meeting_attempts?.[0]]);
 
 // 2. Deleting a company takes its stored files too; nobody else's.
 const other = await call(a.token, { action: 'delete_company', company_id: b.co.id });
@@ -74,6 +78,8 @@ const { data: costAnon } = await admin.from('ai_usage_logs').select('user_id, co
 check(!(cost || []).length && (costAnon || []).some((r: any) => r.user_id === null), 'the cost record stays, with nothing linking it to her', { cost, n: costAnon?.length });
 const { data: rates } = await admin.from('user_rate_events').select('id').eq('user_id', a.id);
 check(!rates?.length, 'her rate records are gone');
+const { data: fms } = await admin.from('free_meeting_attempts').select('id').eq('ip_hash', `test-alice-${tag}`);
+check(!fms?.length, 'her free-meeting record, with its hashed address, is gone');
 check((await files(b.co.id)) === 1 && !!(await admin.auth.admin.getUserById(b.id)).data.user, "Bob's account and files are untouched");
 
 // 4. A visitor without an account can't use any of it.
@@ -87,6 +93,7 @@ check(none.status === 401, 'nobody signed in gets nothing', none.status);
 for (const c of [b.co, b.co2]) await admin.storage.from('documents').remove(((await admin.storage.from('documents').list(c.id)).data || []).map((f: any) => `${c.id}/${f.name}`));
 await admin.from('ai_usage_logs').delete().is('user_id', null).eq('model', 'claude-sonnet-5-5').eq('estimated_cost', 0.01);
 await admin.from('ai_usage_logs').delete().eq('user_id', b.id);
+await admin.from('free_meeting_attempts').delete().eq('ip_hash', `test-bob-${tag}`);
 await admin.auth.admin.deleteUser(b.id);
 await admin.auth.admin.deleteUser(anon.user!.id);
 console.log(`\n${failures ? `${failures} FAILED` : 'ALL PASSED'}`);

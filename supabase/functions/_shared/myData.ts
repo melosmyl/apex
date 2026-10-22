@@ -6,9 +6,10 @@
 export const FILES_BUCKET = 'documents';
 
 // Every table that holds the founder's own rows, and the column that says
-// they're theirs. Kept to the founder's own rows only: nothing here is
-// anyone else's, and nothing of ours (model settings, alerts) is included.
-export const OWN_TABLES: { table: string; owner: string }[] = [
+// they're theirs. Only the founder's own rows; where a row also carries our
+// internal figures (what a call cost us, how it was retried), only the
+// columns that are about them (`columns`).
+export const OWN_TABLES: { table: string; owner: string; columns?: string }[] = [
   { table: 'profiles', owner: 'id' },
   { table: 'companies', owner: 'created_by_id' },
   { table: 'advisors', owner: 'created_by_id' },
@@ -29,7 +30,9 @@ export const OWN_TABLES: { table: string; owner: string }[] = [
   { table: 'progression_nodes', owner: 'created_by_id' },
   { table: 'progression_node_completions', owner: 'created_by_id' },
   { table: 'subscriptions', owner: 'created_by_id' },
-  { table: 'ai_usage_logs', owner: 'user_id' },
+  { table: 'deliverable_generation_logs', owner: 'user_id', columns: 'id, company_id, task_id, advisor_id, document_id, document_type, export_format, status, created_at' },
+  { table: 'free_meeting_attempts', owner: 'user_id', columns: 'id, started_at, completed, company_id, meeting_id, created_at' },
+  { table: 'ai_usage_logs', owner: 'user_id', columns: 'id, created_at, company_id, meeting_id, advisor_id, task_run_id, request_type, provider, model, status, input_size, output_size' },
 ];
 
 // Search indexes are numbers, not content: left out of the copy.
@@ -47,10 +50,10 @@ export const confirmed = (typed: unknown) => String(typed ?? '').trim().toLowerC
 
 // All of a table's rows for the owner, page by page (the API returns at most
 // 1000 at a time).
-export async function allRows(db: any, table: string, owner: string, userId: string) {
+export async function allRows(db: any, table: string, owner: string, userId: string, columns = '*') {
   const rows: any[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from(table).select('*').eq(owner, userId).order('id', { ascending: true }).range(from, from + 999);
+    const { data, error } = await db.from(table).select(columns).eq(owner, userId).order('id', { ascending: true }).range(from, from + 999);
     if (error) throw new Error(`reading ${table}: ${error.message}`);
     rows.push(...(data || []));
     if (!data || data.length < 1000) return rows;

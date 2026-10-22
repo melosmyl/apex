@@ -38,7 +38,7 @@ export default function YourData() {
   const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setAnonymous(!data?.user || !!data.user.is_anonymous));
+    supabase.auth.getUser().then(({ data }) => setAnonymous(!data?.user || !!data.user.is_anonymous)).catch(() => setAnonymous(true));
   }, []);
   if (anonymous) return null;
 
