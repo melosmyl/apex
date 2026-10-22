@@ -96,3 +96,21 @@ export function shouldEmail(existing: any, now = Date.now()) {
   const emailed = existing.emailed_at ? new Date(existing.emailed_at).getTime() : 0;
   return now - emailed > REMIND_EVERY_MS;
 }
+
+// The email's body, for a real alert and for the test below.
+export function alertText(d: { message: string; latest: string }) {
+  return `${d.message}\n\nLatest error: ${d.latest}\n\nThis shows in red on the Admin page until it stops. You'll get a reminder every 12 hours while it lasts.`;
+}
+
+// A test the owner asks for (owner, 22 October 2026: confirm the alert
+// email arrives). Says plainly that nothing is wrong, then shows a real
+// alert's wording, made by the same code from a made-up example.
+export function testEmail() {
+  const example = describe({ provider: 'anthropic', calls: 4, unrescued: 0, latestError: 'Anthropic error: HTTP 400 — Your credit balance is too low to access the Anthropic API.' });
+  return {
+    subject: 'Test: Just Ask The Room alerts are working',
+    text: `This is a test of the provider alert email. Nothing is wrong: it was sent because you asked for one.\n\n`
+      + `If a provider starts failing, you'll get an email like the one below, once per incident, with a reminder every 12 hours while it lasts. This example is made up.\n\n`
+      + `---\nSubject: ${example.subject}\n\n${alertText(example)}\n---`,
+  };
+}

@@ -7,7 +7,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { isServiceCall } from '../_shared/meetingDriver.ts';
-import { NEW_INCIDENT_GAP_MS, WINDOW_MS, describe, findFailures, shouldEmail } from '../_shared/providerHealth.ts';
+import { NEW_INCIDENT_GAP_MS, WINDOW_MS, alertText, describe, findFailures, shouldEmail, testEmail } from '../_shared/providerHealth.ts';
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
@@ -29,6 +29,17 @@ async function email(subject: string, text: string) {
 
 Deno.serve(async (req) => {
   if (!isServiceCall(req)) return json({ error: 'Unauthorized' }, 401);
+  const { action } = (await req.json().catch(() => null)) || {};
+  // One test email, on request: checks the secrets and that mail arrives.
+  if (action === 'test') {
+    try {
+      const t = testEmail();
+      return json({ test: await email(t.subject, t.text) });
+    } catch (e) {
+      console.error('providerHealth: the test email failed:', (e as Error).message);
+      return json({ test: 'failed', error: (e as Error).message }, 502);
+    }
+  }
   try {
     const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const since = new Date(Date.now() - WINDOW_MS).toISOString();
@@ -56,7 +67,7 @@ Deno.serve(async (req) => {
       let mailed = 'not needed';
       if (send) {
         try {
-          mailed = await email(d.subject, `${d.message}\n\nLatest error: ${d.latest}\n\nThis shows in red on the Admin page until it stops. You'll get a reminder every 12 hours while it lasts.`);
+          mailed = await email(d.subject, alertText(d));
           if (mailed === 'sent') {
             const { error: markErr } = await db.from('provider_health_alerts').update({ emailed_at: new Date().toISOString() }).eq('provider', g.provider).eq('alert_type', 'error');
             if (markErr) console.error("providerHealth: couldn't record the email; the next check may send it again:", markErr.message);

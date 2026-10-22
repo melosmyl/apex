@@ -59,3 +59,13 @@ Deno.test('timeouts are read as slow, and a latency is never read as a status co
   assertEquals(reasonOf('anthropic/claude-sonnet-5 (fallback): timed out after 134012ms'), 'slow');
   assertEquals(reasonOf('HTTP 429 — rate limited'), 'busy');
 });
+
+Deno.test("the test alert says nothing is wrong and shows a real alert's wording", async () => {
+  const { testEmail } = await import('./providerHealth.ts');
+  const t = testEmail();
+  assertEquals(t.subject, 'Test: Just Ask The Room alerts are working');
+  assert(t.text.startsWith('This is a test of the provider alert email. Nothing is wrong'));
+  assert(t.text.includes('Subject: Action needed: Claude (Anthropic) is out of credit'));
+  assert(t.text.includes('Latest error: Anthropic error: HTTP 400'));
+  assert(t.text.includes("You'll get a reminder every 12 hours"));
+});
