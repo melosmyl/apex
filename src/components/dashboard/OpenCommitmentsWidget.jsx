@@ -1,6 +1,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Handshake } from "lucide-react";
+import { DepartmentTag } from "@/components/tasks/DepartmentChip";
+import { cardTitle } from "@/lib/departments";
 
 const OVERDUE_AFTER_DAYS = 14;
 const MAX_SHOWN = 4;
@@ -50,8 +52,9 @@ export default function OpenCommitmentsWidget({ tasks = [], meetings = [], compa
                 className="w-full text-left group"
                 disabled={!meeting}
               >
-                <div className="text-sm leading-snug group-hover:text-brand transition-colors">{c.title}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="text-sm leading-snug group-hover:text-brand transition-colors">{cardTitle(c)}</div>
+                <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                  <DepartmentTag department={c.department} />
                   <span className={c.days >= OVERDUE_AFTER_DAYS ? "text-brand" : ""}>{ageLabel(c.days)}</span>
                   {meeting && <span> · from "{meeting.question}"</span>}
                 </div>

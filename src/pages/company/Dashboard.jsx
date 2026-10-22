@@ -9,6 +9,10 @@ import {
 import OpenCommitmentsWidget from "@/components/dashboard/OpenCommitmentsWidget";
 import OpenCallsWidget from "@/components/dashboard/OpenCallsWidget";
 import ProgressionTree from "@/components/dashboard/ProgressionTree";
+import DepartmentCounts from "@/components/dashboard/DepartmentCounts";
+import { DepartmentTag } from "@/components/tasks/DepartmentChip";
+import { cardTitle } from "@/lib/departments";
+import { useShortTitles, withShortTitles } from "@/lib/shortTitles";
 
 export default function Dashboard() {
   const { company } = useOutletContext();
@@ -30,6 +34,8 @@ export default function Dashboard() {
     })();
   }, [companyId]);
 
+  useShortTitles(companyId, data?.tasks, (titles) => setData((d) => (d ? { ...d, tasks: withShortTitles(d.tasks, titles) } : d)));
+
   const allMeetings = data?.meetings || [];
   const allTasks = data?.tasks || [];
 
@@ -40,7 +46,7 @@ export default function Dashboard() {
   const openTasks = data?.tasks?.filter((t) => t.status !== "done") || [];
   const doneTasks = data?.tasks?.filter((t) => t.status === "done") || [];
   const recentProgress = [
-    ...doneTasks.map((t) => ({ label: t.title, type: "task", time: t.updated_date })),
+    ...doneTasks.map((t) => ({ label: cardTitle(t), type: "task", time: t.updated_date })),
     ...(data?.decisions || []).map((d) => ({ label: d.question, type: "decision", time: d.created_date })),
     ...(data?.docs || []).map((d) => ({ label: d.title, type: "document", time: d.created_date })),
   ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 4);
@@ -110,8 +116,11 @@ export default function Dashboard() {
                   <button onClick={() => go("tasks")} className="flex items-start gap-3 text-left w-full group">
                     <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-brand shrink-0" />
                     <div>
-                      <div className="text-sm font-medium group-hover:text-brand transition-colors">{t.title}</div>
-                      <div className="text-xs text-muted-foreground">{t.assigned_to || "Unassigned"}</div>
+                      <div className="text-sm font-medium group-hover:text-brand transition-colors">{cardTitle(t)}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                        <DepartmentTag department={t.department} />
+                        <span>{t.assigned_to || "Unassigned"}</span>
+                      </div>
                     </div>
                   </button>
                 </li>
@@ -159,6 +168,7 @@ export default function Dashboard() {
 
       <OpenCallsWidget meetings={allMeetings} records={data?.records || []} companyId={companyId} />
       <OpenCommitmentsWidget tasks={allTasks} meetings={allMeetings} companyId={companyId} />
+      <DepartmentCounts tasks={allTasks} companyId={companyId} />
 
       {/* The Progression Tree — replaces MilestoneTracker (self-reported)
           and BuildStateWidget (computed, but only 5 fixed facts) as of the

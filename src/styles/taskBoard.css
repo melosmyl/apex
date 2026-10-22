@@ -1,0 +1,90 @@
+/* The task board (Workstream T): cards in the comic style (ink edge, offset
+   shadow) with a department band down the left, chips in the partner
+   colours, and the department filter. Colours come from src/lib/departments.js. */
+
+.task-card {
+  display: flex;
+  min-width: 0;
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--foreground));
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.task-card--delegated { background: #FFF8EB; }
+.task-card__band {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  border-right: 2px solid hsl(var(--foreground));
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.task-card__body { flex: 1; min-width: 0; padding: 0.7rem 0.8rem 0.75rem; }
+.task-card__title { font-weight: 600; font-size: 0.95rem; line-height: 1.3; overflow-wrap: anywhere; }
+.task-card__full { margin-top: 0.2rem; font-size: 0.8rem; line-height: 1.4; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+
+.dept-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.05rem 0.45rem;
+  border: 1.5px solid hsl(var(--foreground));
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.dept-chip--button { cursor: pointer; }
+.dept-chip--button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.dept-chip--button:disabled { cursor: default; opacity: 0.7; }
+
+/* The filter above the board: All plus the six, each with its count. */
+.dept-filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+.dept-filter button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.3rem 0.75rem 0.3rem 0.4rem;
+  border: 2px solid hsl(var(--foreground));
+  border-radius: 999px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.dept-filter button:hover { box-shadow: 2px 2px 0 hsl(var(--foreground)); }
+.dept-filter button[aria-pressed="true"] { box-shadow: 3px 3px 0 hsl(var(--foreground)); transform: translate(-1px, -1px); font-weight: 600; }
+.dept-filter button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.dept-filter .swatch { width: 0.9rem; height: 0.9rem; border-radius: 999px; border: 1.5px solid hsl(var(--foreground)); }
+.dept-filter .count { font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); font-size: 0.78rem; }
+.dept-filter button[aria-pressed="true"] .count { color: hsl(var(--foreground)); }
+
+/* The Dashboard's open tasks by department. */
+.dept-counts { display: grid; gap: 0.55rem; }
+.dept-counts a { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) 2rem; align-items: center; gap: 0.75rem; color: inherit; text-decoration: none; border-radius: 6px; }
+.dept-counts a:hover .label { text-decoration: underline; text-underline-offset: 3px; }
+.dept-counts a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.dept-counts .label { font-size: 0.9rem; font-weight: 500; }
+.dept-counts .track { height: 0.9rem; border: 1.5px solid hsl(var(--foreground)); border-radius: 999px; overflow: hidden; }
+.dept-counts .fill { display: block; height: 100%; border-right: 1.5px solid hsl(var(--foreground)); }
+.dept-counts .fill--empty { border-right: 0; }
+.dept-counts .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dept-filter button { transition: none; }
+}

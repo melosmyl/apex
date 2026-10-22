@@ -13,6 +13,9 @@ import DocumentDetailDialog from "@/components/documents/DocumentDetailDialog";
 import AdvisorWorkDialog, { isAdvisorWork } from "@/components/documents/AdvisorWorkDialog";
 import { useTaskRuns } from "@/lib/taskRuns";
 import { toast } from "@/components/ui/use-toast";
+import { DEPARTMENTS, departmentForAdvisor, isDepartment } from "@/lib/departments";
+import { useShortTitles, withShortTitles } from "@/lib/shortTitles";
+import "@/styles/taskBoard.css";
 
 const COLUMNS = [
   { key: "todo", label: "To Do" },
@@ -26,6 +29,15 @@ export default function Tasks() {
   const { company } = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const meetingFilter = searchParams.get("meeting");
+  // The department filter (Workstream T), kept in the address so the
+  // Dashboard's counts can link straight to it.
+  const deptParam = searchParams.get("dept");
+  const deptFilter = isDepartment(deptParam) ? deptParam : null;
+  const setDeptFilter = (key) => {
+    const next = new URLSearchParams(searchParams);
+    if (key) next.set("dept", key); else next.delete("dept");
+    setSearchParams(next);
+  };
   const [items, setItems] = useState(null);
   const [advisors, setAdvisors] = useState([]);
   const [advisorsLoaded, setAdvisorsLoaded] = useState(false);
@@ -36,7 +48,9 @@ export default function Tasks() {
   // A "Do this for me" result opens in its own clean view, not the old
   // deliverable viewer.
   const [workDoc, setWorkDoc] = useState(null);
-  const EMPTY_FORM = { title: "", assigned_to: "", project_id: "", task_type: "", brief: "" };
+  // The department follows the advisor you pick until you choose one
+  // yourself (deptChosen).
+  const EMPTY_FORM = { title: "", assigned_to: "", project_id: "", task_type: "", brief: "", department: "ops", deptChosen: false };
   const [form, setForm] = useState(EMPTY_FORM);
 
   const load = () => base44.entities.Task.filter({ company_id: companyId }, "-created_date", 200).then(setItems);
@@ -53,7 +67,7 @@ export default function Tasks() {
     await base44.entities.Task.create({
       company_id: companyId, title: form.title, assigned_to: form.assigned_to, project_id: form.project_id || undefined,
       advisor_id: aiAssignee?.id || null, task_type: form.task_type || null, description: form.brief.trim() || null,
-      created_by: "Founder", status: "todo",
+      department: form.department, created_by: "Founder", status: "todo",
     });
     setForm(EMPTY_FORM); setOpen(false); load();
   };
@@ -94,7 +108,27 @@ export default function Tasks() {
     await markDone(task);
   };
 
-  const visibleItems = meetingFilter ? (items || []).filter((t) => t.source_meeting_id === meetingFilter) : items;
+  const changeDepartment = async (task, department) => {
+    setItems((prev) => prev?.map((t) => (t.id === task.id ? { ...t, department } : t)) || prev);
+    try {
+      await base44.entities.Task.update(task.id, { department });
+    } catch {
+      toast({ title: "That didn't save", description: "The department is back as it was." });
+      load();
+    }
+  };
+
+  useShortTitles(companyId, items, (titles) => setItems((prev) => withShortTitles(prev, titles)));
+
+  const pickAssignee = (name) => setForm((f) => ({
+    ...f,
+    assigned_to: name,
+    department: f.deptChosen ? f.department : departmentForAdvisor(advisors.find((a) => a.name === name)),
+  }));
+
+  const meetingItems = meetingFilter ? (items || []).filter((t) => t.source_meeting_id === meetingFilter) : items;
+  const deptCounts = Object.fromEntries(DEPARTMENTS.map((d) => [d.key, (meetingItems || []).filter((t) => t.department === d.key).length]));
+  const visibleItems = deptFilter ? (meetingItems || []).filter((t) => t.department === deptFilter) : meetingItems;
   // "Do this for me": each task's latest run; a finished run moves its task,
   // so the board reloads when one settles.
   const { runs, put } = useTaskRuns((visibleItems || []).map((t) => t.id), load);
@@ -107,13 +141,29 @@ export default function Tasks() {
       {meetingFilter && (
         <div className="flex items-center justify-between gap-3 bg-accent/50 rounded-xl px-4 py-2.5 mb-5 text-sm">
           <span>Showing the {visibleItems?.length ?? ""} task{visibleItems?.length === 1 ? "" : "s"} from that board meeting.</span>
-          <button onClick={() => setSearchParams({})} className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors shrink-0">
+          <button onClick={() => { const next = new URLSearchParams(searchParams); next.delete("meeting"); setSearchParams(next); }} className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors shrink-0">
             <X className="w-3.5 h-3.5" /> Show all tasks
           </button>
         </div>
       )}
+      {items !== null && meetingItems.length > 0 && (
+        <div className="dept-filter" role="group" aria-label="Show tasks by department">
+          <button type="button" aria-pressed={!deptFilter} onClick={() => setDeptFilter(null)}>
+            <span className="swatch" style={{ background: "conic-gradient(" + DEPARTMENTS.map((d, i) => `${d.band} ${(i * 100) / 6}% ${((i + 1) * 100) / 6}%`).join(", ") + ")" }} aria-hidden="true" />
+            All <span className="count">{meetingItems.length}</span>
+          </button>
+          {DEPARTMENTS.map((d) => (
+            <button key={d.key} type="button" aria-pressed={deptFilter === d.key} onClick={() => setDeptFilter(deptFilter === d.key ? null : d.key)}>
+              <span className="swatch" style={{ background: d.band }} aria-hidden="true" />
+              {d.label} <span className="count">{deptCounts[d.key]}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {items === null ? <div className="h-40 rounded-2xl bg-secondary/60 animate-pulse" />
-        : visibleItems.length === 0 ? <EmptyState icon={CheckSquare} title={meetingFilter ? "No tasks from that meeting" : "No tasks yet"} description={meetingFilter ? "They may have already been completed or removed." : "Create a task, or let your board assign work during a meeting."} action={!meetingFilter && <Button onClick={() => setOpen(true)} variant="primary" className="px-6"><Plus className="w-4 h-4 mr-1.5" /> New task</Button>} />
+        : visibleItems.length === 0 ? (deptFilter && meetingItems.length > 0
+          ? <EmptyState icon={CheckSquare} title={`No ${DEPARTMENTS.find((d) => d.key === deptFilter).label} tasks`} description="Choose another department, or All." />
+          : <EmptyState icon={CheckSquare} title={meetingFilter ? "No tasks from that meeting" : "No tasks yet"} description={meetingFilter ? "They may have already been completed or removed." : "Create a task, or let your board assign work during a meeting."} action={!meetingFilter && <Button onClick={() => setOpen(true)} variant="primary" className="px-6"><Plus className="w-4 h-4 mr-1.5" /> New task</Button>} />)
         : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {COLUMNS.map((col) => {
@@ -135,6 +185,7 @@ export default function Tasks() {
                       acknowledging={acknowledgingId === t.id}
                       onCompleteFounder={completeForFounder}
                       onMove={move}
+                      onDepartmentChange={changeDepartment}
                       onOpenDocument={async (docId) => {
                         const d = await base44.entities.Document.get(docId).catch(() => null);
                         if (!d) { toast({ title: "That result isn't there any more", description: "It may have been deleted from Knowledge." }); return; }
@@ -166,7 +217,7 @@ export default function Tasks() {
               </select>
             </div>
             <div><Label htmlFor="task-assignee" className="mb-1.5 block">{form.task_type ? "Which advisor does it" : "Assign to"}</Label>
-              <select id="task-assignee" value={form.assigned_to} onChange={(e)=>setForm(f=>({...f,assigned_to:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <select id="task-assignee" value={form.assigned_to} onChange={(e)=>pickAssignee(e.target.value)} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">{form.task_type ? "Choose an advisor" : "Unassigned"}</option>
                 {advisors.filter((a) => !form.task_type || a.type !== "human").map(a=><option key={a.id}>{a.name}</option>)}
               </select>
@@ -178,6 +229,11 @@ export default function Tasks() {
                   className="block w-full rounded-md border border-input bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
               </div>
             )}
+            <div><Label htmlFor="task-department" className="mb-1.5 block">Department</Label>
+              <select id="task-department" value={form.department} onChange={(e)=>setForm(f=>({...f,department:e.target.value,deptChosen:true}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                {DEPARTMENTS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
+              </select>
+            </div>
             <div><Label htmlFor="task-project" className="mb-1.5 block">Project</Label>
               <select id="task-project" value={form.project_id} onChange={(e)=>setForm(f=>({...f,project_id:e.target.value}))} className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">None</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}

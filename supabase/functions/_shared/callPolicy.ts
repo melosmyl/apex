@@ -82,6 +82,11 @@ const POLICIES: Record<string, CallPolicy> = {
     maxTokens: { anthropic: 2_000, openai: 1_000 },
     thinking: 'off', effort: 'low', nativeFormat: true, fallbackReserveMs: 10_000, attemptTimeoutMs: 25_000,
   },
+  // Short titles for task cards (Workstream T, cheap tier): a line each.
+  task_short_title: {
+    maxTokens: { anthropic: 2_000, openai: 1_000 },
+    thinking: 'off', effort: 'low', nativeFormat: true, fallbackReserveMs: 10_000, attemptTimeoutMs: 25_000,
+  },
   // The Chair putting a founder's note to the board in one sentence (turn
   // shape): quick, so the round's advisors keep their time.
   chair_tabling: {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import EmptyState from "@/components/EmptyState";
+import { cardTitle } from "@/lib/departments";
 
 const STATUS_BAR = {
   todo: "bg-stone-300/80 border-stone-400/50 text-stone-800",
@@ -76,7 +77,7 @@ export default function GanttTimeline({ projects, tasks, onTasksChange }) {
       <div className="space-y-2">
         {unscheduled.map((t) => (
           <div key={t.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/40 px-4 py-2.5">
-            <span className="text-sm font-medium truncate">{t.title}</span>
+            <span className="text-sm font-medium truncate" title={t.title}>{cardTitle(t)}</span>
             <Button size="sm" variant="secondaryOutline" onClick={() => openEdit(t)} className="shrink-0"><CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> Add dates</Button>
           </div>
         ))}
@@ -115,7 +116,7 @@ export default function GanttTimeline({ projects, tasks, onTasksChange }) {
                       const { left, width } = pos(t.start_date, t.end_date);
                       return (
                         <div key={t.id} className="flex border-b border-border/40 hover:bg-secondary/20">
-                          <div className="w-60 shrink-0 px-5 py-2.5 truncate text-sm">{t.title}</div>
+                          <div className="w-60 shrink-0 px-5 py-2.5 truncate text-sm" title={t.title}>{cardTitle(t)}</div>
                           <div className="relative flex-1 h-9">
                             <button
                               onClick={() => openEdit(t)}
