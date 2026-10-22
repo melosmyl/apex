@@ -8,6 +8,8 @@ import { CHATBOT, CLOSING_LINES, QUESTION, READY, ROOM } from "@/lib/whyNotChatb
 // real petit m question, answered by a plain chatbot on the left and by the
 // Room on the right. When the page is narrow (900px or less) the columns stack, chatbot first.
 
+const inWords = (n) => ["none", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"][n] ?? String(n);
+
 function Face({ advisorKey }) {
   const p = advisorKey && portraitFor({ libraryKey: advisorKey });
   return p ? <img className="face" src={p.card} alt="" loading="lazy" /> : <span className="face" aria-hidden="true" />;
@@ -78,10 +80,10 @@ export default function WhyNotChatbot() {
         </article>
 
         <article className="col room" aria-label="The Room's answer">
-          <header className="head"><b>The Room</b><span className="room-mono">{ROOM.spoke} of {ROOM.seated} spoke · {ROOM.disagreements} disagreements</span></header>
+          <header className="head"><b>The Room</b><span className="room-mono">{ROOM.spoke === ROOM.seated ? `${ROOM.seated} advisors` : `${ROOM.spoke} of ${ROOM.seated} spoke`} · {ROOM.disagreements} disagreements</span></header>
 
           <div className="block">
-            <span className="room-mono">Where they stood</span>
+            <span className="room-mono">Where they stood{ROOM.positions.length < ROOM.spoke ? ` · ${inWords(ROOM.positions.length)} of ${inWords(ROOM.spoke)}` : ""}</span>
             <ul className="positions">
               {ROOM.positions.map((p, i) => <Position key={i} position={p} />)}
             </ul>

@@ -1,6 +1,6 @@
 // The landing page's "Why not just ask a chatbot?" side-by-side (Workstream L).
-// One real question from petit m (the owner's own company), asked in a Sit in
-// meeting on 16 October 2026 (meeting f150cbfc), and the same question put to
+// One real question from petit m (the owner's own company), asked of the full
+// board on 22 October 2026 (meeting 2c796462), and the same question put to
 // ChatGPT by the owner. Nothing here is written for the page:
 //   - the chatbot's reply is verbatim, cut only where the column runs out,
 //     with "…" at each cut;
@@ -15,7 +15,7 @@ import { getAdvisorByKey } from "@/lib/advisorLibrary";
 
 export const QUESTION = {
   text: "Should petit m price the dinner set at £45 or £65?",
-  who: "petit m · children’s dinner sets · 16 October 2026",
+  who: "petit m · children’s dinner sets · 22 October 2026",
 };
 
 // ChatGPT's reply, as the owner pasted it on 16 October 2026 (613 words as
@@ -44,37 +44,36 @@ export const CHATBOT = {
   endsBy: "Asks what’s in the set and what it costs",
 };
 
-// The Room, from meeting f150cbfc. Julian Rhodes was unavailable in Round 1,
-// so four of the five spoke (owner, 16 October: show it as "4 of 5 spoke",
-// and swap in a full board once the main session's missing-turns fix is live
-// and the owner has asked the question again). The Chair recorded three
+// The Room, from meeting 2c796462 (22 October 2026): the owner asked the
+// question again with the full board, after withdrawing two facts made up
+// for testing (the £11 Stoke quote and the £58/£72 shop prices). All five
+// advisors spoke in Round 1; these are the four most different positions,
+// none resting on the withdrawn facts. The Chair recorded three
 // disagreements (its own word) and created three tasks.
 export const ROOM = {
-  spoke: 4,
+  spoke: 5,
   seated: 5,
   disagreements: 3,
   tasks: 3,
   positions: [
-    { key: "supply_chain", text: "Price at £65 for the test, with £55 as your floor. £45 is too thin…", source: "f150cbfc Round 1, Rafael Duarte" },
-    { key: "creative_director", text: "Lead with £65, not £45. Test £45 only as a fallback if strangers refuse £65 with a real deposit.", source: "f150cbfc Round 1, Sofia Marchetti" },
-    { key: "contrarian", text: "Open at £65, not £45. …parents said ‘price’, but that comment came before they had seen the object…", source: "f150cbfc Round 1, Victor Hale" },
-    { key: "marketing_director", text: "…Put both on price cards this week, start from £65 as your working hypothesis, and let stranger deposits decide…", source: "f150cbfc Round 1, Priya Nair" },
+    { key: "supply_chain", text: "Don’t lock in either price today, because the cost of the set is unknown.", source: "2c796462 Round 1, Rafael Duarte" },
+    { key: "creative_director", text: "Lean £65, but as a hypothesis to test, not a decision.", source: "2c796462 Round 1, Sofia Marchetti" },
+    { key: "legal_advisor", text: "Legally, neither £45 nor £65 is safe to publish yet…", source: "2c796462 Round 1, Julian Rhodes" },
+    { key: "contrarian", text: "…My case against the room is that ruling £45 out in advance is as unsupported as choosing it.", source: "2c796462 Round 1, Victor Hale" },
   ],
   chair: {
     key: "chair",
     verdict:
-      "Go with £65, shown as one delivered price, and test it with real £10 refundable deposits from grandparent gift buyers; £45 is out, and £58 is the fallback if strangers refuse.",
-    confidence: 57,
-    // The reason opens "All five advisors converged on £65, so…", but Julian
-    // didn't speak in Round 1, so it starts after that clause.
-    reason: "…the agreement has not been stress-tested. It rests on two shops’ asking prices, an uncosted cradle and no stranger deposits yet.",
-    source: "meeting f150cbfc, board_resolution",
+      "Neither £45 nor £65 can be chosen yet because the set’s real cost is unknown; get a written landed cost first, and until then treat £65 delivered as the only price worth showing strangers, with no deposits taken.",
+    confidence: 52,
+    reason: "The board broadly converged on ‘get the cost first, £65 if you must test’, which may share a blind spot, and nobody has any cost, sample or buyer evidence to test it against.",
+    source: "meeting 2c796462, board_resolution",
   },
   task: {
     key: "supply_chain",
-    title: "Work out the margin per set at £65 delivered, with the gift box and Etsy fees on postage included",
+    title: "Write down your maximum landed cost per set at £45 and at £65, before asking anyone for a quote",
     type: "Calculate",
-    source: "meeting f150cbfc, task assigned to Rafael Duarte",
+    source: "meeting 2c796462, task assigned to Rafael Duarte",
   },
 };
 
@@ -84,12 +83,10 @@ export const CLOSING_LINES = [
   "They write down what you decided, and hold you to it.",
 ];
 
-// BLOCKER (owner, 16 October 2026): meeting f150cbfc used two facts the owner
-// made up for testing (the £11 Stoke quote and the £58/£72 shop prices).
-// Before this section is merged and published, the owner re-runs the question
-// with a full board and only real petit m facts, and the Room column is
-// swapped to that meeting. Only then set this to true.
-const CLEARED_FOR_PUBLIC = false;
+// The blocker of 16 October (meeting f150cbfc used two made-up test facts)
+// is lifted: the Room column is now the owner's full-board re-run of
+// 22 October (2c796462), which uses none of them.
+const CLEARED_FOR_PUBLIC = true;
 
 const sourced = (x) => Boolean(x && x.source);
 const known = (key) => Boolean(key && getAdvisorByKey(key));
