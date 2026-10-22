@@ -3,7 +3,7 @@
 Written 22 October 2026 by the People and Growth session (branch `workstream-t/task-board`). The task
 board itself is built there; these two changes are in the Chair's code, which is the main session's, so
 they're described here rather than made. Both need the task board's migration
-(`20261022100000_t_task_board.sql`, renumbered at merge) to be in main first, and they use
+(`20261022140000_t_task_board.sql`, renumbered at merge) to be in main first, and they use
 `supabase/functions/_shared/shortTitle.ts` from the same branch.
 
 ## What the task board does without them

@@ -24,7 +24,7 @@ export const departmentOf = (key) => BY_KEY.get(key) || BY_KEY.get("ops");
 export const isDepartment = (key) => BY_KEY.has(key);
 
 // An advisor's home department. The same rules as the database's
-// department_for_advisor() (migration 20261022100000_t_task_board.sql),
+// department_for_advisor() (migration 20261022140000_t_task_board.sql),
 // which decides for tasks made without one: keep the two in step.
 const BY_LIBRARY_KEY = {
   product: ["product_strategist", "ai_expert", "felix-hart", "nathan-cole", "scientist", "innovation_director", "visionary"],
