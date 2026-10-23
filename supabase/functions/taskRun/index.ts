@@ -18,6 +18,7 @@ import { buildSystemPrompt } from '../_shared/advisorPrompt.ts';
 import { insertUsageLog } from '../_shared/llmCall.ts';
 import { CAPS, RESEARCH_MODEL, citedSources, runResearchPass, skippedSitesIn } from '../_shared/webResearch.ts';
 import { requireOwnedRow, requireNotAnonymous, checkUserLimit, accessErrorResponse } from '../_shared/access.ts';
+import { TASK_LIMITS, indexPendingKnowledge, relevantPassages } from '../_shared/knowledgePassages.ts';
 import { RESEARCH_TYPES, RUNNABLE_TYPES, STRUCTURE_INSTRUCTIONS, TASK_MODEL, companyContext, finishResearch, finishResult, resultAsText, taskPrompt, voiceSamples } from '../_shared/taskRun.ts';
 
 // deno-lint-ignore no-explicit-any
@@ -103,9 +104,16 @@ async function processRun(db: Any, runId: string) {
       return;
     }
 
-    const [{ data: company }, { data: knowledge }, { data: meetings }, { data: notes }, meetingRes, previousRes] = await Promise.all([
+    // Their Knowledge, read by the parts that bear on the task (owner, 23
+    // October 2026): what changed since it was last read is indexed first,
+    // for a few seconds at most; if nothing matches, every item is read by
+    // its opening, as before.
+    try { await indexPendingKnowledge(db, run.company_id, null); } catch (e) { console.error('Indexing Knowledge failed:', (e as Error).message); }
+    const passagesFor = relevantPassages(db, run.company_id, null, `${task.title || ''}\n${task.description || ''}`.trim(), TASK_LIMITS, { founderOnly: true })
+      .catch((e) => { console.error('Reading Knowledge by passage failed; read by opening instead:', (e as Error).message); return null; });
+    const [{ data: company }, { data: knowledge }, { data: meetings }, { data: notes }, meetingRes, previousRes, passages] = await Promise.all([
       db.from('companies').select('*').eq('id', run.company_id).maybeSingle(),
-      db.from('documents').select('title, content, category, status').eq('company_id', run.company_id).eq('kind', 'knowledge')
+      db.from('documents').select('id, title, content, category, status').eq('company_id', run.company_id).eq('kind', 'knowledge')
         .or(`category.is.null,category.not.in.(${BOARD_CATEGORIES.map((c) => `"${c}"`).join(',')})`).order('created_at', { ascending: false }).limit(30),
       db.from('board_meetings').select('question, founder_decision_notes, discussion_transcript')
         .eq('company_id', run.company_id).eq('created_by_id', run.created_by_id).order('created_at', { ascending: false }).limit(5),
@@ -116,6 +124,7 @@ async function processRun(db: Any, runId: string) {
       run.previous_run_id
         ? db.from('task_runs').select('result').eq('id', run.previous_run_id).eq('task_id', run.task_id).maybeSingle()
         : Promise.resolve({ data: null }),
+      passagesFor,
     ]);
 
     // The founder's own Knowledge: not the board's earlier drafts and plans
@@ -137,7 +146,7 @@ async function processRun(db: Any, runId: string) {
     });
 
     if (RESEARCH_TYPES.includes(run.task_type)) {
-      await researchTask(db, { run, task, advisor, context: companyContext(company, ownKnowledge), prompt, startedAt });
+      await researchTask(db, { run, task, advisor, context: companyContext(company, ownKnowledge, passages), prompt, startedAt });
       return;
     }
 
@@ -147,7 +156,7 @@ async function processRun(db: Any, runId: string) {
       body: JSON.stringify({
         advisor_id: advisor.id, company_id: run.company_id, meeting_id: task.source_meeting_id || null, user_id: run.created_by_id,
         model_override: TASK_MODEL, task_run_id: run.id,
-        system_instructions: prompt.system_instructions, company_context: companyContext(company, ownKnowledge),
+        system_instructions: prompt.system_instructions, company_context: companyContext(company, ownKnowledge, passages),
         meeting_context: prompt.meeting_context, user_question: prompt.user_question, previous_responses: [],
         output_schema: SCHEMAS[run.task_type], temperature: 0.6, request_type: `task_${run.task_type}`,
         deadline_at: startedAt + CALL_DEADLINE_MS - CALLER_SAVE_MARGIN_MS,

@@ -58,7 +58,8 @@ await script({});
 const m1 = await meeting('clean meeting (first meeting, so no Chair opening yet)');
 const wire1 = await fakeLog();
 const claude = wire1.filter((w: any) => w.provider === 'anthropic');
-const gpt = wire1.filter((w: any) => w.provider === 'openai');
+// The Record keeper (P1) is a small helper on GPT-4o mini, not a meeting seat.
+const gpt = wire1.filter((w: any) => w.provider === 'openai' && w.who !== 'Record keeper');
 check(claude.length > 0 && claude.every((w: any) => w.stream === true && w.temperature === undefined && w.thinking?.type === 'adaptive' && w.effort === 'high' && w.native && !w.pasted),
   'every Claude request streams, states adaptive thinking and effort high, sends no temperature, uses native format', claude);
 check(gpt.length > 0 && gpt.every((w: any) => w.format === 'json_schema' && w.strict === true), 'every GPT-4o meeting request uses strict json_schema', gpt);

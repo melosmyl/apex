@@ -4,6 +4,7 @@
 // search (Stage 3).
 // deno-lint-ignore-file no-explicit-any
 import { plainMissingInfo } from './resultsStandard.ts';
+import { type Passage, passagesSection } from './knowledgePassages.ts';
 
 export const RUNNABLE_TYPES = ['draft', 'plan', 'research', 'calculate'] as const;
 // The two that research the web first (Stage 3), on Opus 5.5.
@@ -47,7 +48,11 @@ export function voiceSamples(input: { questions?: unknown[]; notes?: unknown[]; 
   return out;
 }
 
-export function companyContext(company: any, knowledge: any[] = []): string {
+// With `passages` (owner, 23 October 2026): the parts of their Knowledge
+// that bear on the task, then the openings of the newest items not quoted
+// there, as before ("What you told the board" isn't split, so it's always
+// by opening). Without (null: none found), every item by its opening.
+export function companyContext(company: any, knowledge: any[] = [], passages: Passage[] | null = null): string {
   const c = company || {};
   const line = (label: string, v: unknown) => (str(v, 600) ? `${label}: ${str(v, 600)}\n` : '');
   let ctx = `THE COMPANY RECORD (what the founder has told us about the company)\nCompany: ${str(c.name, 200) || 'Unnamed'}\n`;
@@ -61,7 +66,9 @@ export function companyContext(company: any, knowledge: any[] = []): string {
   ctx += line('Current challenges', c.current_challenges);
   ctx += line('Immediate goal', c.immediate_goal);
   ctx += line('Deadlines', c.deadlines);
-  const docs = knowledge.filter((d) => str(d?.content)).slice(0, 5);
+  if (passages?.length) ctx += passagesSection(passages, 'this task');
+  const quoted = new Set((passages || []).map((p) => p.document_id));
+  const docs = knowledge.filter((d) => str(d?.content) && !quoted.has(d.id)).slice(0, 5);
   if (docs.length) {
     ctx += '\nFrom their Knowledge:\n';
     docs.forEach((d) => { ctx += `- ${str(d.title, 120)}: ${str(d.content, 500)}\n`; });

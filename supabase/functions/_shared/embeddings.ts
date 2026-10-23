@@ -19,6 +19,9 @@ export async function embedText(text: string): Promise<number[]> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
+    // A hung request fails instead of holding up a meeting or task, which
+    // then reads by recency and opening instead.
+    signal: AbortSignal.timeout(20_000),
   });
 
   const data = await res.json();
@@ -27,6 +30,30 @@ export async function embedText(text: string): Promise<number[]> {
   const vector = data.data?.[0]?.embedding;
   if (!Array.isArray(vector)) throw new Error('Embedding response contained no vector');
   return vector;
+}
+
+// Many texts in one request (Knowledge passages): the same model, in the
+// order given. Up to 100 at a time; callers batch beyond that. Gives up
+// after timeoutMs (30 seconds unless the caller has less time).
+export async function embedTexts(texts: string[], timeoutMs = 30_000): Promise<number[][]> {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
+  const input = texts.map((t) => (t || '').trim().slice(0, MAX_EMBED_CHARS));
+  if (!input.length) return [];
+  if (input.length > 100) throw new Error('At most 100 texts per request');
+  if (input.some((t) => !t)) throw new Error('Cannot embed empty text');
+  const base = Deno.env.get('OPENAI_BASE_URL') || 'https://api.openai.com/v1';
+  const res = await fetch(`${base}/embeddings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
+    signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, 30_000))),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || `Embedding failed (${res.status})`);
+  const vectors = (data.data || []).slice().sort((a: { index: number }, b: { index: number }) => a.index - b.index).map((d: { embedding: number[] }) => d.embedding);
+  if (vectors.length !== input.length || vectors.some((v: unknown) => !Array.isArray(v))) throw new Error('Embedding response is missing vectors');
+  return vectors;
 }
 
 // The text a decision is remembered by: what was asked, and what was decided.

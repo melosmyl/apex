@@ -13,6 +13,8 @@ let delayBy: Record<string, number> = {};
 // Speakers (by name) whose every call fails on both providers, as if out of
 // credit everywhere: { "failFor": ["Priya Shah"] }.
 let failFor: string[] = [];
+// Embeddings fail, as if OpenAI were down: { "failEmbeddings": true }.
+let failEmbeddings = false;
 const log: any[] = [];
 // Answers to give for a field, in order, one per request that asks for it:
 // { "priority_actions": [[...], [...]] } returns the first list to the first
@@ -182,8 +184,7 @@ async function openai(body: any): Promise<Response> {
 
 // Embeddings: each word lands in one of 1536 slots, so texts that share
 // words come out similar, as real embeddings would.
-function embeddings(body: any): Response {
-  const input = String(body.input ?? '');
+function embedOne(input: string) {
   const v = new Array(1536).fill(0);
   for (const w of input.toLowerCase().match(/[a-z0-9£]+/g) || []) {
     let h = 0;
@@ -192,13 +193,19 @@ function embeddings(body: any): Response {
   }
   if (v.every((x) => x === 0)) v[0] = 1; // text with no words still gets a usable vector
   const norm = Math.hypot(...v);
-  log.push({ kind: 'embedding', provider: 'openai', model: body.model, marked: marked(input), chars: input.length });
-  return Response.json({ object: 'list', model: body.model, data: [{ object: 'embedding', index: 0, embedding: v.map((x) => x / norm) }], usage: { prompt_tokens: 8, total_tokens: 8 } });
+  return v.map((x) => x / norm);
+}
+// One text, or a batch (Knowledge passages), in the order given.
+function embeddings(body: any): Response {
+  if (failEmbeddings) return Response.json({ error: { message: 'The server had an error (scripted).', type: 'server_error' } }, { status: 500 });
+  const inputs: string[] = Array.isArray(body.input) ? body.input.map(String) : [String(body.input ?? '')];
+  for (const input of inputs) log.push({ kind: 'embedding', provider: 'openai', model: body.model, marked: marked(input), chars: input.length });
+  return Response.json({ object: 'list', model: body.model, data: inputs.map((input, index) => ({ object: 'embedding', index, embedding: embedOne(input) })), usage: { prompt_tokens: 8 * inputs.length, total_tokens: 8 * inputs.length } });
 }
 
 Deno.serve({ port: PORT, hostname: '0.0.0.0' }, async (req) => {
   const url = new URL(req.url);
-  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; failFor = s.failFor || []; fields = s.fields || {}; marks = s.marks || []; research = s.research || {}; log.length = 0; return Response.json({ ok: true }); }
+  if (url.pathname === '/__script') { const s = await req.json(); script.anthropic = s.anthropic || []; script.openai = s.openai || []; mentionBy = s.mentionBy || []; delayBy = s.delayBy || {}; failFor = s.failFor || []; failEmbeddings = !!s.failEmbeddings; fields = s.fields || {}; marks = s.marks || []; research = s.research || {}; log.length = 0; return Response.json({ ok: true }); }
   if (url.pathname === '/__log') return Response.json(log);
   const body = await req.json();
   if (url.pathname.endsWith('/v1/messages')) return anthropic(body);

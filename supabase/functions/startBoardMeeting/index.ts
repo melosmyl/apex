@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callAdvisorWithRetry, plainUnavailableReason } from '../_shared/advisorCall.ts';
 import { embedText } from '../_shared/embeddings.ts';
+import { INDEX_LATER, MEETING_LIMITS, indexPendingKnowledge, passagesSection, relevantPassages } from '../_shared/knowledgePassages.ts';
 import { distinctRoundOne } from '../_shared/roundOne.ts';
 import { commitmentKey, loadOpenCommitments, oneEach, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
 import { dayOf, todayLine } from '../_shared/recordDates.ts';
@@ -83,9 +84,13 @@ function commitmentsFor(advisor, commitments) {
 // dated, and is never cut; the rest (the gaps, documents within their own
 // share, the plan's suggestions, progress, projects, then each commitment
 // once) fills what's left of maxSize, and loses its end if it doesn't fit.
+// The parts of their Knowledge that bear on the question (owner, 23 October
+// 2026) follow the founder's part and aren't cut either: they're already
+// within their own limit. `passages` is null when none were found, and
+// every item is then read as before, by its opening.
 const COMMITMENTS_LISTED = 20;
 const DOCUMENTS_SHARE = 2500;
-function buildContext(company, documents, decisions, meetings, projects, commitments, progression, maxSize) {
+function buildContext(company, documents, decisions, meetings, projects, commitments, progression, maxSize, passages = null) {
   let ctx = todayLine();
   // Everything the founder has filled in, as facts they stated (not just
   // the gaps below), the same block every later stage of the meeting gets.
@@ -109,6 +114,7 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
   // Everything above is the founder's and stays whole; what follows fills
   // the space that's left.
   const founders = ctx;
+  const relevant = passagesSection(passages || [], 'this question');
   ctx = '';
   const gaps = PROFILE_GAPS.filter(g => !String(company[g.key] ?? '').trim());
   if (gaps.length) {
@@ -118,14 +124,18 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
   }
   // Their documents, dated, and whose they are: the board's work (a task's
   // result) is not the founder's words. Within their own share, so a full
-  // shelf can't push out what the founder said.
+  // shelf can't push out what the founder said. An item whose relevant
+  // parts are given above is listed by its title; every other one by its
+  // opening, as before.
+  const quoted = new Set((passages || []).map(p => p.document_id));
   const otherDocs = (documents || []).filter(d => d.category !== 'What you told the board');
   if (otherDocs.length) {
     let docs = '';
     for (const d of otherDocs.slice(0, 10)) {
       const when = dayOf(d.created_at);
       const whose = d.created_by_advisor_id || d.task_id ? "the board's work" : 'added by the founder';
-      const line = `- [${when ? `${when}, ` : ''}${whose}] ${d.title} (${d.category}): ${(d.content || '').slice(0, 400)}\n`;
+      const body = quoted.has(d.id) ? ' [the parts that bear on this question are given above]' : `: ${(d.content || '').slice(0, 400)}`;
+      const line = `- [${when ? `${when}, ` : ''}${whose}] ${d.title} (${d.category})${body}\n`;
       if (docs.length + line.length > DOCUMENTS_SHARE) break;
       docs += line;
     }
@@ -158,21 +168,21 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
   }
   const room = Math.max(0, maxSize - founders.length);
   if (ctx.length > room) ctx = ctx.slice(0, room) + '... [the rest of the record didn\'t fit]';
-  return founders + ctx;
+  return founders + relevant + ctx;
 }
 
 // Board memory: find past decisions related to the question being asked, rather
 // than merely the most recent ones. Falls back to recency when the question
 // cannot be embedded or nothing clears the similarity floor, so a board meeting
 // never fails because memory is unavailable.
-async function recallRelatedDecisions(db, companyId, ownerId, question) {
-  const recalled = await recallDecisionRows(db, companyId, ownerId, question);
+async function recallRelatedDecisions(db, companyId, ownerId, question, questionVector = null) {
+  const recalled = await recallDecisionRows(db, companyId, ownerId, question, questionVector);
   // Each with its meeting's call, which is the record of what was decided.
   recalled.decisions = (await withCalls(db, ownerId, { decisions: recalled.decisions })).decisions;
   return recalled;
 }
 
-async function recallDecisionRows(db, companyId, ownerId, question) {
+async function recallDecisionRows(db, companyId, ownerId, question, questionVector = null) {
   let recencyFallback = [];
   try {
     const { data } = await db.from('decisions').select('*')
@@ -181,7 +191,8 @@ async function recallDecisionRows(db, companyId, ownerId, question) {
   } catch { /* fall through with an empty list */ }
 
   try {
-    const embedding = await embedText(question);
+    const embedding = await (questionVector || embedText(question));
+    if (!embedding) throw new Error('the question could not be embedded');
     const { data: matches, error } = await db.rpc('match_decisions', {
       p_company_id: companyId,
       p_query_embedding: JSON.stringify(embedding),
@@ -354,7 +365,26 @@ async function claimFreeMeeting(db, userId, attemptId) {
 
 // Everything the board draws on for Round 1, for the meeting's owner.
 async function gather(db, userId, companyId, question): Promise<any> {
-  const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression] = await Promise.all([
+  // Knowledge whose words changed since it was last read gets its passages
+  // first, for a few seconds at most, so nothing is read stale; what's left
+  // is read by its opening this time and indexed in the background. The
+  // question is embedded once, for passages and decisions.
+  try {
+    const { waiting } = await indexPendingKnowledge(db, companyId, userId);
+    if (waiting) later(indexPendingKnowledge(db, companyId, userId, { limits: INDEX_LATER }), 'Indexing Knowledge');
+  } catch (e) { console.error('Indexing Knowledge failed:', e.message); }
+  const questionVector = embedText(question).catch((e) => { console.error('Embedding the question failed:', e.message); return null; });
+  const knowledgePassages = (async () => {
+    try {
+      return await relevantPassages(db, companyId, userId, question, MEETING_LIMITS, {
+        embed: async () => { const v = await questionVector; if (!v) throw new Error('the question could not be embedded'); return v; },
+      });
+    } catch (e) {
+      console.error('Reading Knowledge by passage failed; read by opening instead:', e.message);
+      return null;
+    }
+  })();
+  const [{ data: documents }, { data: meetings }, { data: projects }, { data: advisors }, recalled, commitments, progression, passages] = await Promise.all([
     // Archived and replaced documents stay out of the meeting. Facts told to
     // the board in earlier meetings (P1) are fetched apart, so they never
     // crowd out the founder's other documents.
@@ -364,10 +394,11 @@ async function gather(db, userId, companyId, question): Promise<any> {
     db.from('board_meetings').select('*').eq('company_id', companyId).eq('created_by_id', userId).eq('status', 'complete').order('created_at', { ascending: false }).limit(5),
     db.from('projects').select('*').eq('company_id', companyId).eq('created_by_id', userId).order('created_at', { ascending: false }).limit(10),
     db.from('advisors').select('*').eq('company_id', companyId).eq('created_by_id', userId).limit(100),
-    recallRelatedDecisions(db, companyId, userId, question),
+    recallRelatedDecisions(db, companyId, userId, question, questionVector),
     // Read more than are listed: repeats are listed once (oneEach).
     loadOpenCommitments(db, companyId, userId, 60),
     loadProgressionSummary(db, companyId),
+    knowledgePassages,
   ]);
   const { data: toldBoard } = await db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
     .eq('category', 'What you told the board').or('status.is.null,status.not.in.(archived,superseded)')
@@ -375,7 +406,7 @@ async function gather(db, userId, companyId, question): Promise<any> {
   // Each past meeting with a call made in the Decision Centre, if that's
   // where the founder made it.
   const withRecords = (await withCalls(db, userId, { meetings: meetings || [] })).meetings;
-  return { documents: [...(toldBoard || []), ...(documents || [])], meetings: withRecords, projects, advisors, recalled, commitments, progression };
+  return { documents: [...(toldBoard || []), ...(documents || [])], meetings: withRecords, projects, advisors, recalled, commitments, progression, passages };
 }
 
 // What the board is drawing on, recorded so the founder can see it later.
@@ -544,14 +575,14 @@ async function retryRoundOne(db, supabaseUrl, serviceKey, meetingId) {
 
   const user = await meetingOwner(db, m.created_by_id);
   const { data: company } = await db.from('companies').select('*').eq('id', m.company_id).maybeSingle();
-  const { documents, meetings, projects, advisors, recalled, commitments, progression } = await gather(db, user.id, m.company_id, m.question);
+  const { documents, meetings, projects, advisors, recalled, commitments, progression, passages } = await gather(db, user.id, m.company_id, m.question);
   const { data: limitsList } = await db.from('system_limits').select('*').order('created_at', { ascending: false }).limit(1);
   const chair = findChair(advisors);
   const chosen = new Set(m.participant_advisor_ids || []);
   const selectedAdvisors: any[] = withoutChair((advisors || []).filter(a => chosen.has(a.id) && a.type !== 'human'), chair);
   const before = beforeMeetingSection(m.founder_notes);
-  const contextPackage = buildContext(company, documents, recalled.decisions, meetings, projects, commitments, progression, limitsList?.[0]?.max_context_size || 8000) + before;
-  const roundOneContext = buildContext(company, documents, recalled.decisions, meetings, projects, [], progression, limitsList?.[0]?.max_context_size || 8000) + before;
+  const contextPackage = buildContext(company, documents, recalled.decisions, meetings, projects, commitments, progression, limitsList?.[0]?.max_context_size || 8000, passages) + before;
+  const roundOneContext = buildContext(company, documents, recalled.decisions, meetings, projects, [], progression, limitsList?.[0]?.max_context_size || 8000, passages) + before;
   await db.from('board_meetings').update({ context_package: contextPackage }).eq('id', m.id);
   later(runRoundOne({
     db, supabaseUrl, serviceKey, meeting: claimed, company, user, selectedAdvisors, chair, contextPackage, roundOneContext, commitments,
@@ -616,7 +647,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'The free meeting needs to be started from the free meeting page.' }, { status: 403, headers: corsHeaders });
     if (!user.is_anonymous) await checkUserLimit(db, user.id, 'board_meeting');
 
-    const { documents, meetings, projects, advisors, recalled, commitments, progression } = await gather(db, user.id, company_id, question);
+    const { documents, meetings, projects, advisors, recalled, commitments, progression, passages } = await gather(db, user.id, company_id, question);
     const decisions = recalled.decisions;
 
     // The Chair never debates, even if the browser sends her id; a board
@@ -643,10 +674,10 @@ Deno.serve(async (req) => {
     const beforeNotes = beforeText && !user.is_anonymous && server_driven === true
       ? [{ id: crypto.randomUUID(), text: beforeText, before_meeting: true, to_advisor_id: null, to_name: null, at: new Date().toISOString() }] : [];
     const before = beforeMeetingSection(beforeNotes);
-    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000) + before;
+    const contextPackage = buildContext(company, documents, decisions, meetings, projects, commitments, progression, limits.max_context_size || 8000, passages) + before;
     // Round 1's shared part: everything but the commitments, which each
     // advisor gets only for their own.
-    const roundOneContext = buildContext(company, documents, decisions, meetings, projects, [], progression, limits.max_context_size || 8000) + before;
+    const roundOneContext = buildContext(company, documents, decisions, meetings, projects, [], progression, limits.max_context_size || 8000, passages) + before;
     const memoryContext = buildMemoryContext(recalled, decisions, commitments);
 
     // A meeting the server runs (P0) moves on by itself; one started by an

@@ -20,3 +20,9 @@ so they cost nothing and never touch production.
 Claude call, output limits per call type, native answer formats, retries
 (busy provider, mid-reply error, cut-off, refusal, rejected schema), and the
 usage log (thinking tokens, real prices).
+
+`knowledge_e2e.ts` covers Knowledge read by passage (23 October 2026): the
+part of a long item that bears on the question reaches a meeting or task,
+edits are read fresh, archived items and another founder's never are, and
+with embeddings down (`{"failEmbeddings": true}` on `/__script`) everything
+is read by its opening, as before.
