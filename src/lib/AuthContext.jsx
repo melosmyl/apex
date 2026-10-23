@@ -26,7 +26,14 @@ export const AuthProvider = ({ children }) => {
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const profile = await base44.auth.me().catch(() => null);
+        let profile = null;
+        try {
+          profile = await base44.auth.me();
+        } catch (error) {
+          // No answer isn't "signed out": a tab coming back into view after a
+          // sleep must not lose the person it was showing (review, 23 Oct).
+          if (error?.unreachable) return;
+        }
         setUser(profile);
         setIsAuthenticated(!!profile);
         // The server answered: that settles the start-up check too, even if
@@ -81,11 +88,14 @@ export const AuthProvider = ({ children }) => {
 
   // When the page comes back into view (Safari showing a page it paused or
   // preloaded, or restoring it from its cache) while the check was still
-  // waiting, its requests may never be answered: start a fresh one. Only
-  // then; a page that had already finished its check is left alone.
+  // waiting, its requests may never be answered: start again. Only then; a
+  // page that had already finished its check is left alone.
+  // A fresh page, not just a fresh check: after a hung sign-in refresh the
+  // Supabase library holds on to the failure for a minute, so only a new page
+  // starts truly fresh requests. Nothing is lost: the page was still waiting.
   useEffect(() => {
     const again = () => {
-      if (waiting.current && document.visibilityState === 'visible') checkUserAuth();
+      if (waiting.current && document.visibilityState === 'visible') window.location.reload();
     };
     const onPageShow = (e) => { if (e.persisted) again(); };
     document.addEventListener('visibilitychange', again);

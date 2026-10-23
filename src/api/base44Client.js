@@ -4,17 +4,23 @@ import { SITE_URL } from '@/lib/branding';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Signing in and reading your profile get a time limit (owner, 23 October
-// 2026): Safari sometimes leaves a request unanswered rather than failing it,
-// and the first screen waits on these, so one that hangs left the spinner up
-// for good. A request past the limit is abandoned like a failed one, and the
-// Supabase library retries a sign-in refresh by itself. Nothing else (meetings,
-// exports, saves) is limited here.
+// The three requests the first screen waits on get a time limit (owner, 23
+// October 2026): Safari sometimes leaves a request unanswered rather than
+// failing it, and one that hung left the spinner up for good. A request past
+// the limit is abandoned like a failed one, and the Supabase library retries
+// a sign-in refresh by itself. Only these three: signing up, password resets
+// and email changes can take longer and do their work on the server whether
+// or not we wait, so they're never cut short; nor are meetings, exports or
+// saves.
 export const SIGN_IN_REQUEST_LIMIT_MS = 10_000;
-const LIMITED = ['/auth/v1/', '/rest/v1/rpc/get_my_profile'];
+const isStartupRequest = (url, method) =>
+  (url.includes('/auth/v1/token') && url.includes('grant_type=refresh_token'))
+  || (url.includes('/auth/v1/user') && (!method || method.toUpperCase() === 'GET'))
+  || url.includes('/rest/v1/rpc/get_my_profile');
 function fetchWithLimit(input, init = {}) {
   const url = typeof input === 'string' ? input : input?.url || String(input);
-  if (!LIMITED.some((part) => url.includes(part)) || typeof AbortSignal?.timeout !== 'function') return fetch(input, init);
+  const method = init.method || (typeof input === 'object' ? input?.method : undefined);
+  if (!isStartupRequest(url, method) || typeof AbortSignal?.timeout !== 'function') return fetch(input, init);
   const limit = AbortSignal.timeout(SIGN_IN_REQUEST_LIMIT_MS);
   const signal = init.signal && typeof AbortSignal.any === 'function' ? AbortSignal.any([init.signal, limit]) : init.signal || limit;
   return fetch(input, { ...init, signal });
@@ -132,13 +138,15 @@ const entities = Object.fromEntries(
 // A request that never got an answer (no connection, or past its time limit)
 // isn't the same as "not signed in": the app says it couldn't reach the
 // server instead of showing a signed-in person the logged-out home page.
-const noAnswer = (error) => error?.name === 'AuthRetryableFetchError'
+// A server error (5xx) counts too: the server didn't say "not signed in".
+const noAnswer = (error, status) => error?.name === 'AuthRetryableFetchError'
+  || Number(status ?? error?.status) === 0 || Number(status ?? error?.status) >= 500
   || /failed to fetch|fetch failed|network|load failed|abort|timeout|timed out/i.test(`${error?.name || ''} ${error?.message || ''}`);
 const unreachable = () => Object.assign(new Error("Couldn't reach the server"), { unreachable: true });
 
 async function fetchProfile(authUser) {
-  const { data: profile, error } = await supabase.rpc('get_my_profile');
-  if (error) throw noAnswer(error) ? unreachable() : error;
+  const { data: profile, error, status } = await supabase.rpc('get_my_profile');
+  if (error) throw noAnswer(error, status) ? unreachable() : error;
   return {
     id: authUser.id,
     email: authUser.email,

@@ -67,7 +67,7 @@ const CouldNotReach = ({ onRetry }) => (
 );
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, checkUserAuth } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -79,7 +79,8 @@ const AuthenticatedApp = () => {
 
   if (authError) {
     if (authError.type === 'unreachable') {
-      return <CouldNotReach onRetry={checkUserAuth} />;
+      // A fresh page: it starts every request anew (see AuthContext).
+      return <CouldNotReach onRetry={() => window.location.reload()} />;
     }
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
