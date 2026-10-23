@@ -12,10 +12,17 @@
 //     before, and a meeting carries on indexing it in the background.
 //   - Passages are stored against a fingerprint of the words they came from,
 //     and only those of an item's current words are read (see the migration).
-//   - "What you told the board" isn't split: it's always given in full.
+//   - What the founder told the board in earlier meetings is never lost: the
+//     newest five entries are given in full (toldBoardSection), and older
+//     ones are read by passage like the rest of Knowledge.
 // deno-lint-ignore-file no-explicit-any
 import { embedText, embedTexts } from './embeddings.ts';
 import { dayOf } from './recordDates.ts';
+
+export const TOLD_BOARD = 'What you told the board';
+export const TOLD_BOARD_IN_FULL = 5;
+const TOLD_BOARD_BUDGET = 12_000;
+const TOLD_BOARD_OPENING = 600;
 
 export const PASSAGE_CHARS = 1200;
 export const PASSAGE_OVERLAP = 150;
@@ -157,14 +164,16 @@ export function selectPassages(matches: Passage[] = [], { chars, count, perItem 
 }
 
 // The passages that bear on `question`, from the founder's own Knowledge in
-// one company (ownerId null: the whole company's). Null if none were found
-// or matching failed (it throws), so the caller reads by opening instead.
+// one company (ownerId null: the whole company's), leaving out the items in
+// `exclude` (given in full already). Null if none were found or matching
+// failed (it throws), so the caller reads by opening instead.
 export async function relevantPassages(db: any, companyId: string, ownerId: string | null, question: string,
-  limits: { chars: number; count: number; perItem: number }, { founderOnly = false, embed = embedText }: { founderOnly?: boolean; embed?: (t: string) => Promise<number[]> } = {}) {
+  limits: { chars: number; count: number; perItem: number },
+  { founderOnly = false, exclude = [], embed = embedText }: { founderOnly?: boolean; exclude?: string[]; embed?: (t: string) => Promise<number[]> } = {}) {
   const vector = await embed(question);
   const { data, error } = await db.rpc('match_knowledge_passages', {
     p_company_id: companyId, p_owner_id: ownerId, p_query_embedding: JSON.stringify(vector),
-    p_match_count: 40, p_founder_only: founderOnly, p_per_item: limits.perItem,
+    p_match_count: 40, p_founder_only: founderOnly, p_per_item: limits.perItem, p_exclude: exclude,
   });
   if (error) throw new Error(error.message);
   const chosen = selectPassages(data || [], limits);
@@ -177,12 +186,47 @@ export function passagesSection(passages: Passage[], about: string) {
   if (!passages?.length) return '';
   const byDoc = new Map<string, Passage[]>();
   for (const p of passages) byDoc.set(p.document_id, [...(byDoc.get(p.document_id) || []), p]);
-  let text = `\nFrom the founder's Knowledge, the parts that bear on ${about} (dated; "the board's work" was made by an advisor and accepted by the founder, "added by the founder" is theirs; "…" marks where a passage starts or stops inside a longer item):\n`;
+  let text = `\nFrom the founder's Knowledge, the parts that bear on ${about} (dated; "the board's work" was made by an advisor and accepted by the founder, "added by the founder" is theirs, "the founder told the board" is their own words in an earlier meeting; "…" marks where a passage starts or stops inside a longer item):\n`;
   for (const ps of byDoc.values()) {
     const d = ps[0];
     const when = dayOf(d.created_at);
-    text += `[${when ? `${when}, ` : ''}${d.board_work ? "the board's work" : 'added by the founder'}] ${d.title}${d.category ? ` (${d.category})` : ''}:\n`;
+    if (d.category === TOLD_BOARD) {
+      const meeting = String(d.title || '').replace(/^What you told the board:\s*/, '').slice(0, 120);
+      text += `[${when ? `${when}, ` : ''}the founder told the board${meeting ? `, in the meeting on "${meeting}"` : ''}]:\n`;
+    } else text += `[${when ? `${when}, ` : ''}${d.board_work ? "the board's work" : 'added by the founder'}] ${d.title}${d.category ? ` (${d.category})` : ''}:\n`;
     for (const p of ps) text += `${p.text}\n…\n`;
+  }
+  return text;
+}
+
+// The newest "What you told the board" entries, in full, each dated with the
+// meeting it was said in (the same block for meetings and tasks). Together
+// they're given whole up to TOLD_BOARD_BUDGET characters: a few lines each is
+// usual, so that's only for a founder who's said a great deal or pasted a lot
+// into one. An entry that doesn't fit whole gives its first 600 characters,
+// as before, and is matched by passage like older ones, so the rest still
+// reaches the board where it bears on the question.
+export function toldBoardInFull(entries: any[] = []) {
+  let left = TOLD_BOARD_BUDGET;
+  return (entries || []).slice(0, TOLD_BOARD_IN_FULL).map((d) => {
+    const whole = String(d.content || '').length <= left;
+    if (whole) left -= String(d.content || '').length;
+    return { d, whole };
+  });
+}
+// The entries given whole, so left out of the passages.
+export const toldBoardWhole = (entries: any[] = []) => toldBoardInFull(entries).filter((t) => t.whole).map((t) => t.d.id);
+
+export function toldBoardSection(entries: any[] = []) {
+  const told = toldBoardInFull(entries);
+  if (!told.length) return '';
+  let text = `\nWhat the founder told the board in earlier meetings (their words, dated; they may have edited them since):\n`;
+  for (const { d, whole } of told) {
+    const when = dayOf(d.created_at);
+    const about = String(d.title || '').replace(/^What you told the board:\s*/, '').slice(0, 120);
+    const words = String(d.content || '');
+    const shown = whole ? words : `${words.slice(0, TOLD_BOARD_OPENING)}… [the rest of this reaches the board by passage, where it bears on the question]`;
+    text += `On ${when || 'an earlier day'}${about ? `, in the meeting on "${about}"` : ''}:\n${shown}\n`;
   }
   return text;
 }

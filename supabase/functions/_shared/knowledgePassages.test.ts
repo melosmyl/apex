@@ -1,5 +1,5 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { INDEX_LATER, MEETING_LIMITS, TASK_LIMITS, type Passage, indexPendingKnowledge, passagesSection, selectPassages, splitIntoPassages } from './knowledgePassages.ts';
+import { INDEX_LATER, MEETING_LIMITS, TASK_LIMITS, type Passage, indexPendingKnowledge, passagesSection, selectPassages, splitIntoPassages, toldBoardSection, toldBoardWhole } from './knowledgePassages.ts';
 import { companyContext } from './taskRun.ts';
 
 const para = (word: string, n: number) => Array.from({ length: n }, (_, i) => `${word} sentence number ${i} says something about ${word}.`).join(' ');
@@ -67,13 +67,40 @@ Deno.test('the section names each item, its date and whose it is', () => {
 Deno.test('tasks: passages, then the openings of items not quoted; without passages, openings as before', () => {
   const knowledge = [
     { id: 'a', title: 'Plan', content: 'Long plan opening', passages_indexed_at: '2026-10-23' },
-    { id: 't', title: 'What you told the board: pricing', content: 'We charge £40', category: 'What you told the board', passages_indexed_at: null },
+    { id: 't', title: 'Price list', content: 'We charge £40', passages_indexed_at: null },
   ];
   const withPassages = companyContext({ name: 'Co' }, [...knowledge, { id: 'b', title: 'Other', content: 'Other opening', passages_indexed_at: '2026-10-23' }], [match('a', 3, 0.9, 60, { title: 'Plan' })]);
   assert(withPassages.includes('the parts that bear on this task') && withPassages.includes('a-3'));
   assert(!withPassages.includes('Long plan opening') && withPassages.includes('We charge £40') && withPassages.includes('Other opening'), 'an item quoted is not repeated; the others keep their openings');
   const without = companyContext({ name: 'Co' }, knowledge, null);
   assert(without.includes('Long plan opening') && without.includes('We charge £40') && !without.includes('bear on'));
+});
+
+Deno.test('what the founder told the board: the newest five in full, dated, with the meeting', () => {
+  const long = `- We sell at £45.\n${'- Another fact we stated in the meeting.\n'.repeat(30)}- LAST-FACT: Stoke quotes £11 a set.`;
+  const entries = Array.from({ length: 7 }, (_, i) => ({ title: `What you told the board: Question ${i + 1}`, content: i === 0 ? long : `- Fact ${i + 1}.`, created_at: `2026-10-${String(20 - i).padStart(2, '0')}T10:00:00Z` }));
+  const text = toldBoardSection(entries);
+  assert(long.length > 600 && text.includes('LAST-FACT: Stoke quotes £11 a set.'), 'nothing past 600 characters is cut any more');
+  assert(text.includes('On 20 October 2026, in the meeting on "Question 1":\n- We sell at £45.'));
+  assert(text.includes('Fact 5.') && !text.includes('Fact 6.') && !text.includes('Fact 7.'), 'the newest five; older ones are read by passage');
+  // Together whole up to 12,000 characters; one that doesn't fit gives its
+  // first 600, as before, and is matched by passage for the rest.
+  const big = [{ id: 'a', content: 'a'.repeat(8000) }, { id: 'b', content: 'b'.repeat(5000) }, { id: 'c', content: 'c'.repeat(3000) }];
+  assertEquals(toldBoardWhole(big), ['a', 'c']);
+  const bigText = toldBoardSection(big);
+  assert(bigText.includes('a'.repeat(8000)) && bigText.includes(`${'b'.repeat(600)}… [the rest of this reaches the board by passage`) && !bigText.includes('b'.repeat(601)));
+  assertEquals(toldBoardSection([]), '');
+});
+
+Deno.test('an older thing the founder told the board, found by passage, is labelled as their words', () => {
+  const text = passagesSection([match('t', 0, 0.9, 40, { title: 'What you told the board: Should we open a shop?', category: 'What you told the board' })], 'this question');
+  assert(text.includes('[1 October 2026, the founder told the board, in the meeting on "Should we open a shop?"]:'), text);
+});
+
+Deno.test('tasks: what the founder told the board has its own place, in full', () => {
+  const told = [{ title: 'What you told the board: Pricing', content: `${'- A fact.\n'.repeat(80)}- TOLD-LAST`, created_at: '2026-10-20T10:00:00Z' }];
+  const ctx = companyContext({ name: 'Co' }, [{ id: 'k', title: 'Plan', content: 'Plan opening' }], null, told);
+  assert(ctx.includes('What the founder told the board in earlier meetings') && ctx.includes('TOLD-LAST') && ctx.includes('Plan opening'));
 });
 
 // A stand-in for the database calls the indexer makes.

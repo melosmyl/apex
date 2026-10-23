@@ -1,7 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callAdvisorWithRetry, plainUnavailableReason } from '../_shared/advisorCall.ts';
 import { embedText } from '../_shared/embeddings.ts';
-import { INDEX_LATER, MEETING_LIMITS, indexPendingKnowledge, passagesSection, relevantPassages } from '../_shared/knowledgePassages.ts';
+import { INDEX_LATER, MEETING_LIMITS, TOLD_BOARD_IN_FULL, indexPendingKnowledge, passagesSection, relevantPassages, toldBoardSection, toldBoardWhole } from '../_shared/knowledgePassages.ts';
 import { distinctRoundOne } from '../_shared/roundOne.ts';
 import { commitmentKey, loadOpenCommitments, oneEach, OVERDUE_AFTER_DAYS } from '../_shared/commitments.ts';
 import { dayOf, todayLine } from '../_shared/recordDates.ts';
@@ -97,16 +97,10 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
   ctx += companyProfile(company) || `Company: ${company.name || 'N/A'}\n`;
   if (company.metrics?.length) ctx += `Key Metrics: ${company.metrics.map(m => `${m.label}: ${m.value} (${m.trend})`).join(', ')}\n`;
   // Facts the founder stated in earlier meetings (P1), each with the day
-  // and the meeting they said it in.
-  const toldBoard = (documents || []).filter(d => d.category === 'What you told the board');
-  if (toldBoard.length) {
-    ctx += `\nWhat the founder told the board in earlier meetings (their words, dated; they may have edited them since):\n`;
-    toldBoard.slice(0, 5).forEach(d => {
-      const when = dayOf(d.created_at);
-      const about = String(d.title || '').replace(/^What you told the board:\s*/, '').slice(0, 120);
-      ctx += `On ${when || 'an earlier day'}${about ? `, in the meeting on "${about}"` : ''}:\n${(d.content || '').slice(0, 600)}\n`;
-    });
-  }
+  // and the meeting they said it in: the newest five in full (owner, 23
+  // October 2026); older ones reach the record by passage, below.
+  const toldText = toldBoardSection((documents || []).filter(d => d.category === 'What you told the board'));
+  ctx += toldText;
   // Past resolutions and meetings, dated, each with the founder's call: a
   // recommendation they haven't acted on is never a decision.
   ctx += pastResolutionsSection(decisions);
@@ -166,7 +160,10 @@ function buildContext(company, documents, decisions, meetings, projects, commitm
     });
     ctx += `Raise these only where they bear on the question — an overdue commitment may be worth asking about directly, a recent one usually is not.\n`;
   }
-  const room = Math.max(0, maxSize - founders.length);
+  // What they told the board takes from the space for the rest only as much
+  // as it always did (five entries of 600 characters at most), so saying
+  // more in meetings never pushes their commitments out of the record.
+  const room = Math.max(0, maxSize - (founders.length - toldText.length + Math.min(toldText.length, 3000)));
   if (ctx.length > room) ctx = ctx.slice(0, room) + '... [the rest of the record didn\'t fit]';
   return founders + relevant + ctx;
 }
@@ -374,9 +371,17 @@ async function gather(db, userId, companyId, question): Promise<any> {
     if (waiting) later(indexPendingKnowledge(db, companyId, userId, { limits: INDEX_LATER }), 'Indexing Knowledge');
   } catch (e) { console.error('Indexing Knowledge failed:', e.message); }
   const questionVector = embedText(question).catch((e) => { console.error('Embedding the question failed:', e.message); return null; });
+  // The newest things the founder told the board, given in full, so left out
+  // of the passages.
+  const toldBoardRows = db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
+    .eq('category', 'What you told the board').or('status.is.null,status.not.in.(archived,superseded)')
+    .order('created_at', { ascending: false }).limit(TOLD_BOARD_IN_FULL)
+    .then(({ data }) => data || [], () => []);
   const knowledgePassages = (async () => {
     try {
+      const told = await toldBoardRows;
       return await relevantPassages(db, companyId, userId, question, MEETING_LIMITS, {
+        exclude: toldBoardWhole(told),
         embed: async () => { const v = await questionVector; if (!v) throw new Error('the question could not be embedded'); return v; },
       });
     } catch (e) {
@@ -400,13 +405,11 @@ async function gather(db, userId, companyId, question): Promise<any> {
     loadProgressionSummary(db, companyId),
     knowledgePassages,
   ]);
-  const { data: toldBoard } = await db.from('documents').select('*').eq('company_id', companyId).eq('created_by_id', userId)
-    .eq('category', 'What you told the board').or('status.is.null,status.not.in.(archived,superseded)')
-    .order('created_at', { ascending: false }).limit(5);
+  const toldBoard = await toldBoardRows;
   // Each past meeting with a call made in the Decision Centre, if that's
   // where the founder made it.
   const withRecords = (await withCalls(db, userId, { meetings: meetings || [] })).meetings;
-  return { documents: [...(toldBoard || []), ...(documents || [])], meetings: withRecords, projects, advisors, recalled, commitments, progression, passages };
+  return { documents: [...toldBoard, ...(documents || [])], meetings: withRecords, projects, advisors, recalled, commitments, progression, passages };
 }
 
 // What the board is drawing on, recorded so the founder can see it later.

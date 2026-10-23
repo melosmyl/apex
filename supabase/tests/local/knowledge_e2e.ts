@@ -65,6 +65,17 @@ const { data: docs } = await A.client.from('documents').insert([
     content: 'BOARD-PRICE: at sixty five pounds the price leaves forty one pounds margin per dinner set after fees.' },
 ]).select();
 const planDoc = docs!.find((d: any) => d.title === 'Business plan');
+// Seven things the founder told the board: the newest is long (past the old
+// 600-character cut), and the two oldest were never read before.
+const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+const told = (n: number, question: string, content: string) => ({ company_id: co.id, created_by_id: A.uid, kind: 'knowledge', category: 'What you told the board',
+  title: `What you told the board: ${question}`, content, created_at: daysAgo(n) });
+await admin.from('documents').insert([
+  told(1, 'Should we go to the craft fair?', `${'- We booked the craft fair stall for the weekend in Leeds.\n'.repeat(14)}- TOLD-LONG-END: the stall costs us nothing if it rains.`),
+  ...[2, 3, 4, 5].map((n) => told(n, `Recent question ${n}`, `- TOLD-RECENT-${n}: a recent fact about the stall.`)),
+  told(20, 'Should we service the kiln?', '- TOLD-OLD-KILN: the kiln was serviced in the spring.'),
+  told(30, 'What should we charge?', '- TOLD-OLD-PRICE: I said we will charge sixty five pounds for each dinner set, whatever the price of clay.'),
+]);
 await B.client.from('documents').insert({ company_id: coB.id, created_by_id: B.uid, kind: 'knowledge', category: 'Business Plan', title: 'Their plan',
   content: 'OTHER-FOUNDER-PRICE: price each dinner set at sixty five pounds, charge margin.' });
 
@@ -92,6 +103,11 @@ check(pricedParts.includes('Price each dinner set at sixty five pounds'), "the p
 check(!pricedParts.includes('Couriers deliver parcels'), '…chosen for the question, not for coming first: the opening (delivery) is not', pricedParts.slice(0, 600));
 check(pricedParts.includes("the board's work] Money left per set (Calculation)") && pricedParts.includes('BOARD-PRICE'), "the board's accepted work counts, labelled as the board's", pricedParts.slice(0, 600));
 check(!priced.rec.includes('ARCHIVED-PRICE'), 'an archived item is never read');
+const toldPart = priced.rec.slice(priced.rec.indexOf('What the founder told the board in earlier meetings'), priced.rec.indexOf("From the founder's Knowledge, the parts"));
+check(toldPart.includes('TOLD-LONG-END') && [2, 3, 4, 5].every((n) => toldPart.includes(`TOLD-RECENT-${n}`)), 'the five newest things the founder told the board are given in full, past the old 600 characters', toldPart.length);
+check(pricedParts.includes('TOLD-OLD-PRICE') && /the founder told the board, in the meeting on "What should we charge\?"\]/.test(pricedParts), 'an older one that bears on the question is found by passage, labelled as their words', pricedParts.slice(0, 800));
+check(!pricedParts.includes('TOLD-RECENT') && !pricedParts.includes('TOLD-LONG-END'), 'the five given in full are not given twice');
+check(!priced.rec.includes('TOLD-OLD-KILN'), 'an older one with nothing on the question is left out');
 check(!priced.rec.includes('OTHER-FOUNDER-PRICE'), "another founder's Knowledge is never read");
 check(pricedParts.length > 0 && pricedParts.length < 6000 + 1500, 'the parts stay within about 6,000 characters', pricedParts.length);
 check(/Business plan \(Business Plan\) \[the parts that bear on this question are given above\]/.test(priced.rec), 'the plan is listed by its title, not its opening', priced.rec.slice(priced.rec.indexOf('Documents ('), priced.rec.indexOf('Documents (') + 400));
@@ -125,7 +141,7 @@ check((after || []).length > 0 && new Set((after || []).map((h: any) => h.conten
 // 4. A "Do this for me" task reads the founder's own passages, not the board's work.
 const { data: task } = await admin.from('tasks').insert({ company_id: co.id, created_by_id: A.uid, title: 'Draft a price list for each dinner set', description: 'With the price per set and the margin',
   task_type: 'draft', advisor_id: marcus.id, status: 'todo' }).select().single();
-await script({ marks: ['Price each dinner set at', 'Couriers deliver parcels', 'BOARD-PRICE', 'OTHER-FOUNDER-PRICE', 'ARCHIVED-PRICE', 'the parts that bear on this task'],
+await script({ marks: ['Price each dinner set at', 'Couriers deliver parcels', 'BOARD-PRICE', 'OTHER-FOUNDER-PRICE', 'ARCHIVED-PRICE', 'the parts that bear on this task', 'TOLD-LONG-END', 'TOLD-RECENT-5', 'TOLD-OLD-PRICE'],
   fields: { body: ['Price list: £70 a set.'], placeholders: [[]] } });
 const started = await A.fn('taskRun', { action: 'start', task_id: task.id });
 let run: any;
@@ -135,6 +151,7 @@ const taskCall = (await fakeLog()).find((l: any) => l.marked?.includes('the part
 check(!!taskCall && taskCall.marked.includes('Price each dinner set at') && !taskCall.marked.includes('Couriers deliver parcels'), "the task reads the plan's pricing section", taskCall?.marked);
 check(!!taskCall && !taskCall.marked.includes('BOARD-PRICE') && !taskCall.marked.includes('ARCHIVED-PRICE') && !taskCall.marked.includes('OTHER-FOUNDER-PRICE'),
   "…and not the board's own work, an archived item or another founder's", taskCall?.marked);
+check(!!taskCall && ['TOLD-LONG-END', 'TOLD-RECENT-5', 'TOLD-OLD-PRICE'].every((m) => taskCall.marked.includes(m)), 'the task gets what the founder told the board: the newest five in full, and an older one that bears on it', taskCall?.marked);
 
 // 4b. Two readers at once, with an edit between them: a slow reader of the
 // old words finishes last, and nothing of its passages is kept.
