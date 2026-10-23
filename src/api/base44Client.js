@@ -4,7 +4,23 @@ import { SITE_URL } from '@/lib/branding';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Signing in and reading your profile get a time limit (owner, 23 October
+// 2026): Safari sometimes leaves a request unanswered rather than failing it,
+// and the first screen waits on these, so one that hangs left the spinner up
+// for good. A request past the limit is abandoned like a failed one, and the
+// Supabase library retries a sign-in refresh by itself. Nothing else (meetings,
+// exports, saves) is limited here.
+export const SIGN_IN_REQUEST_LIMIT_MS = 10_000;
+const LIMITED = ['/auth/v1/', '/rest/v1/rpc/get_my_profile'];
+function fetchWithLimit(input, init = {}) {
+  const url = typeof input === 'string' ? input : input?.url || String(input);
+  if (!LIMITED.some((part) => url.includes(part)) || typeof AbortSignal?.timeout !== 'function') return fetch(input, init);
+  const limit = AbortSignal.timeout(SIGN_IN_REQUEST_LIMIT_MS);
+  const signal = init.signal && typeof AbortSignal.any === 'function' ? AbortSignal.any([init.signal, limit]) : init.signal || limit;
+  return fetch(input, { ...init, signal });
+}
+
+export const supabase = createClient(supabaseUrl, supabaseKey, { global: { fetch: fetchWithLimit } });
 
 const TABLES = {
   Company: 'companies',
@@ -113,9 +129,16 @@ const entities = Object.fromEntries(
   Object.entries(TABLES).map(([name, table]) => [name, createEntityClient(table)])
 );
 
+// A request that never got an answer (no connection, or past its time limit)
+// isn't the same as "not signed in": the app says it couldn't reach the
+// server instead of showing a signed-in person the logged-out home page.
+const noAnswer = (error) => error?.name === 'AuthRetryableFetchError'
+  || /failed to fetch|fetch failed|network|load failed|abort|timeout|timed out/i.test(`${error?.name || ''} ${error?.message || ''}`);
+const unreachable = () => Object.assign(new Error("Couldn't reach the server"), { unreachable: true });
+
 async function fetchProfile(authUser) {
   const { data: profile, error } = await supabase.rpc('get_my_profile');
-  if (error) throw error;
+  if (error) throw noAnswer(error) ? unreachable() : error;
   return {
     id: authUser.id,
     email: authUser.email,
@@ -129,6 +152,7 @@ async function fetchProfile(authUser) {
 const auth = {
   async me() {
     const { data: { user }, error } = await supabase.auth.getUser();
+    if (error && noAnswer(error)) throw unreachable();
     if (error || !user) {
       const err = new Error('Not authenticated');
       err.status = 401;

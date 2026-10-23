@@ -43,6 +43,7 @@ import AdvisorPage from '@/pages/advisors/AdvisorPage';
 import { AdvisorProfileProvider } from '@/components/advisors/AdvisorProfilePanel';
 import AuthConfirm from '@/pages/AuthConfirm';
 import Account from '@/pages/Account';
+import { Button } from '@/components/ui/button';
 // import CompanySettings from '@/pages/company/CompanySettings';
 
 // Signed out on a page that needs an account: sign in, then come back to it.
@@ -52,8 +53,21 @@ const LoginThenBack = () => {
   return <Navigate to={back === '/' ? '/login' : `/login?returnTo=${encodeURIComponent(back)}`} replace />;
 };
 
+// When the sign-in check couldn't reach the server in time (owner, 23
+// October 2026): said plainly, with a way to try again, instead of a spinner
+// that never ends.
+const CouldNotReach = ({ onRetry }) => (
+  <div className="min-h-screen flex items-center justify-center px-5 sm:px-8 py-16 bg-background">
+    <div role="alert" className="max-w-md w-full bg-card border-2 border-foreground rounded-2xl shadow-[3px_3px_0_hsl(var(--foreground))] p-7 text-center">
+      <h1 className="font-display text-2xl mb-2 text-balance">We couldn't reach Just Ask The Room</h1>
+      <p className="text-muted-foreground mb-6">This is usually a brief connection problem. Nothing you've done is lost.</p>
+      <Button variant="primary" onClick={onRetry} className="px-6">Try again</Button>
+    </div>
+  </div>
+);
+
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, checkUserAuth } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -64,6 +78,9 @@ const AuthenticatedApp = () => {
   }
 
   if (authError) {
+    if (authError.type === 'unreachable') {
+      return <CouldNotReach onRetry={checkUserAuth} />;
+    }
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
